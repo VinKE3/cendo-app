@@ -1,0 +1,23 @@
+# REGLAS DEL PROYECTO (ARQUITECTURA, DISEÑO Y SEGURIDAD)
+
+## 1. Stack Obligatorio
+- Next.js (App Router), TypeScript estricto, Tailwind CSS v4 (`@theme inline` en `globals.css`), shadcn/ui, Drizzle ORM, Zod, React Server Actions.
+
+## 2. Reglas de UI/UX (Estética Linear / Supabase)
+- PROHIBIDO el diseño genérico de IA: Prohibido iniciar con 4 tarjetas cuadradas idénticas arriba o sombras difusas (`shadow-2xl`).
+- PROHIBIDO colores fijos arbitrarios (como `bg-blue-600` o `text-gray-400`). Usa EXCLUSIVAMENTE tokens semánticos (`bg-background`, `bg-card`, `bg-muted`, `text-foreground`, `text-muted-foreground`, `bg-primary`, `text-primary-foreground`, `bg-success`, `bg-warning`, `border-border`).
+- Usa Bento Grids asimétricos, tablas densas y legibles, fuentes `font-mono` para IDs, fechas y cifras numéricas.
+
+## 3. Estándar de Seguridad Universal (Zero Trust)
+- Cero Identidad del Cliente: PROHIBIDO recibir `userId`, `tenantId` o `role` en parámetros de entrada. Se obtienen del payload firmado en `guardedAction`.
+- Validación Estricta: Todo esquema Zod en backend debe terminar en `.strict()`.
+- Prevención de IDOR: Toda consulta en `services/` debe filtrar por `userId` o `tenantId` del contexto autenticado.
+- Variables de Entorno: Validar siempre mediante `import { env } from "@/env"`.
+
+## 4. Separación Estricta de Lógica, UI y Métodos HTTP
+- Componentes UI Puros (`components/`): PROHIBIDO mezclar lógica de negocio o fetching dentro de componentes visuales. Extraer estado complejo y handlers a Custom Hooks en `features/[modulo]/hooks/use-[nombre].ts`.
+- Capa de Servicios (`services/`): Encapsular consultas de Drizzle ORM en `features/[modulo]/services/`.
+- Segregación de APIs por Método HTTP (`api/`): Todo archivo `src/app/api/[recurso]/route.ts` debe ser un enrutador delgado que importe controladores separados desde `features/[modulo]/api/` (`get.ts`, `post.ts`, `patch.ts`, `delete.ts`).
+
+## 5. Progreso
+- Cada cambio relevante debe quedar registrado actualizando `progress.md`.
