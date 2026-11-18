@@ -10,7 +10,7 @@ export type SessionPayload = {
   tenantId?: string;
 };
 
-async function getAuthenticatedContext(): Promise<SessionPayload | null> {
+export async function getAuthenticatedContext(): Promise<SessionPayload | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get("session_token")?.value;
 

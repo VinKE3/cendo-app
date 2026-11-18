@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,8 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Plataforma Web Modular",
-  description: "Arquitectura escalable y segura",
+  title: "CENDO | Centro de Endometriosis y Ginecología Especializada",
+  description:
+    "Plataforma médica de producción — Sede Miraflores, Lima. Director Médico: Dr. Patrick José Jacinto Gomero (CMP 61693 | RNE 38657).",
 };
 
 export default function RootLayout({
@@ -24,10 +26,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className="dark">
+    <html lang="es" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        {children}
-        <Toaster position="top-right" richColors />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+          <Toaster position="top-right" richColors />
+        </ThemeProvider>
       </body>
     </html>
   );

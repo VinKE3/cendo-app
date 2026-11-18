@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { verifySignedPayload, type SessionPayload } from "@/lib/security/crypto";
+import { verifySignedPayload } from "@/lib/security/crypto";
+import type { SessionPayload } from "@/lib/security/action-guard";
 
 const PUBLIC_ROUTES = ["/login", "/register", "/forgot-password", "/api/public"];
 const ADMIN_ROUTES = ["/admin", "/api/admin"];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (
