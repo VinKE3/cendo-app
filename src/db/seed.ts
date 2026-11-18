@@ -1,5 +1,12 @@
 import { db } from "./index";
-import { clinics, labOrderTemplates, profiles } from "./schema";
+import {
+  catalogCategories,
+  clinics,
+  labOrderTemplates,
+  medicationsVademecum,
+  proceduresTariff,
+  profiles,
+} from "./schema";
 import { hashPassword } from "@/lib/security/password";
 
 export const DEFAULT_CLINIC_ID = "00000000-0000-0000-0000-000000000001";
@@ -244,7 +251,289 @@ async function seed() {
       });
   }
 
-  console.log("Seed CENDO completado: sede Miraflores, 3 médicos y 5 plantillas de laboratorio.");
+  const officialTariffs = [
+    {
+      id: "c1000000-0000-0000-0000-000000000001",
+      code: "CONS-ESP",
+      name: "Consulta Médica Ginecológica Especializada",
+      category: "Consulta",
+      description:
+        "Evaluación integral por especialista en ginecología, revisión de antecedentes y plan diagnóstico.",
+      price: "180.00",
+    },
+    {
+      id: "c1000000-0000-0000-0000-000000000002",
+      code: "COLPO-DX",
+      name: "Colposcopía Digital de Alta Resolución IFCPC con Test de Schiller",
+      category: "Procedimiento",
+      description:
+        "Evaluación colposcópica completa con videocámara HD, captura fotográfica y reporte oficial.",
+      price: "250.00",
+    },
+    {
+      id: "c1000000-0000-0000-0000-000000000003",
+      code: "ECO-TV",
+      name: "Ecografía Ginecológica Transvaginal Doppler Color",
+      category: "Ecografía",
+      description:
+        "Estudio ultrasonográfico de alta definición para útero, miometrio, endometrio y reserva ovárica.",
+      price: "180.00",
+    },
+    {
+      id: "c1000000-0000-0000-0000-000000000004",
+      code: "ECO-MAMA",
+      name: "Ecografía Mamaria Bilateral con Clasificación BI-RADS",
+      category: "Ecografía",
+      description: "Mapeo ecográfico de ambas mamas y huecos axilares por cuadrantes.",
+      price: "200.00",
+    },
+    {
+      id: "c1000000-0000-0000-0000-000000000005",
+      code: "BIO-CX",
+      name: "Biopsia de Cérvix Dirigida Tischler + Acondicionamiento de Muestra",
+      category: "Procedimiento",
+      description:
+        "Toma de tejido cervical bajo visión colposcópica directa con hemostasia local.",
+      price: "320.00",
+    },
+    {
+      id: "c1000000-0000-0000-0000-000000000006",
+      code: "PAP-CONV",
+      name: "Papanicolaou Convencional en Base Líquida Bethesda",
+      category: "Laboratorio",
+      description: "Citología exfoliativa en medio líquido con tinción y lectura citopatológica.",
+      price: "80.00",
+    },
+    {
+      id: "c1000000-0000-0000-0000-000000000007",
+      code: "LEEP-CONO",
+      name: "Conización Cervical LEEP / Radiocirugía Bajo Anestesia Local",
+      category: "Procedimiento",
+      description: "Escisión electroquirúrgica con asa diatérmica de la zona de transformación atípica.",
+      price: "1400.00",
+    },
+    {
+      id: "c1000000-0000-0000-0000-000000000008",
+      code: "HDA-ENDO",
+      name: "Histeroscopía Diagnóstica Ambulatoria HD",
+      category: "Procedimiento",
+      description:
+        "Inspección endoscópica del canal endocervical y cavidad endometrial sin anestesia general.",
+      price: "950.00",
+    },
+    {
+      id: "c1000000-0000-0000-0000-000000000009",
+      code: "PAQ-PREV",
+      name: "Chequeo Integral Ginecológico Anual CENDO",
+      category: "Paquete",
+      description:
+        "Incluye: Consulta especializada + Colposcopía digital HD + Ecografía transvaginal + Papanicolaou.",
+      price: "420.00",
+    },
+    {
+      id: "c1000000-0000-0000-0000-000000000010",
+      code: "IMPL-ETONO",
+      name: "Inserción de Implante Anticonceptivo Subdérmico Implanon NXT",
+      category: "Procedimiento",
+      description:
+        "Colocación estéril en cara interna del brazo no dominante con anestesia local.",
+      price: "480.00",
+    },
+  ];
+
+  for (const tariff of officialTariffs) {
+    await db
+      .insert(proceduresTariff)
+      .values({
+        ...tariff,
+        tenantId: DEFAULT_CLINIC_ID,
+        active: true,
+      })
+      .onConflictDoUpdate({
+        target: proceduresTariff.id,
+        set: {
+          code: tariff.code,
+          name: tariff.name,
+          category: tariff.category,
+          description: tariff.description,
+          price: tariff.price,
+          active: true,
+          updatedAt: new Date(),
+        },
+      });
+  }
+
+  const officialMedications = [
+    {
+      id: "c2000000-0000-0000-0000-000000000001",
+      genericName: "Dienogest 2 mg",
+      atcCode: "G03DB08",
+      therapeuticGroup: "Progestágenos / Tratamiento de Endometriosis",
+      commercialBrands: [
+        {
+          brandName: "Visannette",
+          laboratory: "Bayer Healthcare",
+          presentation: "Caja x 28 comprimidos",
+          referencePricePen: 280,
+        },
+        {
+          brandName: "Dienomed",
+          laboratory: "Medifarma",
+          presentation: "Caja x 30 comprimidos",
+          referencePricePen: 195,
+        },
+      ],
+      indications:
+        "Tratamiento de la endometriosis ovárica y pélvica profunda, dismenorrea severa y dolor pélvico crónico.",
+      contraindications:
+        "Trastorno tromboembólico venoso activo, enfermedad hepática severa, embarazo.",
+    },
+    {
+      id: "c2000000-0000-0000-0000-000000000002",
+      genericName: "Ácido Tranexámico 500 mg",
+      atcCode: "B02AA02",
+      therapeuticGroup: "Antifibrinolíticos / Hemostáticos Ginecológicos",
+      commercialBrands: [
+        {
+          brandName: "Transamin",
+          laboratory: "Daiichi Sankyo",
+          presentation: "Caja x 20 tabletas",
+          referencePricePen: 85,
+        },
+        {
+          brandName: "Hemostop",
+          laboratory: "Laboratorios AC Farma",
+          presentation: "Caja x 30 tabletas",
+          referencePricePen: 52,
+        },
+      ],
+      indications:
+        "Hemorragia uterina anormal (HUA-O / HUA-A), hipermenorrea por adenomiosis o miomatosis.",
+      contraindications:
+        "Antecedente de trombosis arterial o venosa, insuficiencia renal severa.",
+    },
+    {
+      id: "c2000000-0000-0000-0000-000000000003",
+      genericName: "Metronidazol 500 mg + Miconazol 100 mg",
+      atcCode: "G01AF20",
+      therapeuticGroup: "Antiinfecciosos y Antisépticos Ginecológicos",
+      commercialBrands: [
+        {
+          brandName: "Ginedazol",
+          laboratory: "Laboratorios Roemmers",
+          presentation: "Caja x 10 óvulos vaginales",
+          referencePricePen: 48,
+        },
+      ],
+      indications:
+        "Tratamiento tópico de vulvovaginitis mixta (vaginosis bacteriana y candidiasis vulvovaginal).",
+      contraindications:
+        "Primer trimestre de gestación, hipersensibilidad a los derivados imidazólicos.",
+    },
+    {
+      id: "c2000000-0000-0000-0000-000000000004",
+      genericName: "Ácido Mefenámico 500 mg",
+      atcCode: "M01AG01",
+      therapeuticGroup: "Antiinflamatorios No Esteroides (AINES)",
+      commercialBrands: [
+        {
+          brandName: "Ponstan",
+          laboratory: "Pfizer",
+          presentation: "Caja x 20 tabletas",
+          referencePricePen: 65,
+        },
+      ],
+      indications:
+        "Manejo del dolor agudo en dismenorrea primaria y secundaria por endometriosis.",
+      contraindications:
+        "Úlcera péptica activa, hipersensibilidad al ácido acetilsalicílico u otros AINES.",
+    },
+    {
+      id: "c2000000-0000-0000-0000-000000000005",
+      genericName: "Levonorgestrel 75 mg (Implante Subdérmico Jadelle x 2 varillas)",
+      atcCode: "G03AC03",
+      therapeuticGroup: "Anticonceptivos de Larga Duración (LARC)",
+      commercialBrands: [
+        {
+          brandName: "Jadelle",
+          laboratory: "Bayer Healthcare",
+          presentation: "Caja con 2 implantes subdérmicos + trocar",
+          referencePricePen: 420,
+        },
+      ],
+      indications: "Anticoncepción de larga duración hasta por 5 años continuos.",
+      contraindications:
+        "Embarazo conocido o sospechado, enfermedad arterial severa activa.",
+    },
+  ];
+
+  for (const med of officialMedications) {
+    await db
+      .insert(medicationsVademecum)
+      .values({
+        ...med,
+        tenantId: DEFAULT_CLINIC_ID,
+      })
+      .onConflictDoUpdate({
+        target: medicationsVademecum.id,
+        set: {
+          genericName: med.genericName,
+          atcCode: med.atcCode,
+          therapeuticGroup: med.therapeuticGroup,
+          commercialBrands: med.commercialBrands,
+          indications: med.indications,
+          contraindications: med.contraindications,
+          updatedAt: new Date(),
+        },
+      });
+  }
+
+  const initialCategories = [
+    { id: "c3000000-0000-0000-0000-000000000001", scope: "tariff", name: "Consulta" },
+    { id: "c3000000-0000-0000-0000-000000000002", scope: "tariff", name: "Procedimiento" },
+    { id: "c3000000-0000-0000-0000-000000000003", scope: "tariff", name: "Ecografía" },
+    { id: "c3000000-0000-0000-0000-000000000004", scope: "tariff", name: "Laboratorio" },
+    { id: "c3000000-0000-0000-0000-000000000005", scope: "tariff", name: "Paquete" },
+    {
+      id: "c3000000-0000-0000-0000-000000000011",
+      scope: "vademecum",
+      name: "Progestágenos / Tratamiento de Endometriosis",
+    },
+    {
+      id: "c3000000-0000-0000-0000-000000000012",
+      scope: "vademecum",
+      name: "Antifibrinolíticos / Hemostáticos Ginecológicos",
+    },
+    {
+      id: "c3000000-0000-0000-0000-000000000013",
+      scope: "vademecum",
+      name: "Antiinfecciosos y Antisépticos Ginecológicos",
+    },
+    {
+      id: "c3000000-0000-0000-0000-000000000014",
+      scope: "vademecum",
+      name: "Antiinflamatorios No Esteroides (AINES)",
+    },
+    {
+      id: "c3000000-0000-0000-0000-000000000015",
+      scope: "vademecum",
+      name: "Anticonceptivos de Larga Duración (LARC)",
+    },
+  ];
+
+  for (const cat of initialCategories) {
+    await db
+      .insert(catalogCategories)
+      .values({
+        ...cat,
+        tenantId: DEFAULT_CLINIC_ID,
+      })
+      .onConflictDoNothing();
+  }
+
+  console.log(
+    "Seed CENDO completado: sede Miraflores, 3 médicos, 5 plantillas, 10 tarifas, 5 fármacos y categorías."
+  );
   process.exit(0);
 }
 

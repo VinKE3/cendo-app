@@ -11,11 +11,12 @@ export function ThemeToggle() {
   return (
     <Button
       type="button"
-      variant="outline"
-      size="icon"
+      variant="ghost"
+      size="icon-sm"
       onClick={() => setTheme(isDark ? "light" : "dark")}
       aria-label="Cambiar tema visual"
       title={isDark ? "Cambiar a modo clínico claro" : "Cambiar a modo oscuro"}
+      className="text-muted-foreground hover:text-foreground"
     >
       <Sun className="size-4 scale-100 rotate-0 transition-transform dark:scale-0 dark:-rotate-90" />
       <Moon className="absolute size-4 scale-0 rotate-90 transition-transform dark:scale-100 dark:rotate-0" />

@@ -109,3 +109,24 @@ export const labOrderTemplates = pgTable(
     index("idx_lab_templates_tenant_category").on(table.tenantId, table.category),
   ]
 );
+
+export const catalogCategories = pgTable(
+  "catalog_categories",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => clinics.id, { onDelete: "cascade" }),
+    scope: varchar("scope", { length: 30 }).notNull(),
+    name: text("name").notNull(),
+    createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+    updatedBy: uuid("updated_by").references(() => profiles.id, { onDelete: "set null" }),
+    ...auditColumns,
+  },
+  (table) => [
+    uniqueIndex("idx_catalog_categories_tenant_scope_name")
+      .on(table.tenantId, table.scope, sql`LOWER(TRIM(${table.name}))`)
+      .where(sql`${table.deletedAt} IS NULL`),
+    index("idx_catalog_categories_tenant_scope").on(table.tenantId, table.scope),
+  ]
+);

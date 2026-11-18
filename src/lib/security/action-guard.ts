@@ -4,6 +4,13 @@ import { verifySignedPayload } from "./crypto";
 
 export type UserRole = "user" | "admin" | "moderator";
 
+export class DomainError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DomainError";
+  }
+}
+
 export type SessionPayload = {
   userId: string;
   role: UserRole;
@@ -46,6 +53,9 @@ export async function guardedAction<TInput, TOutput>(options: {
     } catch (err: unknown) {
       if (err instanceof z.ZodError) {
         return { success: false, error: "Datos de entrada inválidos", details: err.flatten() };
+      }
+      if (err instanceof DomainError) {
+        return { success: false, error: err.message };
       }
       console.error("[Guarded Action Error]:", err);
       return { success: false, error: "Error interno al procesar la solicitud." };

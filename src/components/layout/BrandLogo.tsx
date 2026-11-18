@@ -1,9 +1,10 @@
 import { cn } from "@/lib/utils";
 
 interface BrandLogoProps {
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
   inverted?: boolean;
   showText?: boolean;
+  layout?: "horizontal" | "vertical";
   className?: string;
 }
 
@@ -11,28 +12,43 @@ export function BrandLogo({
   size = "md",
   inverted = false,
   showText = true,
+  layout = "horizontal",
   className,
 }: BrandLogoProps) {
   const iconDimensions = {
-    sm: "size-8",
-    md: "size-10",
-    lg: "size-13",
+    sm: "size-9",
+    md: "size-12",
+    lg: "size-16",
+    xl: "size-20",
   }[size];
 
   const titleClass = {
-    sm: "text-lg font-bold tracking-tight",
-    md: "text-2xl font-bold tracking-tight",
-    lg: "text-3xl font-bold tracking-tight",
+    sm: "text-xl leading-none",
+    md: "text-2xl leading-none",
+    lg: "text-3xl leading-none",
+    xl: "text-4xl leading-none",
   }[size];
 
   const subtitleClass = {
-    sm: "text-[9px] font-semibold tracking-wider",
-    md: "text-[10px] font-semibold tracking-widest",
-    lg: "text-xs font-semibold tracking-widest",
+    sm: "text-[6.5px] tracking-[0.12em]",
+    md: "text-[8px] tracking-[0.14em]",
+    lg: "text-[10px] tracking-[0.15em]",
+    xl: "text-xs tracking-[0.15em]",
   }[size];
 
+  const primaryFill = inverted ? "var(--primary-foreground)" : "var(--primary)";
+  const blueCrescentFill = inverted
+    ? "color-mix(in oklch, var(--primary-foreground), transparent 12%)"
+    : "var(--primary)";
+
   return (
-    <div className={cn("inline-flex items-center gap-3 select-none", className)}>
+    <div
+      className={cn(
+        "inline-flex items-center select-none",
+        layout === "vertical" ? "flex-col gap-2 text-center" : "gap-3.5",
+        className
+      )}
+    >
       <div className={cn("relative flex shrink-0 items-center justify-center", iconDimensions)}>
         <svg
           viewBox="0 0 100 100"
@@ -41,69 +57,80 @@ export function BrandLogo({
           className="size-full transition-transform duration-200 hover:scale-105"
           aria-hidden="true"
         >
-          <circle
-            cx="50"
-            cy="50"
-            r="46"
-            fill={inverted ? "var(--primary-foreground)" : "var(--primary)"}
-            fillOpacity={inverted ? "0.1" : "0.08"}
-          />
+          {/* Media luna superior derecha en ámbar institucional (círculos excéntricos oficiales) */}
           <path
-            d="M 22 75 A 38 38 0 1 1 82 32"
-            stroke={inverted ? "var(--primary-foreground)" : "var(--primary)"}
-            strokeWidth="5.5"
-            strokeLinecap="round"
-          />
-          <path
-            d="M 78 40 A 34 34 0 0 1 35 83"
-            stroke="var(--warning)"
-            strokeWidth="4"
-            strokeLinecap="round"
-            strokeDasharray="4 1"
-          />
-          <path
-            d="M 50 28 C 42 38 38 48 38 58 C 38 66 43 72 50 72 C 57 72 62 66 62 58 C 62 48 58 38 50 28 Z"
-            fill={inverted ? "var(--primary-foreground)" : "var(--primary)"}
-            fillOpacity="0.92"
-          />
-          <path
-            d="M 45 42 C 34 39 28 47 31 54 C 33 59 38 61 43 55 Z"
+            d="M 13.80 32.57 A 41.13 41.13 0 1 1 84.05 70.03 A 40.03 40.03 0 1 0 13.80 32.57 Z"
             fill="var(--warning)"
-            fillOpacity="0.9"
           />
+
+          {/* Media luna inferior izquierda en azul petróleo (círculos excéntricos oficiales) */}
           <path
-            d="M 55 42 C 66 39 72 47 69 54 C 67 59 62 61 57 55 Z"
-            fill={inverted ? "var(--primary-foreground)" : "var(--primary)"}
-            fillOpacity="0.72"
+            d="M 98.70 55.48 A 49.13 49.13 0 1 1 17.70 12.32 A 47.03 47.03 0 1 0 98.70 55.48 Z"
+            fill={blueCrescentFill}
           />
-          <circle
-            cx="50"
-            cy="54"
-            r="3.2"
-            fill={inverted ? "var(--primary)" : "var(--primary-foreground)"}
+
+          {/* Emblema ginecológico central caligráfico (trazo continuo variable + gota interior) */}
+          <path
+            fillRule="evenodd"
+            fill={primaryFill}
+            d="
+              M 50.00 37.80
+              C 45.60 33.10, 38.20 29.85, 30.80 29.85
+              C 23.60 29.85, 19.50 33.70, 19.50 39.50
+              C 19.50 44.75, 23.40 48.35, 30.00 48.35
+              C 35.20 48.35, 41.45 47.30, 41.45 45.95
+              C 41.45 45.00, 40.40 44.65, 38.80 44.85
+              C 35.80 45.25, 33.20 45.35, 30.70 45.30
+              C 24.80 45.15, 22.00 42.85, 22.00 39.50
+              C 22.00 36.00, 25.40 33.75, 31.30 33.75
+              C 38.70 33.75, 45.30 37.25, 48.10 39.65
+              C 45.00 43.30, 41.45 49.20, 41.45 55.40
+              C 41.45 61.95, 44.80 67.95, 50.00 72.25
+              C 55.20 67.95, 58.55 61.95, 58.55 55.40
+              C 58.55 49.20, 55.00 43.30, 51.90 39.65
+              C 54.70 37.25, 61.30 33.75, 68.70 33.75
+              C 74.60 33.75, 78.00 36.00, 78.00 39.50
+              C 78.00 42.85, 75.20 45.15, 69.30 45.30
+              C 66.80 45.35, 64.20 45.25, 61.20 44.85
+              C 59.60 44.65, 58.55 45.00, 58.55 45.95
+              C 58.55 47.30, 64.80 48.35, 70.00 48.35
+              C 76.60 48.35, 80.50 44.75, 80.50 39.50
+              C 80.50 33.70, 76.40 29.85, 69.20 29.85
+              C 61.80 29.85, 54.40 33.10, 50.00 37.80
+              Z
+              M 50.00 43.75
+              C 46.40 47.75, 45.00 51.60, 45.00 55.60
+              C 45.00 60.20, 46.75 64.45, 50.00 68.20
+              C 53.25 64.45, 55.00 60.20, 55.00 55.60
+              C 55.00 51.60, 53.60 47.75, 50.00 43.75
+              Z
+            "
           />
         </svg>
       </div>
 
       {showText ? (
-        <div className="flex flex-col leading-none">
-          <div className="flex items-center gap-1.5">
-            <span
-              className={cn(
-                "font-heading",
-                titleClass,
-                inverted ? "text-primary-foreground" : "text-primary"
-              )}
-            >
-              CENDO
-            </span>
-            <span className="mb-1 inline-block size-1.5 rounded-full bg-warning" />
-          </div>
+        <div
+          className={cn(
+            "inline-flex flex-col",
+            layout === "vertical" ? "items-center" : "items-start"
+          )}
+        >
           <span
             className={cn(
-              "font-sans uppercase",
+              "font-serif font-bold tracking-[0.02em]",
+              titleClass,
+              inverted ? "text-primary-foreground" : "text-primary"
+            )}
+          >
+            CENDO
+          </span>
+          <span className="my-1 h-[2.5px] w-full bg-warning" />
+          <span
+            className={cn(
+              "font-sans font-medium uppercase",
               subtitleClass,
-              inverted ? "text-primary-foreground/80" : "text-muted-foreground"
+              inverted ? "text-primary-foreground/85" : "text-primary"
             )}
           >
             Centro de Endometriosis

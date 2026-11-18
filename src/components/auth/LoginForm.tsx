@@ -11,7 +11,6 @@ import {
   ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLoginForm } from "@/features/auth/hooks/use-login-form";
@@ -32,11 +31,11 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
   return (
     <div className="w-full max-w-md space-y-6">
       <div className="space-y-2">
-        <Badge variant="secondary" className="gap-1.5 border border-border">
+        <div className="inline-flex items-center gap-1.5 rounded-md border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
           <ShieldCheck className="size-3.5 text-primary" />
           Portal Asistencial Autorizado
-        </Badge>
-        <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+        </div>
+        <h2 className="font-heading text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
           Acceso a Profesionales de la Salud
         </h2>
         <p className="text-sm leading-relaxed text-muted-foreground">
@@ -54,13 +53,13 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
             Correo Electrónico Institucional
           </label>
           <div className="relative">
-            <Mail className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Mail className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               id="email"
               type="email"
               autoComplete="username"
-              placeholder="medico@cendo.pe"
-              className="h-10 bg-card pl-9 font-mono text-sm"
+              placeholder="ej. pjacinto@cendo.pe"
+              className="h-11 rounded-xl bg-card pr-4 pl-10 text-sm"
               aria-invalid={Boolean(errors.email)}
               {...register("email")}
             />
@@ -84,13 +83,13 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
             <ForgotPasswordDialog />
           </div>
           <div className="relative">
-            <Lock className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Lock className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               id="password"
               type={showPassword ? "text" : "password"}
               autoComplete="current-password"
               placeholder="••••••••"
-              className="h-10 bg-card pr-10 pl-9 text-sm"
+              className="h-11 rounded-xl bg-card pr-11 pl-10 text-sm"
               aria-invalid={Boolean(errors.password)}
               {...register("password")}
             />
@@ -125,40 +124,40 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
         <Button
           type="submit"
           size="lg"
-          className="h-10 w-full gap-2 font-semibold"
+          className="mt-2 h-11 w-full gap-2 rounded-xl text-sm font-bold"
           disabled={isSubmitting}
         >
           {isSubmitting ? (
-            <span>Verificando credenciales...</span>
+            <span>Verificando Credenciales...</span>
           ) : (
             <>
               <KeyRound className="size-4 text-warning" />
               <span>Ingresar al Sistema Asistencial CENDO</span>
-              <ArrowRight className="size-4" />
+              <ArrowRight className="size-4 text-primary-foreground/80" />
             </>
           )}
         </Button>
       </form>
 
-      <div className="space-y-1.5 rounded-xl border border-border bg-muted/60 p-3.5 text-xs text-muted-foreground">
-        <div className="flex items-center gap-2 text-[11px] font-semibold tracking-wide text-foreground uppercase">
+      <div className="space-y-1.5 rounded-xl border border-border bg-muted/70 p-3.5 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 text-[11px] font-bold tracking-wide text-foreground uppercase">
           <Building2 className="size-3.5 text-primary" />
           Gestión Centralizada de Accesos
         </div>
         <p className="text-[11px] leading-relaxed">
-          Las cuentas médicas y permisos de atención son administrados por la{" "}
+          Las cuentas médicas y permisos de atención son creados y administrados por la{" "}
           <span className="font-semibold text-foreground">
             Dirección Médica (Dr. Patrick Jacinto)
           </span>
-          . Si requiere un nuevo acceso, contáctese con administración.
+          . Si requiere un nuevo acceso o cambio de clave, contáctese con administración.
         </p>
       </div>
 
-      <div className="flex items-center gap-2.5 rounded-xl border border-success/30 bg-success/10 p-3 text-[11px] text-foreground">
+      <div className="flex items-center gap-2.5 rounded-xl border border-success/25 bg-success/5 p-3 text-[11px] text-foreground">
         <ShieldCheck className="size-5 shrink-0 text-success" />
         <span>
-          Cumplimiento de la <span className="font-semibold">Ley N° 29733</span>{" "}
-          (Protección de Datos Personales en Salud) y normativa{" "}
+          Cumplimiento estricto de la <span className="font-semibold">Ley N° 29733</span>{" "}
+          (Protección de Datos Personales en Salud en el Perú) y normativa{" "}
           <span className="font-semibold">SUSALUD</span>.
         </span>
       </div>
