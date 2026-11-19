@@ -21,6 +21,7 @@ export interface AuthenticatedDoctor {
   contactEmail: string;
   avatarUrl: string | null;
   signatureUrl: string | null;
+  showSignatureByDefault: boolean;
 }
 
 function normalizeUserRole(role: string): UserRole {
@@ -76,6 +77,7 @@ export async function authenticateDoctorByCredentials(
     contactEmail: row.profile.contactEmail,
     avatarUrl: row.profile.avatarUrl,
     signatureUrl: row.profile.signatureUrl,
+    showSignatureByDefault: row.profile.showSignatureByDefault,
   };
 }
 
@@ -117,5 +119,6 @@ export async function getSessionDoctorProfile(
     contactEmail: profile.contactEmail,
     avatarUrl: profile.avatarUrl,
     signatureUrl: profile.signatureUrl,
+    showSignatureByDefault: profile.showSignatureByDefault,
   };
 }

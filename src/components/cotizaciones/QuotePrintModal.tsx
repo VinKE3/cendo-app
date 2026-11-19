@@ -1,8 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { MessageCircle, Pencil, Printer } from "lucide-react";
 import { CoverPageSwitch } from "@/components/export/CoverPageSwitch";
 import { QuotePrintView } from "@/components/export/QuotePrintView";
+import { SignatureToggleSwitch } from "@/components/export/SignatureToggleSwitch";
+import { useSignatureSettings } from "@/components/providers/SignatureSettingsProvider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -36,6 +39,23 @@ export function QuotePrintModal({
   onEdit,
   onClose,
 }: QuotePrintModalProps) {
+  const { getSignatureForDoctor } = useSignatureSettings();
+  const sigInfo = quote
+    ? getSignatureForDoctor(quote.doctorId, null)
+    : getSignatureForDoctor(null, null);
+
+  const [signatureOverride, setSignatureOverride] = useState<{
+    docId: string;
+    value: boolean;
+  } | null>(null);
+
+  const effectiveShowSignature =
+    quote && sigInfo.hasSignature
+      ? signatureOverride?.docId === quote.id
+        ? signatureOverride.value
+        : sigInfo.showByDefault
+      : false;
+
   return (
     <Dialog
       open={Boolean(quote)}
@@ -53,14 +73,25 @@ export function QuotePrintModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2">
-          <CoverPageSwitch
-            checked={showCoverPage}
-            onCheckedChange={onShowCoverPageChange}
-          />
+        <div className="space-y-2.5 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+          <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
+            <CoverPageSwitch
+              checked={showCoverPage}
+              onCheckedChange={onShowCoverPageChange}
+            />
+            <SignatureToggleSwitch
+              checked={effectiveShowSignature}
+              onCheckedChange={(checked) => {
+                if (!quote) return;
+                setSignatureOverride({ docId: quote.id, value: checked });
+              }}
+              hasSignature={sigInfo.hasSignature}
+              isOwnDocument={sigInfo.isOwnDocument}
+            />
+          </div>
 
           {quote ? (
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               <Button
                 type="button"
                 variant="outline"
@@ -124,6 +155,8 @@ export function QuotePrintModal({
               quote={quote}
               patient={patient}
               showCoverPage={showCoverPage}
+              signatureSrc={sigInfo.signatureSrc}
+              showDigitalSignature={effectiveShowSignature}
             />
           </div>
         ) : null}

@@ -66,6 +66,7 @@ export function printHtmlElement(elementId: string, documentTitle = "Informe CEN
     .join("\n");
 
   const safeTitle = escapeHtml(documentTitle);
+  const baseHref = escapeHtml(`${window.location.origin}/`);
 
   printWindow.document.open();
   printWindow.document.write(`<!DOCTYPE html>
@@ -73,6 +74,7 @@ export function printHtmlElement(elementId: string, documentTitle = "Informe CEN
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="${baseHref}" />
     <title>${safeTitle}</title>
     ${styleNodes}
     <style>
@@ -130,8 +132,6 @@ export function printHtmlElement(elementId: string, documentTitle = "Informe CEN
     <div id="print-root">${sourceElement.innerHTML}</div>
   </body>
 </html>`);
-  printWindow.document.close();
-
   let hasPrinted = false;
   const triggerPrint = () => {
     if (hasPrinted) return;
@@ -140,10 +140,45 @@ export function printHtmlElement(elementId: string, documentTitle = "Informe CEN
     printWindow.print();
   };
 
-  printWindow.onload = () => {
-    setTimeout(triggerPrint, 250);
+  const waitForImagesAndPrint = async () => {
+    const images = Array.from(printWindow.document.images);
+    if (images.length > 0) {
+      await Promise.all(
+        images.map(
+          (img) =>
+            new Promise<void>((resolve) => {
+              const finish = () => {
+                if (typeof img.decode === "function") {
+                  img
+                    .decode()
+                    .catch(() => undefined)
+                    .finally(resolve);
+                } else {
+                  resolve();
+                }
+              };
+              if (img.complete) {
+                finish();
+              } else {
+                img.addEventListener("load", finish, { once: true });
+                img.addEventListener("error", () => resolve(), { once: true });
+              }
+            })
+        )
+      );
+    }
+    setTimeout(triggerPrint, 120);
   };
-  setTimeout(triggerPrint, 900);
+
+  printWindow.onload = () => {
+    void waitForImagesAndPrint();
+  };
+
+  printWindow.document.close();
+  if (printWindow.document.readyState === "complete") {
+    void waitForImagesAndPrint();
+  }
+  setTimeout(triggerPrint, 2500);
 
   return true;
 }

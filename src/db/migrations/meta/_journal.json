@@ -15,6 +15,13 @@
       "when": 1795021383266,
       "tag": "0001_blue_colonel_america",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795056843968,
+      "tag": "0002_curvy_alice",
+      "breakpoints": true
     }
   ]
 }

@@ -3,7 +3,9 @@
 import { AlertTriangle, Calendar } from "lucide-react";
 import { CendoCoverPage } from "@/components/export/CendoCoverPage";
 import { CendoFooterWave } from "@/components/export/CendoFooterWave";
+import { CendoSignatureBlock } from "@/components/export/CendoSignatureBlock";
 import { BrandLogo } from "@/components/layout/BrandLogo";
+import { useSignatureSettings } from "@/components/providers/SignatureSettingsProvider";
 import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
 import type { MedicalPrescriptionItem } from "@/features/recetas/recetas.schema";
 import { cn, formatPeruDateDisplay } from "@/lib/utils";
@@ -19,6 +21,8 @@ interface PrescriptionPrintViewProps {
   clinicPhone?: string;
   showCoverPage?: boolean;
   paperFormat?: PrescriptionPaperFormat;
+  signatureSrc?: string | null;
+  showDigitalSignature?: boolean;
 }
 
 function hasPositiveAllergy(value?: string | null): boolean {
@@ -42,7 +46,21 @@ export function PrescriptionPrintView({
   clinicPhone = "985 945 697",
   showCoverPage = true,
   paperFormat = "A4",
+  signatureSrc,
+  showDigitalSignature,
 }: PrescriptionPrintViewProps) {
+  const { getSignatureForDoctor } = useSignatureSettings();
+  const resolvedSig = getSignatureForDoctor(
+    prescription.doctorId,
+    prescription.doctorCmp
+  );
+  const resolvedSignatureSrc =
+    signatureSrc !== undefined ? signatureSrc : resolvedSig.signatureSrc;
+  const resolvedShowDigitalSignature =
+    showDigitalSignature !== undefined
+      ? showDigitalSignature
+      : resolvedSig.showByDefault;
+
   const credentials = [
     prescription.doctorCmp ? `CMP ${prescription.doctorCmp}` : "",
     prescription.doctorRne ? `RNE ${prescription.doctorRne}` : "",
@@ -275,19 +293,14 @@ export function PrescriptionPrintView({
               <p>Ley General de Salud N° 26842 • Sistema Clínico CENDO Miraflores</p>
             </div>
 
-            <div className="min-w-[210px] space-y-0.5 text-center">
-              <div className="flex h-9 items-center justify-center border-b border-border">
-                <span className="font-serif text-sm font-bold italic text-primary select-none">
-                  {prescription.doctorName}
-                </span>
-              </div>
-              <p className="text-[11px] font-bold text-foreground uppercase">
-                {prescription.doctorName}
-              </p>
-              <p className="font-mono text-[9.5px] font-semibold text-muted-foreground">
-                {credentials || "CMP 61693 • RNE 38657"}
-              </p>
-            </div>
+            <CendoSignatureBlock
+              doctorName={prescription.doctorName}
+              doctorSpecialty={resolvedSig.doctorSpecialty}
+              doctorCredentials={credentials || "CMP 61693 • RNE 38657"}
+              signatureSrc={resolvedSignatureSrc}
+              showDigitalSignature={resolvedShowDigitalSignature}
+              compact={isA5}
+            />
           </div>
         </div>
 

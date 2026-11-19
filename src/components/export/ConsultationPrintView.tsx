@@ -2,7 +2,9 @@
 
 import { CendoCoverPage } from "@/components/export/CendoCoverPage";
 import { CendoFooterWave } from "@/components/export/CendoFooterWave";
+import { CendoSignatureBlock } from "@/components/export/CendoSignatureBlock";
 import { BrandLogo } from "@/components/layout/BrandLogo";
+import { useSignatureSettings } from "@/components/providers/SignatureSettingsProvider";
 import type { MedicalConsultationItem } from "@/features/consultas/consultas.schema";
 import type { LabOrderItem } from "@/features/laboratorio/laboratorio.schema";
 import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
@@ -18,6 +20,8 @@ interface ConsultationPrintViewProps {
   clinicEmail?: string;
   clinicPhone?: string;
   showCoverPage?: boolean;
+  signatureSrc?: string | null;
+  showDigitalSignature?: boolean;
 }
 
 export function ConsultationPrintView({
@@ -29,7 +33,21 @@ export function ConsultationPrintView({
   clinicEmail = "cendoperu@gmail.com",
   clinicPhone = "985 945 697",
   showCoverPage = true,
+  signatureSrc,
+  showDigitalSignature,
 }: ConsultationPrintViewProps) {
+  const { getSignatureForDoctor } = useSignatureSettings();
+  const resolvedSig = getSignatureForDoctor(
+    consultation.doctorId,
+    consultation.doctorCmp
+  );
+  const resolvedSignatureSrc =
+    signatureSrc !== undefined ? signatureSrc : resolvedSig.signatureSrc;
+  const resolvedShowDigitalSignature =
+    showDigitalSignature !== undefined
+      ? showDigitalSignature
+      : resolvedSig.showByDefault;
+
   const credentials = [
     consultation.doctorCmp ? `CMP ${consultation.doctorCmp}` : "",
     consultation.doctorRne ? `RNE ${consultation.doctorRne}` : "",
@@ -330,14 +348,15 @@ export function ConsultationPrintView({
         {/* Firma médica y Cenefa CENDO */}
         <div>
           <div className="px-[14mm] pb-4 text-right">
-            <div className="inline-block border-t border-border pt-2 text-right">
-              <p className="text-xs font-bold text-primary uppercase">
-                {consultation.doctorName}
-              </p>
-              <p className="font-mono text-[10px] text-muted-foreground">
-                {credentials || "CMP 61693 • RNE 38657"}
-              </p>
-            </div>
+            <CendoSignatureBlock
+              doctorName={consultation.doctorName}
+              doctorSpecialty={resolvedSig.doctorSpecialty}
+              doctorCredentials={credentials || "CMP 61693 • RNE 38657"}
+              signatureSrc={resolvedSignatureSrc}
+              showDigitalSignature={resolvedShowDigitalSignature}
+              align="right"
+              showSalutation
+            />
           </div>
           <CendoFooterWave
             address={clinicAddress}

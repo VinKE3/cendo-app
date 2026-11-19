@@ -1,8 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { Printer } from "lucide-react";
 import { CoverPageSwitch } from "@/components/export/CoverPageSwitch";
 import { ConsultationPrintView } from "@/components/export/ConsultationPrintView";
+import { SignatureToggleSwitch } from "@/components/export/SignatureToggleSwitch";
+import { useSignatureSettings } from "@/components/providers/SignatureSettingsProvider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -37,6 +40,23 @@ export function ConsultationPrintModal({
   onShowCoverPageChange,
   onClose,
 }: ConsultationPrintModalProps) {
+  const { getSignatureForDoctor } = useSignatureSettings();
+  const sigInfo = consultation
+    ? getSignatureForDoctor(consultation.doctorId, consultation.doctorCmp)
+    : getSignatureForDoctor(null, null);
+
+  const [signatureOverride, setSignatureOverride] = useState<{
+    docId: string;
+    value: boolean;
+  } | null>(null);
+
+  const effectiveShowSignature =
+    consultation && sigInfo.hasSignature
+      ? signatureOverride?.docId === consultation.id
+        ? signatureOverride.value
+        : sigInfo.showByDefault
+      : false;
+
   return (
     <Dialog
       open={Boolean(consultation)}
@@ -53,25 +73,39 @@ export function ConsultationPrintModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2">
-          <CoverPageSwitch
-            checked={showCoverPage}
-            onCheckedChange={onShowCoverPageChange}
-          />
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => {
-              if (!consultation) return;
-              printHtmlElement(
-                "consultation-print-sheet",
-                `Consulta_${patient.fullName}_${consultation.consultationDate}`
-              );
-            }}
-          >
-            <Printer className="size-4" />
-            Imprimir / Guardar PDF
-          </Button>
+        <div className="space-y-2.5 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+          <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
+            <CoverPageSwitch
+              checked={showCoverPage}
+              onCheckedChange={onShowCoverPageChange}
+            />
+            <SignatureToggleSwitch
+              checked={effectiveShowSignature}
+              onCheckedChange={(checked) => {
+                if (!consultation) return;
+                setSignatureOverride({ docId: consultation.id, value: checked });
+              }}
+              hasSignature={sigInfo.hasSignature}
+              isOwnDocument={sigInfo.isOwnDocument}
+            />
+          </div>
+
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                if (!consultation) return;
+                printHtmlElement(
+                  "consultation-print-sheet",
+                  `Consulta_${patient.fullName}_${consultation.consultationDate}`
+                );
+              }}
+            >
+              <Printer className="size-4" />
+              Imprimir / Guardar PDF
+            </Button>
+          </div>
         </div>
 
         {consultation ? (
@@ -82,6 +116,8 @@ export function ConsultationPrintModal({
               linkedPrescriptions={linkedPrescriptions}
               linkedLabOrders={linkedLabOrders}
               showCoverPage={showCoverPage}
+              signatureSrc={sigInfo.signatureSrc}
+              showDigitalSignature={effectiveShowSignature}
             />
           </div>
         ) : null}

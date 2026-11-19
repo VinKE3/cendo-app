@@ -1,0 +1,1 @@
+ALTER TABLE "profiles" ADD COLUMN "show_signature_by_default" boolean DEFAULT true NOT NULL;

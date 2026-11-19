@@ -126,6 +126,45 @@ export async function createSignedStorageUrl(params: {
 }
 
 /**
+ * Descarga un objeto binario desde un bucket privado de Supabase Storage (solo servidor).
+ */
+export async function downloadPrivateStorageObject(params: {
+  bucket: CendoStorageBucket;
+  path: string;
+}): Promise<{ buffer: ArrayBuffer; contentType: string } | null> {
+  const { baseUrl, secretKey } = getStorageConfig();
+  const normalizedPath = params.path.replace(/^\/+/, "");
+
+  const res = await fetch(`${baseUrl}/storage/v1/object/${params.bucket}/${normalizedPath}`, {
+    method: "GET",
+    headers: buildAuthHeaders(secretKey),
+    cache: "no-store",
+  });
+
+  if (res.status === 404) {
+    return null;
+  }
+
+  if (res.status === 400) {
+    const errText = await res.text();
+    if (errText.toLowerCase().includes("not found") || errText.toLowerCase().includes("object")) {
+      return null;
+    }
+    throw new Error(`Error descargando archivo en ${params.bucket}: ${errText}`);
+  }
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Error descargando archivo en ${params.bucket}: ${errText}`);
+  }
+
+  return {
+    buffer: await res.arrayBuffer(),
+    contentType: res.headers.get("content-type") || "image/png",
+  };
+}
+
+/**
  * Elimina un objeto privado de Supabase Storage.
  */
 export async function deletePrivateStorageObject(params: {

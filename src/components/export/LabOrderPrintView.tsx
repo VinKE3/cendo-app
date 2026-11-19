@@ -3,7 +3,9 @@
 import { FlaskConical, Info, Microscope } from "lucide-react";
 import { CendoCoverPage } from "@/components/export/CendoCoverPage";
 import { CendoFooterWave } from "@/components/export/CendoFooterWave";
+import { CendoSignatureBlock } from "@/components/export/CendoSignatureBlock";
 import { BrandLogo } from "@/components/layout/BrandLogo";
+import { useSignatureSettings } from "@/components/providers/SignatureSettingsProvider";
 import {
   getDefaultInstructionsForTemplateType,
   type LabOrderItem,
@@ -18,6 +20,8 @@ interface LabOrderPrintViewProps {
   clinicEmail?: string;
   clinicPhone?: string;
   showCoverPage?: boolean;
+  signatureSrc?: string | null;
+  showDigitalSignature?: boolean;
 }
 
 export function LabOrderPrintView({
@@ -27,7 +31,21 @@ export function LabOrderPrintView({
   clinicEmail = "cendoperu@gmail.com",
   clinicPhone = "985 945 697",
   showCoverPage = true,
+  signatureSrc,
+  showDigitalSignature,
 }: LabOrderPrintViewProps) {
+  const { getSignatureForDoctor } = useSignatureSettings();
+  const resolvedSig = getSignatureForDoctor(
+    labOrder.doctorId,
+    labOrder.doctorCmp
+  );
+  const resolvedSignatureSrc =
+    signatureSrc !== undefined ? signatureSrc : resolvedSig.signatureSrc;
+  const resolvedShowDigitalSignature =
+    showDigitalSignature !== undefined
+      ? showDigitalSignature
+      : resolvedSig.showByDefault;
+
   const credentials = [
     labOrder.doctorCmp ? `CMP ${labOrder.doctorCmp}` : "",
     labOrder.doctorRne ? `RNE ${labOrder.doctorRne}` : "",
@@ -347,19 +365,13 @@ export function LabOrderPrintView({
               <p>Emitido a través del Sistema Clínico CENDO</p>
             </div>
 
-            <div className="min-w-[210px] space-y-0.5 text-center">
-              <div className="flex h-8 items-center justify-center border-b border-border">
-                <span className="font-serif text-sm font-bold italic text-primary select-none">
-                  {labOrder.doctorName}
-                </span>
-              </div>
-              <p className="text-[11px] font-bold text-foreground uppercase">
-                {labOrder.doctorName}
-              </p>
-              <p className="font-mono text-[9.5px] font-semibold text-muted-foreground">
-                {credentials || "CMP 61693 • RNE 38657"}
-              </p>
-            </div>
+            <CendoSignatureBlock
+              doctorName={labOrder.doctorName}
+              doctorSpecialty={resolvedSig.doctorSpecialty}
+              doctorCredentials={credentials || "CMP 61693 • RNE 38657"}
+              signatureSrc={resolvedSignatureSrc}
+              showDigitalSignature={resolvedShowDigitalSignature}
+            />
           </div>
 
           <CendoFooterWave

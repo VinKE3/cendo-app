@@ -59,6 +59,7 @@ export const profiles = pgTable(
     contactEmail: text("contact_email").default("cendoperu@gmail.com").notNull(),
     avatarUrl: text("avatar_url"),
     signatureUrl: text("signature_url"),
+    showSignatureByDefault: boolean("show_signature_by_default").default(true).notNull(),
     isActive: boolean("is_active").default(true).notNull(),
     ...auditColumns,
   },

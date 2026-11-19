@@ -1,11 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import { MessageCircle, Pencil, Printer } from "lucide-react";
 import { CoverPageSwitch } from "@/components/export/CoverPageSwitch";
 import {
   PrescriptionPrintView,
   type PrescriptionPaperFormat,
 } from "@/components/export/PrescriptionPrintView";
+import { SignatureToggleSwitch } from "@/components/export/SignatureToggleSwitch";
+import { useSignatureSettings } from "@/components/providers/SignatureSettingsProvider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -45,6 +48,23 @@ export function PrescriptionPrintModal({
   onEdit,
   onClose,
 }: PrescriptionPrintModalProps) {
+  const { getSignatureForDoctor } = useSignatureSettings();
+  const sigInfo = prescription
+    ? getSignatureForDoctor(prescription.doctorId, prescription.doctorCmp)
+    : getSignatureForDoctor(null, null);
+
+  const [signatureOverride, setSignatureOverride] = useState<{
+    docId: string;
+    value: boolean;
+  } | null>(null);
+
+  const effectiveShowSignature =
+    prescription && sigInfo.hasSignature
+      ? signatureOverride?.docId === prescription.id
+        ? signatureOverride.value
+        : sigInfo.showByDefault
+      : false;
+
   return (
     <Dialog
       open={Boolean(prescription)}
@@ -61,13 +81,24 @@ export function PrescriptionPrintModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2">
-          <div className="flex flex-wrap items-center gap-3">
+        <div className="space-y-2.5 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+          <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
             <CoverPageSwitch
               checked={showCoverPage}
               onCheckedChange={onShowCoverPageChange}
             />
+            <SignatureToggleSwitch
+              checked={effectiveShowSignature}
+              onCheckedChange={(checked) => {
+                if (!prescription) return;
+                setSignatureOverride({ docId: prescription.id, value: checked });
+              }}
+              hasSignature={sigInfo.hasSignature}
+              isOwnDocument={sigInfo.isOwnDocument}
+            />
+          </div>
 
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="inline-flex items-center rounded-md border border-border bg-card p-0.5 text-xs">
               {(["A4", "A5"] as const).map((fmt) => (
                 <button
@@ -84,10 +115,9 @@ export function PrescriptionPrintModal({
                 </button>
               ))}
             </div>
-          </div>
 
-          {prescription ? (
-            <div className="flex flex-wrap items-center gap-2">
+            {prescription ? (
+              <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
                 variant="outline"
@@ -142,6 +172,7 @@ export function PrescriptionPrintModal({
               </Button>
             </div>
           ) : null}
+          </div>
         </div>
 
         {prescription ? (
@@ -152,6 +183,8 @@ export function PrescriptionPrintModal({
               patientAllergies={patientAllergies}
               showCoverPage={showCoverPage}
               paperFormat={paperFormat}
+              signatureSrc={sigInfo.signatureSrc}
+              showDigitalSignature={effectiveShowSignature}
             />
           </div>
         ) : null}

@@ -11,6 +11,7 @@ import {
   LogOut,
   Pill,
   Receipt,
+  Settings,
   UserCheck,
   Users,
 } from "lucide-react";
@@ -90,6 +91,7 @@ function SidebarContent({
       badge: "Staff",
       adminOnly: true,
     },
+    { name: "Configuración & Firma", href: "/configuracion", icon: Settings },
   ].filter((item) => !item.adminOnly || doctor.role === "admin");
 
   const collapsed = !isMobile && isCollapsed;
