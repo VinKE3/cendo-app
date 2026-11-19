@@ -1,6 +1,7 @@
 import {
   boolean,
   index,
+  integer,
   jsonb,
   numeric,
   pgTable,
@@ -128,5 +129,36 @@ export const catalogCategories = pgTable(
       .on(table.tenantId, table.scope, sql`LOWER(TRIM(${table.name}))`)
       .where(sql`${table.deletedAt} IS NULL`),
     index("idx_catalog_categories_tenant_scope").on(table.tenantId, table.scope),
+  ]
+);
+
+export const clinicalTemplates = pgTable(
+  "clinical_templates",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => clinics.id, { onDelete: "cascade" }),
+    scope: varchar("scope", { length: 40 }).notNull(),
+    subType: varchar("sub_type", { length: 40 }),
+    code: varchar("code", { length: 64 }).notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    payload: jsonb("payload").$type<Record<string, unknown>>().default({}).notNull(),
+    isOfficial: boolean("is_official").default(false).notNull(),
+    sortOrder: integer("sort_order").default(0).notNull(),
+    createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+    updatedBy: uuid("updated_by").references(() => profiles.id, { onDelete: "set null" }),
+    ...auditColumns,
+  },
+  (table) => [
+    uniqueIndex("idx_clinical_templates_tenant_scope_code")
+      .on(table.tenantId, table.scope, sql`LOWER(TRIM(${table.code}))`)
+      .where(sql`${table.deletedAt} IS NULL`),
+    index("idx_clinical_templates_tenant_scope_order").on(
+      table.tenantId,
+      table.scope,
+      table.sortOrder
+    ),
   ]
 );

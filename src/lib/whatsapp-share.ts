@@ -1,6 +1,5 @@
 import { getDefaultInstructionsForTemplateType } from "@/features/laboratorio/laboratorio.schema";
 import {
-  generateGoogleCalendarUrl,
   type CalendarClinicInfo,
   type CalendarExportAppointment,
 } from "@/lib/calendar-export";
@@ -49,37 +48,83 @@ export function generateAppointmentReminderWhatsAppUrl(
     appt.appointmentType ||
     "Consulta Ginecológica Especializada";
 
-  const shortCalendarUrl = generateGoogleCalendarUrl(appt, clinicInfo, {
-    compact: true,
-  });
-  const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(address)}`;
+  const customShortMaps = clinicInfo?.googleMapsUrl?.trim();
+  const mapsUrl =
+    customShortMaps && /^https?:\/\//i.test(customShortMaps)
+      ? customShortMaps
+      : `https://maps.google.com/?q=${encodeURIComponent(address)}`;
 
   const message = [
     `👋 *Recordatorio de Cita Médica • CENDO*`,
     ``,
-    `Estimada *${appt.patientName}*, le recordamos su próxima cita con *${appt.doctorName}*:`,
+    `Estimada *${appt.patientName}*, le confirmamos su cita con *${appt.doctorName}*:`,
     ``,
     `🗓 *Fecha:* *${formattedDate}*`,
-    `⏰ *Hora:* *${timeText}* (Duración aprox: ${duration} min)`,
+    `⏰ *Hora:* *${timeText}* (${duration} min)`,
     `🩺 *Motivo:* ${reasonLabel}`,
     ``,
-    `📍 *Dirección de Atención:*`,
-    `${address}`,
-    `🗺️ *Ver ubicación en Google Maps:*`,
-    mapsUrl,
+    `📍 *Dirección:* ${address}`,
+    `🗺️ *Ubicación Maps:* ${mapsUrl}`,
     ``,
-    `📅 *Añadir a Google Calendar:*`,
-    shortCalendarUrl,
-    ``,
-    `💡 *Recomendaciones para su atención:*`,
-    `• Llegar con 10 minutos de anticipación.`,
-    `• Portar documento de identidad físico y exámenes previos si dispone de ellos.`,
-    `• Si no puede asistir, por favor avisar con 24h de anticipación.`,
-    ``,
-    `📞 *Consultas o reprogramación:* ${phone}`,
-    ``,
-    `_¡Le esperamos en CENDO para brindarle una atención médica de excelencia!_`,
+    `💡 Por favor llegar 10 minutos antes con su documento de identidad.`,
+    `📞 *Consultas:* ${phone}`,
   ].join("\n");
+
+  const encoded = encodeURIComponent(message);
+  return targetPhone
+    ? `https://wa.me/${targetPhone}?text=${encoded}`
+    : `https://wa.me/?text=${encoded}`;
+}
+
+export interface TariffWhatsAppItem {
+  code: string;
+  name: string;
+  category: string;
+  price: number;
+  description?: string | null;
+}
+
+export function generateTariffWhatsAppUrl(
+  items: TariffWhatsAppItem[],
+  clinicInfo?: CalendarClinicInfo | null,
+  patientPhone?: string | null
+): string {
+  const targetPhone = cleanPhoneForWhatsApp(patientPhone);
+  const address = clinicInfo?.clinicAddress?.trim() || DEFAULT_CLINIC_ADDRESS;
+  const phone = clinicInfo?.phone?.trim() || DEFAULT_CLINIC_PHONE;
+  const customShortMaps = clinicInfo?.googleMapsUrl?.trim();
+  const mapsUrl =
+    customShortMaps && /^https?:\/\//i.test(customShortMaps)
+      ? customShortMaps
+      : `https://maps.google.com/?q=${encodeURIComponent(address)}`;
+
+  const lines = items.map(
+    (item, idx) =>
+      `• *${idx + 1}. ${item.name}* [${item.code}]: *${formatCurrency(item.price)}*${
+        item.description?.trim() ? `\n  _${item.description.trim()}_` : ""
+      }`
+  );
+
+  const totalReferencial = items.reduce((acc, item) => acc + Number(item.price || 0), 0);
+
+  const message = [
+    `🏥 *Tarifario de Atención • CENDO Miraflores*`,
+    ``,
+    `Compartimos la información de tarifas solicitada:`,
+    ``,
+    ...lines,
+    items.length > 1
+      ? `\n💰 *Total referencial (${items.length} prestaciones):* *${formatCurrency(totalReferencial)}*`
+      : "",
+    ``,
+    `📍 *Dirección:* ${address}`,
+    `🗺️ *Ubicación:* ${mapsUrl}`,
+    `📞 *Central de Citas:* ${phone}`,
+    ``,
+    `_Tarifas sujetas a vigencia del tarifario institucional CENDO._`,
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const encoded = encodeURIComponent(message);
   return targetPhone

@@ -1,6 +1,11 @@
 import { relations } from "drizzle-orm";
 import { clinicalAuditLogs, clinics, profiles } from "./clinics";
-import { labOrderTemplates, medicationsVademecum, proceduresTariff } from "./catalogs";
+import {
+  clinicalTemplates,
+  labOrderTemplates,
+  medicationsVademecum,
+  proceduresTariff,
+} from "./catalogs";
 import { medicalAppointments, patientBackgrounds, patients } from "./patients";
 import {
   clinicalCheckups,
@@ -23,6 +28,7 @@ export const clinicsRelations = relations(clinics, ({ many }) => ({
   proceduresTariff: many(proceduresTariff),
   medicationsVademecum: many(medicationsVademecum),
   labOrderTemplates: many(labOrderTemplates),
+  clinicalTemplates: many(clinicalTemplates),
   auditLogs: many(clinicalAuditLogs),
 }));
 
@@ -210,5 +216,12 @@ export const wordHistoryDocumentsRelations = relations(wordHistoryDocuments, ({ 
   patient: one(patients, {
     fields: [wordHistoryDocuments.patientId],
     references: [patients.id],
+  }),
+}));
+
+export const clinicalTemplatesRelations = relations(clinicalTemplates, ({ one }) => ({
+  clinic: one(clinics, {
+    fields: [clinicalTemplates.tenantId],
+    references: [clinics.id],
   }),
 }));

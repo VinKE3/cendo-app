@@ -7,6 +7,7 @@ import {
   proceduresTariff,
   profiles,
 } from "./schema";
+import { ensureOfficialClinicalTemplatesSeeded } from "@/features/clinical-templates/services/clinical-templates.service";
 import { hashPassword } from "@/lib/security/password";
 
 export const DEFAULT_CLINIC_ID = "00000000-0000-0000-0000-000000000001";
@@ -531,8 +532,10 @@ async function seed() {
       .onConflictDoNothing();
   }
 
+  await ensureOfficialClinicalTemplatesSeeded(DEFAULT_CLINIC_ID);
+
   console.log(
-    "Seed CENDO completado: sede Miraflores, 3 médicos, 5 plantillas, 10 tarifas, 5 fármacos y categorías."
+    "Seed CENDO completado: sede Miraflores, 3 médicos, 5 plantillas lab, 11 plantillas clínicas, 10 tarifas, 5 fármacos y categorías."
   );
   process.exit(0);
 }

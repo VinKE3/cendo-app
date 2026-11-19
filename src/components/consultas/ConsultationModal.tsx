@@ -1,6 +1,6 @@
 "use client";
 
-import type { BaseSyntheticEvent } from "react";
+import { useState, type BaseSyntheticEvent } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import {
   Activity,
@@ -15,6 +15,12 @@ import {
   Stethoscope,
 } from "lucide-react";
 import { Cie10Autocomplete } from "@/components/common/Cie10Autocomplete";
+import {
+  PatientBackgroundQuickPanel,
+  ViewBackgroundButton,
+} from "@/components/pacientes/PatientBackgroundQuickPanel";
+import type { ColposcopyReportItem } from "@/features/colposcopia/colposcopia.schema";
+import type { UltrasoundReportItem } from "@/features/ecografias/ecografias.schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,7 +41,10 @@ import type {
 } from "@/features/consultas/consultas.schema";
 import type { ConsultationModalFormValues } from "@/features/consultas/hooks/use-consultas";
 import type { LabOrderItem } from "@/features/laboratorio/laboratorio.schema";
-import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
+import type {
+  PatientBackgroundItem,
+  PatientDirectoryItem,
+} from "@/features/pacientes/pacientes.schema";
 import type { MedicalPrescriptionItem } from "@/features/recetas/recetas.schema";
 import { cn, formatPeruDateDisplay } from "@/lib/utils";
 
@@ -43,6 +52,9 @@ interface ConsultationModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   patient: PatientDirectoryItem;
+  background?: PatientBackgroundItem | null;
+  lastUltrasound?: UltrasoundReportItem | null;
+  lastColposcopy?: ColposcopyReportItem | null;
   editingItem: MedicalConsultationItem | null;
   lastConsultation: MedicalConsultationItem | null;
   form: UseFormReturn<ConsultationModalFormValues>;
@@ -94,6 +106,9 @@ export function ConsultationModal({
   open,
   onOpenChange,
   patient,
+  background,
+  lastUltrasound,
+  lastColposcopy,
   editingItem,
   lastConsultation,
   form,
@@ -132,26 +147,45 @@ export function ConsultationModal({
     formState: { errors },
   } = form;
 
+  const [showBackground, setShowBackground] = useState(false);
   const allergyAlert = hasPositiveAllergy(patient.medicalAllergies);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Stethoscope className="size-4 text-primary" />
-            {editingItem
-              ? "Editar Consulta Ginecológica"
-              : "Nueva Consulta Ginecológica Estructurada"}
-          </DialogTitle>
-          <DialogDescription>
-            Paciente: <strong className="text-foreground">{patient.fullName}</strong> •{" "}
-            <span className="font-mono">
-              {patient.documentType} {patient.documentNumber}
-            </span>{" "}
-            • {patient.age} años
-          </DialogDescription>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:pr-8">
+            <div className="space-y-1">
+              <DialogTitle className="flex items-center gap-2">
+                <Stethoscope className="size-4 text-primary" />
+                {editingItem
+                  ? "Editar Consulta Ginecológica"
+                  : "Nueva Consulta Ginecológica Estructurada"}
+              </DialogTitle>
+              <DialogDescription>
+                Paciente:{" "}
+                <strong className="text-foreground">{patient.fullName}</strong> •{" "}
+                <span className="font-mono">
+                  {patient.documentType} {patient.documentNumber}
+                </span>{" "}
+                • {patient.age} años
+              </DialogDescription>
+            </div>
+            <ViewBackgroundButton
+              open={showBackground}
+              onToggle={() => setShowBackground((prev) => !prev)}
+              background={background}
+            />
+          </div>
         </DialogHeader>
+
+        <PatientBackgroundQuickPanel
+          open={showBackground}
+          patient={patient}
+          background={background}
+          lastUltrasound={lastUltrasound}
+          lastColposcopy={lastColposcopy}
+        />
 
         <form id="consultation-form" onSubmit={onSubmit} className="space-y-5">
           {/* Alerta de alergias + resumen última consulta */}

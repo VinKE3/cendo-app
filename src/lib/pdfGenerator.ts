@@ -78,10 +78,14 @@ export function printHtmlElement(
 
   const safeTitle = escapeHtml(documentTitle);
   const baseHref = escapeHtml(`${window.location.origin}/`);
+  const rootFontClasses = document.documentElement.className
+    .split(/\s+/)
+    .filter((cls) => cls && cls !== "dark" && cls !== "light");
+  const safeHtmlClasses = escapeHtml(["light", ...rootFontClasses].join(" "));
 
   printWindow.document.open();
   printWindow.document.write(`<!DOCTYPE html>
-<html lang="es" class="light" style="color-scheme: light;">
+<html lang="es" class="${safeHtmlClasses}" style="color-scheme: light;">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -100,6 +104,19 @@ export function printHtmlElement(
         --warning: #eba419 !important;
         --border: #d5e0e5 !important;
         --muted-foreground: #526875 !important;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        background: #ffffff;
+        color: #0b1b24;
+        font-family: var(--font-inter), "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif !important;
+      }
+      .font-serif {
+        font-family: var(--font-lora), "Lora", Georgia, serif !important;
+      }
+      .font-mono {
+        font-family: var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace !important;
       }
       @page {
         size: ${pageSize};
@@ -130,12 +147,6 @@ export function printHtmlElement(
           page-break-after: avoid !important;
           break-after: avoid !important;
         }
-      }
-      body {
-        margin: 0;
-        padding: 0;
-        background: #ffffff;
-        color: #0b1b24;
       }
     </style>
   </head>

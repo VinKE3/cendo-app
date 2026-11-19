@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 import { PatientDetailView } from "@/components/pacientes/PatientDetailView";
 import { listCategories } from "@/features/catalog-categories/services/catalog-categories.service";
+import { listClinicalTemplates } from "@/features/clinical-templates/services/clinical-templates.service";
 import { listColposcopiesByPatient } from "@/features/colposcopia/services/colposcopia.service";
 import {
   getConsultationFormContext,
@@ -51,9 +52,10 @@ export default async function PacienteDetailPage({
     listLabTemplates(doctor.tenantId),
     listQuotesByPatient(doctor.tenantId, parsedId.data),
   ]);
-  const [ultrasounds, colposcopies] = await Promise.all([
+  const [ultrasounds, colposcopies, clinicalTemplates] = await Promise.all([
     listUltrasoundsByPatient(doctor.tenantId, parsedId.data),
     listColposcopiesByPatient(doctor.tenantId, parsedId.data),
+    listClinicalTemplates(doctor.tenantId),
   ]);
   const consultationFormContext = await getConsultationFormContext(
     doctor.tenantId,
@@ -82,6 +84,7 @@ export default async function PacienteDetailPage({
         initialQuotes={quotes}
         initialUltrasounds={ultrasounds}
         initialColposcopies={colposcopies}
+        initialClinicalTemplates={clinicalTemplates}
         initialTariffs={tariffs}
         consultationFormContext={consultationFormContext}
         canEdit={canEdit}

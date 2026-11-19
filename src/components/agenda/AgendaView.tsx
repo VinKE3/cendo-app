@@ -488,7 +488,7 @@ export function AgendaView({
                           onClick={() =>
                             handleSendWhatsAppReminder(appt, canEdit)
                           }
-                          title="Enviar recordatorio por WhatsApp con Maps y Calendar"
+                          title="Enviar recordatorio corto por WhatsApp con dirección"
                         >
                           <MessageCircle className="size-3" />
                           {appt.reminderSent ? "Reenviar" : "WA"}

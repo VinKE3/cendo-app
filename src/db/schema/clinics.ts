@@ -55,6 +55,7 @@ export const profiles = pgTable(
     clinicAddress: text("clinic_address")
       .default("Av. Alfredo Benavides N° 2975, Of. 405, Miraflores - Lima")
       .notNull(),
+    googleMapsUrl: text("google_maps_url"),
     phone: text("phone").default("985 945 697").notNull(),
     contactEmail: text("contact_email").default("cendoperu@gmail.com").notNull(),
     avatarUrl: text("avatar_url"),

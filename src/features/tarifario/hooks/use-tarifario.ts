@@ -160,6 +160,7 @@ export function useTarifario(
 
   return {
     items: pagination.paginatedItems,
+    allItems: items,
     totalCount: items.length,
     pagination,
     categories: categoryManager.categoryNames,

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, type BaseSyntheticEvent } from "react";
+import { useState, type BaseSyntheticEvent, type FormEvent } from "react";
 import {
   AlertTriangle,
+  BookmarkPlus,
   Camera,
   ChevronDown,
   ChevronUp,
@@ -12,18 +13,33 @@ import {
   Loader2,
   Printer,
   Save,
+  Settings,
   Sparkles,
   Trash2,
 } from "lucide-react";
 import type { DeepPartial, UseFormReturn } from "react-hook-form";
+import { toast } from "sonner";
+import {
+  PatientBackgroundQuickPanel,
+  ViewBackgroundButton,
+} from "@/components/pacientes/PatientBackgroundQuickPanel";
 import type { ClinicalImageRecord } from "@/db/schema/specialty";
+import {
+  colposcopyTemplatePayloadSchema,
+  type ColposcopyClinicalTemplateItem,
+  type ColposcopyTemplatePayload,
+} from "@/features/clinical-templates/clinical-templates.schema";
 import type {
   ColposcopyClassificationResult,
   ColposcopyReportItem,
   CreateColposcopyInput,
 } from "@/features/colposcopia/colposcopia.schema";
 import type { MedicalConsultationItem } from "@/features/consultas/consultas.schema";
-import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
+import type { UltrasoundReportItem } from "@/features/ecografias/ecografias.schema";
+import type {
+  PatientBackgroundItem,
+  PatientDirectoryItem,
+} from "@/features/pacientes/pacientes.schema";
 import { buildClinicalImageViewUrl } from "@/lib/clinical-images";
 import { cn, formatPeruDateDisplay } from "@/lib/utils";
 import { Cie10Autocomplete } from "@/components/common/Cie10Autocomplete";
@@ -45,6 +61,9 @@ interface ColposcopyModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   patient: PatientDirectoryItem;
+  background?: PatientBackgroundItem | null;
+  lastUltrasound?: UltrasoundReportItem | null;
+  lastColposcopy?: ColposcopyReportItem | null;
   editingItem: ColposcopyReportItem | null;
   form: UseFormReturn<CreateColposcopyInput>;
   isSubmitting: boolean;
@@ -53,6 +72,9 @@ interface ColposcopyModalProps {
   consultations: MedicalConsultationItem[];
   watchedValues: DeepPartial<CreateColposcopyInput>;
   classification: ColposcopyClassificationResult;
+  templates: ColposcopyClinicalTemplateItem[];
+  canEditTemplates?: boolean;
+  isSavingTemplate?: boolean;
   scjOptions: readonly string[];
   tzOptions: readonly string[];
   schillerOptions: readonly string[];
@@ -60,6 +82,15 @@ interface ColposcopyModalProps {
   onToggleClockHours: (hours: string[]) => void;
   onToggleBiopsyTaken: (taken: boolean) => void;
   onApplyClassificationSuggestion: () => void;
+  onApplyTemplate: (template: ColposcopyClinicalTemplateItem) => void;
+  onApplyNormalDefaults: () => void;
+  onBuildTemplatePayload: () => ColposcopyTemplatePayload;
+  onSaveAsTemplate: (
+    name: string,
+    description: string,
+    payload: ColposcopyTemplatePayload
+  ) => Promise<boolean>;
+  onOpenTemplatesManager?: () => void;
   onUploadFiles: (files: FileList | null) => Promise<void>;
   onUpdateImageCaption: (index: number, caption: string) => void;
   onRemoveImage: (index: number) => Promise<void>;
@@ -93,6 +124,9 @@ export function ColposcopyModal({
   open,
   onOpenChange,
   patient,
+  background,
+  lastUltrasound,
+  lastColposcopy,
   editingItem,
   form,
   isSubmitting,
@@ -101,6 +135,9 @@ export function ColposcopyModal({
   consultations,
   watchedValues,
   classification,
+  templates,
+  canEditTemplates = false,
+  isSavingTemplate = false,
   scjOptions,
   tzOptions,
   schillerOptions,
@@ -108,6 +145,11 @@ export function ColposcopyModal({
   onToggleClockHours,
   onToggleBiopsyTaken,
   onApplyClassificationSuggestion,
+  onApplyTemplate,
+  onApplyNormalDefaults,
+  onBuildTemplatePayload,
+  onSaveAsTemplate,
+  onOpenTemplatesManager,
   onUploadFiles,
   onUpdateImageCaption,
   onRemoveImage,
@@ -120,6 +162,16 @@ export function ColposcopyModal({
     formState: { errors },
   } = form;
 
+  const [showBackground, setShowBackground] = useState(false);
+  const [pendingApply, setPendingApply] = useState<
+    | { kind: "normal" }
+    | { kind: "template"; template: ColposcopyClinicalTemplateItem }
+    | null
+  >(null);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [tplName, setTplName] = useState("");
+  const [tplDesc, setTplDesc] = useState("");
+
   const [openSections, setOpenSections] = useState({
     normal: false,
     abnormal: true,
@@ -127,6 +179,46 @@ export function ColposcopyModal({
     biopsy: true,
     photos: true,
   });
+
+  const handleClickNormalDefaults = () => {
+    if (editingItem) {
+      setPendingApply({ kind: "normal" });
+      return;
+    }
+    onApplyNormalDefaults();
+  };
+
+  const handleTemplateChipClick = (template: ColposcopyClinicalTemplateItem) => {
+    if (editingItem) {
+      setPendingApply({ kind: "template", template });
+      return;
+    }
+    onApplyTemplate(template);
+  };
+
+  const handleSaveTemplateSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    const cleanName = tplName.trim();
+    if (cleanName.length < 2) {
+      toast.error("Ingrese un nombre de al menos 2 caracteres.");
+      return;
+    }
+    const rawPayload = onBuildTemplatePayload();
+    const parsed = colposcopyTemplatePayloadSchema.safeParse(rawPayload);
+    if (!parsed.success) {
+      toast.error(
+        parsed.error.issues[0]?.message ||
+          "Complete diagnóstico, CIE-10 y plan antes de guardar como plantilla."
+      );
+      return;
+    }
+    const ok = await onSaveAsTemplate(cleanName, tplDesc.trim(), parsed.data);
+    if (ok) {
+      setSaveTemplateOpen(false);
+      setTplName("");
+      setTplDesc("");
+    }
+  };
 
   const toggleSection = (key: keyof typeof openSections) => {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -146,22 +238,100 @@ export function ColposcopyModal({
         : "border-success/40 bg-success/10 text-success";
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-5xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileCheck2 className="size-5 text-primary" />
-            {editingItem
-              ? "Editar Evaluación Colposcópica (IFCPC 2011)"
-              : "Nueva Colposcopía Digital (IFCPC 2011)"}
-          </DialogTitle>
-          <DialogDescription>
-            Paciente: <strong>{patient.fullName}</strong> • {patient.documentType}{" "}
-            {patient.documentNumber} ({patient.age} años)
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-5xl">
+          <DialogHeader>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:pr-8">
+              <div className="space-y-1">
+                <DialogTitle className="flex items-center gap-2">
+                  <FileCheck2 className="size-5 text-primary" />
+                  {editingItem
+                    ? "Editar Evaluación Colposcópica (IFCPC 2011)"
+                    : "Nueva Colposcopía Digital (IFCPC 2011)"}
+                </DialogTitle>
+                <DialogDescription>
+                  Paciente: <strong>{patient.fullName}</strong> •{" "}
+                  {patient.documentType} {patient.documentNumber} ({patient.age}{" "}
+                  años)
+                </DialogDescription>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <ViewBackgroundButton
+                  open={showBackground}
+                  onToggle={() => setShowBackground((prev) => !prev)}
+                  background={background}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleClickNormalDefaults}
+                  title="Marca hallazgos benignos/normales en 1 clic sin modificar fecha ni fotos"
+                >
+                  <Sparkles className="size-3.5" />
+                  Marcar Normales
+                </Button>
+              </div>
+            </div>
+          </DialogHeader>
 
-        <form onSubmit={onSubmit} className="space-y-4">
+          <PatientBackgroundQuickPanel
+            open={showBackground}
+            patient={patient}
+            background={background}
+            lastUltrasound={lastUltrasound}
+            lastColposcopy={lastColposcopy}
+          />
+
+          <form onSubmit={onSubmit} className="space-y-4">
+            {/* Barra de Plantillas Diagnósticas Editables */}
+            <div className="space-y-2 rounded-xl border border-primary/20 bg-primary/5 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-primary uppercase">
+                  <Sparkles className="size-3.5" />
+                  Cargar Plantilla Diagnóstica (1 clic)
+                </span>
+                {canEditTemplates ? (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      onClick={() => setSaveTemplateOpen(true)}
+                      className="bg-card"
+                    >
+                      <BookmarkPlus className="size-3.5 text-primary" />
+                      Guardar como plantilla
+                    </Button>
+                    {onOpenTemplatesManager ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="xs"
+                        onClick={onOpenTemplatesManager}
+                        className="bg-card"
+                      >
+                        <Settings className="size-3.5" />
+                        Gestionar
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                {templates.map((tmpl) => (
+                  <button
+                    key={tmpl.id}
+                    type="button"
+                    onClick={() => handleTemplateChipClick(tmpl)}
+                    className="cursor-pointer rounded-md border border-primary/30 bg-card px-2.5 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-primary/10"
+                  >
+                    {tmpl.name}
+                  </button>
+                ))}
+              </div>
+            </div>
           {/* Clasificador IFCPC Automático */}
           <div
             className={cn(
@@ -791,5 +961,114 @@ export function ColposcopyModal({
         </form>
       </DialogContent>
     </Dialog>
+
+    {/* Mini Dialog: Guardar estado actual como plantilla */}
+    <Dialog open={saveTemplateOpen} onOpenChange={setSaveTemplateOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <BookmarkPlus className="size-4 text-primary" />
+            Guardar Colposcopía Actual como Plantilla
+          </DialogTitle>
+          <DialogDescription>
+            Los criterios IFCPC, mapa horario, Schiller, diagnóstico, CIE-10 y
+            plan quedarán guardados para reutilizar en futuras pacientes.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSaveTemplateSubmit} className="space-y-3">
+          <div className="space-y-1.5">
+            <label
+              htmlFor="colpo-save-tpl-name"
+              className="block text-xs font-semibold text-foreground"
+            >
+              Nombre de la Plantilla *
+            </label>
+            <Input
+              id="colpo-save-tpl-name"
+              value={tplName}
+              onChange={(e) => setTplName(e.target.value)}
+              placeholder="Ej. Control Post-Cono LEEP Normal"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label
+              htmlFor="colpo-save-tpl-desc"
+              className="block text-xs font-semibold text-foreground"
+            >
+              Descripción Breve (Opcional)
+            </label>
+            <Input
+              id="colpo-save-tpl-desc"
+              value={tplDesc}
+              onChange={(e) => setTplDesc(e.target.value)}
+              placeholder="Resumen rápido"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setSaveTemplateOpen(false)}
+              disabled={isSavingTemplate}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isSavingTemplate}>
+              {isSavingTemplate ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Save className="size-4" />
+              )}
+              Guardar Plantilla
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+
+    {/* Confirmación de sobrescritura en modo edición */}
+    <Dialog
+      open={Boolean(pendingApply)}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) setPendingApply(null);
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>¿Aplicar Sobre Evaluación en Edición?</DialogTitle>
+          <DialogDescription>
+            {pendingApply?.kind === "normal"
+              ? "Se marcarán los hallazgos normales/benignos y su diagnóstico sugerido. "
+              : `Se reemplazarán los hallazgos actuales por la plantilla "${pendingApply?.template.name ?? ""}". `}
+            La fecha del estudio, consulta vinculada y fotografías subidas se
+            mantendrán intactas.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setPendingApply(null)}
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            onClick={() => {
+              if (!pendingApply) return;
+              if (pendingApply.kind === "normal") {
+                onApplyNormalDefaults();
+              } else {
+                onApplyTemplate(pendingApply.template);
+              }
+              setPendingApply(null);
+            }}
+          >
+            Sí, Aplicar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </>
   );
 }

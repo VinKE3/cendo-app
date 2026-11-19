@@ -5,6 +5,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import type { ClinicalImageRecord } from "@/db/schema/specialty";
+import type {
+  ColposcopyClinicalTemplateItem,
+  ColposcopyTemplatePayload,
+} from "@/features/clinical-templates/clinical-templates.schema";
 import type { MedicalConsultationItem } from "@/features/consultas/consultas.schema";
 import { usePagination } from "@/hooks/use-pagination";
 import { compressClinicalImageFile } from "@/lib/image-compressor";
@@ -21,6 +25,7 @@ import {
   SCHILLER_TEST_OPTIONS,
   SCJ_VISIBILITY_OPTIONS,
   TRANSFORMATION_ZONE_OPTIONS,
+  VALID_CLOCK_HOURS,
   type ClockHour,
   type ColposcopyReportItem,
   type CreateColposcopyInput,
@@ -31,6 +36,7 @@ export interface UseColposcopiaParams {
   colposcopies: ColposcopyReportItem[];
   onColposcopiesChange: (next: ColposcopyReportItem[]) => void;
   consultations: MedicalConsultationItem[];
+  templates?: ColposcopyClinicalTemplateItem[];
 }
 
 function buildDefaultColposcopyValues(
@@ -98,6 +104,7 @@ export function useColposcopia({
   colposcopies,
   onColposcopiesChange,
   consultations,
+  templates = [],
 }: UseColposcopiaParams) {
   const todayStr = useMemo(() => getPeruDateString(), []);
 
@@ -315,6 +322,173 @@ export function useColposcopia({
     toast.success(`Sugerencia aplicada: ${classification.suggestedCie10}`);
   };
 
+  const applyTemplatePayload = (
+    payload: ColposcopyTemplatePayload,
+    label: string
+  ) => {
+    const scj = (SCJ_VISIBILITY_OPTIONS as readonly string[]).includes(
+      payload.squamocolumnarJunctionVisible
+    )
+      ? payload.squamocolumnarJunctionVisible
+      : "Visible";
+    const tz = (TRANSFORMATION_ZONE_OPTIONS as readonly string[]).includes(
+      payload.transformationZoneType
+    )
+      ? payload.transformationZoneType
+      : "Tipo 1";
+
+    const cleanHours = payload.cervicalBiopsyTaken
+      ? payload.biopsyClockHours
+          .filter((h): h is ClockHour =>
+            (VALID_CLOCK_HOURS as readonly string[]).includes(h)
+          )
+          .sort((a, b) => Number(a) - Number(b))
+      : [];
+
+    const cleanExt = payload.extendedFindings ?? {};
+
+    form.setValue("adequateColposcopy", payload.adequateColposcopy, {
+      shouldDirty: true,
+    });
+    form.setValue("squamocolumnarJunctionVisible", scj, { shouldDirty: true });
+    form.setValue("transformationZoneType", tz, { shouldDirty: true });
+    form.setValue("matureSquamousEpithelium", payload.matureSquamousEpithelium, {
+      shouldDirty: true,
+    });
+    form.setValue("ectopy", payload.ectopy, { shouldDirty: true });
+    form.setValue("thinAcetowhiteEpithelium", payload.thinAcetowhiteEpithelium, {
+      shouldDirty: true,
+    });
+    form.setValue(
+      "denseAcetowhiteEpithelium",
+      payload.denseAcetowhiteEpithelium,
+      { shouldDirty: true }
+    );
+    form.setValue("irregularBorder", payload.irregularBorder, {
+      shouldDirty: true,
+    });
+    form.setValue("fineMosaic", payload.fineMosaic, { shouldDirty: true });
+    form.setValue("coarseMosaic", payload.coarseMosaic, { shouldDirty: true });
+    form.setValue("finePunctation", payload.finePunctation, {
+      shouldDirty: true,
+    });
+    form.setValue("coarsePunctation", payload.coarsePunctation, {
+      shouldDirty: true,
+    });
+    form.setValue("atypicalVessels", payload.atypicalVessels, {
+      shouldDirty: true,
+    });
+    form.setValue(
+      "extendedFindings",
+      {
+        inadequateReason: cleanExt.inadequateReason ?? "",
+        nabothCyst: Boolean(cleanExt.nabothCyst),
+        cryptOpenings: Boolean(cleanExt.cryptOpenings),
+        deciduosis: Boolean(cleanExt.deciduosis),
+        rapidAcetowhite: Boolean(cleanExt.rapidAcetowhite),
+        thickenedGlands: Boolean(cleanExt.thickenedGlands),
+        sharpBorders: Boolean(cleanExt.sharpBorders),
+        innerBorderSign: Boolean(cleanExt.innerBorderSign),
+        ridgeSign: Boolean(cleanExt.ridgeSign),
+        leukoplakia: Boolean(cleanExt.leukoplakia),
+        erosion: Boolean(cleanExt.erosion),
+        fragileVessels: Boolean(cleanExt.fragileVessels),
+        irregularSurface: Boolean(cleanExt.irregularSurface),
+        exophyticLesion: Boolean(cleanExt.exophyticLesion),
+        necrosis: Boolean(cleanExt.necrosis),
+        nodularTumor: Boolean(cleanExt.nodularTumor),
+        congenitalTZ: Boolean(cleanExt.congenitalTZ),
+        condyloma: Boolean(cleanExt.condyloma),
+        polyp: Boolean(cleanExt.polyp),
+        inflammation: Boolean(cleanExt.inflammation),
+        stenosis: Boolean(cleanExt.stenosis),
+        postTreatmentAnomaly: Boolean(cleanExt.postTreatmentAnomaly),
+        endometriosisFoci: Boolean(cleanExt.endometriosisFoci),
+        otherFindings: cleanExt.otherFindings ?? "",
+      },
+      { shouldDirty: true }
+    );
+    form.setValue("schillerTest", payload.schillerTest, { shouldDirty: true });
+    form.setValue("cervicalBiopsyTaken", payload.cervicalBiopsyTaken, {
+      shouldDirty: true,
+    });
+    form.setValue("biopsyClockHours", cleanHours, { shouldDirty: true });
+    form.setValue("cie10Code", payload.cie10Code, { shouldDirty: true });
+    form.setValue("diagnosis", payload.diagnosis, { shouldDirty: true });
+    form.setValue("planRecommendations", payload.planRecommendations, {
+      shouldDirty: true,
+    });
+
+    toast.success(`Plantilla aplicada: ${label}`);
+  };
+
+  const applyTemplate = (template: ColposcopyClinicalTemplateItem) => {
+    applyTemplatePayload(template.payload, template.name);
+  };
+
+  const applyNormalDefaults = () => {
+    const officialNormal = templates.find((t) => t.code === "colpo-normal");
+    if (officialNormal) {
+      applyTemplatePayload(officialNormal.payload, officialNormal.name);
+      return;
+    }
+
+    const defaults = buildDefaultColposcopyValues(patientId, todayStr);
+    applyTemplatePayload(
+      {
+        adequateColposcopy: defaults.adequateColposcopy,
+        squamocolumnarJunctionVisible: defaults.squamocolumnarJunctionVisible,
+        transformationZoneType: defaults.transformationZoneType,
+        matureSquamousEpithelium: defaults.matureSquamousEpithelium,
+        ectopy: defaults.ectopy,
+        thinAcetowhiteEpithelium: defaults.thinAcetowhiteEpithelium,
+        denseAcetowhiteEpithelium: defaults.denseAcetowhiteEpithelium,
+        irregularBorder: defaults.irregularBorder,
+        fineMosaic: defaults.fineMosaic,
+        coarseMosaic: defaults.coarseMosaic,
+        finePunctation: defaults.finePunctation,
+        coarsePunctation: defaults.coarsePunctation,
+        atypicalVessels: defaults.atypicalVessels,
+        extendedFindings: defaults.extendedFindings,
+        schillerTest: defaults.schillerTest,
+        cervicalBiopsyTaken: defaults.cervicalBiopsyTaken,
+        biopsyClockHours: defaults.biopsyClockHours,
+        cie10Code: defaults.cie10Code,
+        diagnosis: defaults.diagnosis,
+        planRecommendations: defaults.planRecommendations,
+      },
+      "Cérvix Normal (Sin LIE)"
+    );
+  };
+
+  const buildTemplatePayloadFromForm = (): ColposcopyTemplatePayload => {
+    const vals = form.getValues();
+    return {
+      adequateColposcopy: vals.adequateColposcopy,
+      squamocolumnarJunctionVisible: vals.squamocolumnarJunctionVisible,
+      transformationZoneType: vals.transformationZoneType,
+      matureSquamousEpithelium: vals.matureSquamousEpithelium,
+      ectopy: vals.ectopy,
+      thinAcetowhiteEpithelium: vals.thinAcetowhiteEpithelium,
+      denseAcetowhiteEpithelium: vals.denseAcetowhiteEpithelium,
+      irregularBorder: vals.irregularBorder,
+      fineMosaic: vals.fineMosaic,
+      coarseMosaic: vals.coarseMosaic,
+      finePunctation: vals.finePunctation,
+      coarsePunctation: vals.coarsePunctation,
+      atypicalVessels: vals.atypicalVessels,
+      extendedFindings: vals.extendedFindings,
+      schillerTest: vals.schillerTest,
+      cervicalBiopsyTaken: vals.cervicalBiopsyTaken,
+      biopsyClockHours: vals.cervicalBiopsyTaken
+        ? vals.biopsyClockHours
+        : [],
+      cie10Code: vals.cie10Code,
+      diagnosis: vals.diagnosis,
+      planRecommendations: vals.planRecommendations,
+    };
+  };
+
   const handleUploadFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
@@ -501,6 +675,9 @@ export function useColposcopia({
     handleToggleClockHours,
     handleToggleBiopsyTaken,
     applyClassificationSuggestion,
+    applyTemplate,
+    applyNormalDefaults,
+    buildTemplatePayloadFromForm,
     handleUploadFiles,
     updateDraftImageCaption,
     removeDraftImage,

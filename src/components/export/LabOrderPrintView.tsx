@@ -88,7 +88,7 @@ export function LabOrderPrintView({
             <div className="flex items-center gap-3">
               <BrandLogo size="md" showText={false} />
               <div>
-                <h1 className="font-serif text-lg font-bold tracking-tight text-primary">
+                <h1 className="font-sans text-lg font-extrabold tracking-tight text-primary">
                   CENDO • CENTRO DE ENDOMETRIOSIS
                 </h1>
                 <p className="text-[11px] font-medium text-foreground">

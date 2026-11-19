@@ -43,7 +43,10 @@ import type {
   ConsultationVademecumOption,
   MedicalConsultationItem,
 } from "@/features/consultas/consultas.schema";
-import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
+import type {
+  PatientBackgroundItem,
+  PatientDirectoryItem,
+} from "@/features/pacientes/pacientes.schema";
 import { useRecetas } from "@/features/recetas/hooks/use-recetas";
 import type { MedicalPrescriptionItem } from "@/features/recetas/recetas.schema";
 import { formatPeruDateDisplay } from "@/lib/utils";
@@ -60,6 +63,7 @@ export interface TabRecetasHandle {
 interface TabRecetasProps {
   ref?: Ref<TabRecetasHandle>;
   patient: PatientDirectoryItem;
+  background?: PatientBackgroundItem | null;
   prescriptions: MedicalPrescriptionItem[];
   onPrescriptionsChange: (next: MedicalPrescriptionItem[]) => void;
   vademecumOptions: ConsultationVademecumOption[];
@@ -71,6 +75,7 @@ interface TabRecetasProps {
 export function TabRecetas({
   ref,
   patient,
+  background,
   prescriptions,
   onPrescriptionsChange,
   vademecumOptions,
@@ -382,6 +387,7 @@ export function TabRecetas({
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         patient={patient}
+        background={background}
         editingItem={editingItem}
         sourceConsultationLabel={sourceConsultationLabel}
         form={form}

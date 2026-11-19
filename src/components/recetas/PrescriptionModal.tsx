@@ -1,6 +1,6 @@
 "use client";
 
-import type { BaseSyntheticEvent } from "react";
+import { useState, type BaseSyntheticEvent } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import {
   AlertTriangle,
@@ -16,6 +16,10 @@ import {
   Trash2,
 } from "lucide-react";
 import { Cie10Autocomplete } from "@/components/common/Cie10Autocomplete";
+import {
+  PatientBackgroundQuickPanel,
+  ViewBackgroundButton,
+} from "@/components/pacientes/PatientBackgroundQuickPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,7 +37,10 @@ import type {
   ConsultationVademecumOption,
   MedicalConsultationItem,
 } from "@/features/consultas/consultas.schema";
-import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
+import type {
+  PatientBackgroundItem,
+  PatientDirectoryItem,
+} from "@/features/pacientes/pacientes.schema";
 import {
   PRESCRIPTION_ROUTES,
   QUICK_GENERAL_INDICATIONS,
@@ -51,6 +58,7 @@ interface PrescriptionModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   patient: PatientDirectoryItem;
+  background?: PatientBackgroundItem | null;
   editingItem: MedicalPrescriptionItem | null;
   sourceConsultationLabel: string | null;
   form: UseFormReturn<PrescriptionModalFormValues>;
@@ -98,6 +106,7 @@ export function PrescriptionModal({
   open,
   onOpenChange,
   patient,
+  background,
   editingItem,
   sourceConsultationLabel,
   form,
@@ -131,24 +140,41 @@ export function PrescriptionModal({
     formState: { errors },
   } = form;
 
+  const [showBackground, setShowBackground] = useState(false);
   const showAllergies = hasPositiveAllergy(patient.medicalAllergies);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-5xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Pill className="size-5 text-primary" />
-            {editingItem
-              ? "Editar Receta Médica Oficial"
-              : "Emitir Nueva Receta Médica Oficial (CENDO)"}
-          </DialogTitle>
-          <DialogDescription>
-            Paciente:{" "}
-            <strong className="text-foreground">{patient.fullName}</strong> •{" "}
-            {patient.documentType} {patient.documentNumber} • {patient.age} años
-          </DialogDescription>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:pr-8">
+            <div className="space-y-1">
+              <DialogTitle className="flex items-center gap-2">
+                <Pill className="size-5 text-primary" />
+                {editingItem
+                  ? "Editar Receta Médica Oficial"
+                  : "Emitir Nueva Receta Médica Oficial (CENDO)"}
+              </DialogTitle>
+              <DialogDescription>
+                Paciente:{" "}
+                <strong className="text-foreground">{patient.fullName}</strong> •{" "}
+                {patient.documentType} {patient.documentNumber} • {patient.age}{" "}
+                años
+              </DialogDescription>
+            </div>
+            <ViewBackgroundButton
+              open={showBackground}
+              onToggle={() => setShowBackground((prev) => !prev)}
+              background={background}
+            />
+          </div>
         </DialogHeader>
+
+        <PatientBackgroundQuickPanel
+          open={showBackground}
+          patient={patient}
+          background={background}
+        />
 
         {/* Alerta de Alergias / RAMs */}
         {showAllergies ? (

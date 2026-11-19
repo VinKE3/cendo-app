@@ -191,6 +191,7 @@ export async function listActiveDoctorsForAgenda(
       specialty: profiles.specialty,
       phone: profiles.phone,
       clinicAddress: profiles.clinicAddress,
+      googleMapsUrl: profiles.googleMapsUrl,
     })
     .from(profiles)
     .where(

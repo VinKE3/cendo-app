@@ -115,7 +115,7 @@ export function PrescriptionPrintView({
               <div>
                 <h1
                   className={cn(
-                    "font-serif font-bold tracking-tight text-primary",
+                    "font-sans font-extrabold tracking-tight text-primary",
                     isA5 ? "text-base" : "text-lg"
                   )}
                 >

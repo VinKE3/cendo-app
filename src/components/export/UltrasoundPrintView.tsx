@@ -105,7 +105,7 @@ export function UltrasoundPrintView({
             <div className="flex items-center gap-3">
               <BrandLogo size="md" showText={false} />
               <div>
-                <h1 className="font-serif text-lg font-bold tracking-tight text-primary">
+                <h1 className="font-sans text-lg font-extrabold tracking-tight text-primary">
                   CENDO • CENTRO DE ENDOMETRIOSIS
                 </h1>
                 <p className="text-[11px] font-medium text-foreground">
@@ -132,12 +132,12 @@ export function UltrasoundPrintView({
           </header>
 
           {/* Banner Modalidad */}
-          <div className="flex items-center justify-between rounded-lg border-l-4 border-warning bg-primary px-4 py-2.5 text-primary-foreground">
+          <div className="flex items-center justify-between rounded-lg border-l-[5px] border-warning bg-primary px-4 py-3 text-primary-foreground">
             <div>
               <span className="block font-mono text-[8.5px] font-bold tracking-widest text-warning uppercase">
                 Modalidad Diagnóstica Especializada
               </span>
-              <h2 className="text-sm font-bold tracking-wide uppercase">
+              <h2 className="mt-0.5 text-lg leading-tight font-extrabold tracking-wide uppercase">
                 {ULTRASOUND_TYPE_LABELS[report.ultrasoundType] ||
                   report.ultrasoundType}
               </h2>
@@ -465,7 +465,7 @@ export function UltrasoundPrintView({
               <div className="flex items-center gap-2.5">
                 <BrandLogo size="sm" showText={false} />
                 <div>
-                  <h2 className="font-serif text-base font-bold text-primary">
+                  <h2 className="font-sans text-base font-extrabold tracking-tight text-primary">
                     ANEXO FOTOGRÁFICO DE ECOGRAFÍA ({pageIdx + 1} /{" "}
                     {photoChunks.length})
                   </h2>

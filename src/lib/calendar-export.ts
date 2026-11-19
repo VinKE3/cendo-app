@@ -1,6 +1,7 @@
 export interface CalendarClinicInfo {
   clinicAddress?: string | null;
   phone?: string | null;
+  googleMapsUrl?: string | null;
 }
 
 export interface CalendarExportAppointment {

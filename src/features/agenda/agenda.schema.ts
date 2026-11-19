@@ -58,6 +58,7 @@ export interface AgendaDoctorOption {
   specialty: string;
   phone: string;
   clinicAddress: string;
+  googleMapsUrl: string | null;
 }
 
 export interface AgendaPatientOption {

@@ -13,8 +13,10 @@ import {
   Plus,
   Printer,
   Search,
+  Settings,
   Trash2,
 } from "lucide-react";
+import { ClinicalTemplatesManagerModal } from "@/components/chequeos/ClinicalTemplatesManagerModal";
 import { ColposcopyModal } from "@/components/colposcopia/ColposcopyModal";
 import { ColposcopyPrintModal } from "@/components/colposcopia/ColposcopyPrintModal";
 import { TablePagination } from "@/components/common/TablePagination";
@@ -46,6 +48,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type {
+  ClinicalTemplateItem,
+  ClinicalTemplateScope,
+} from "@/features/clinical-templates/clinical-templates.schema";
+import { useClinicalTemplates } from "@/features/clinical-templates/hooks/use-clinical-templates";
 import {
   classifyColposcopyFindings,
   type ColposcopyReportItem,
@@ -58,7 +65,10 @@ import {
   type UltrasoundReportItem,
 } from "@/features/ecografias/ecografias.schema";
 import { useEcografias } from "@/features/ecografias/hooks/use-ecografias";
-import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
+import type {
+  PatientBackgroundItem,
+  PatientDirectoryItem,
+} from "@/features/pacientes/pacientes.schema";
 import { cn, formatPeruDateDisplay } from "@/lib/utils";
 import {
   generateColposcopyWhatsAppUrl,
@@ -67,10 +77,12 @@ import {
 
 interface TabChequeosProps {
   patient: PatientDirectoryItem;
+  background?: PatientBackgroundItem | null;
   ultrasounds: UltrasoundReportItem[];
   onUltrasoundsChange: (next: UltrasoundReportItem[]) => void;
   colposcopies: ColposcopyReportItem[];
   onColposcopiesChange: (next: ColposcopyReportItem[]) => void;
+  initialClinicalTemplates: ClinicalTemplateItem[];
   consultations: MedicalConsultationItem[];
   checkupsCount: number;
   canEdit: boolean;
@@ -80,10 +92,12 @@ interface TabChequeosProps {
 
 export function TabChequeos({
   patient,
+  background,
   ultrasounds,
   onUltrasoundsChange,
   colposcopies,
   onColposcopiesChange,
+  initialClinicalTemplates,
   consultations,
   checkupsCount,
   canEdit,
@@ -93,12 +107,17 @@ export function TabChequeos({
   const [subTab, setSubTab] = useState<
     "ecografias" | "colposcopia" | "integral"
   >("ecografias");
+  const [templatesManagerScope, setTemplatesManagerScope] =
+    useState<ClinicalTemplateScope | null>(null);
+
+  const templateStore = useClinicalTemplates(initialClinicalTemplates);
 
   const eco = useEcografias({
     patientId: patient.id,
     ultrasounds,
     onUltrasoundsChange,
     consultations,
+    templates: templateStore.ultrasoundTemplates,
   });
 
   const colpo = useColposcopia({
@@ -106,7 +125,11 @@ export function TabChequeos({
     colposcopies,
     onColposcopiesChange,
     consultations,
+    templates: templateStore.colposcopyTemplates,
   });
+
+  const lastUltrasound = ultrasounds[0] ?? null;
+  const lastColposcopy = colposcopies[0] ?? null;
 
   const photosTotal =
     ultrasounds.reduce((acc, u) => acc + u.images.length, 0) +
@@ -235,19 +258,41 @@ export function TabChequeos({
           </button>
         </div>
 
-        <div className="flex items-center gap-2 pr-1">
+        <div className="flex flex-wrap items-center gap-2 pr-1">
           {canEdit && subTab === "ecografias" ? (
-            <Button type="button" size="sm" onClick={eco.openCreateModal}>
-              <Plus className="size-3.5" />
-              Nueva Ecografía
-            </Button>
+            <>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setTemplatesManagerScope("ULTRASOUND")}
+              >
+                <Settings className="size-3.5" />
+                Plantillas
+              </Button>
+              <Button type="button" size="sm" onClick={eco.openCreateModal}>
+                <Plus className="size-3.5" />
+                Nueva Ecografía
+              </Button>
+            </>
           ) : null}
 
           {canEdit && subTab === "colposcopia" ? (
-            <Button type="button" size="sm" onClick={colpo.openCreateModal}>
-              <Plus className="size-3.5" />
-              Nueva Colposcopía
-            </Button>
+            <>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setTemplatesManagerScope("COLPOSCOPY")}
+              >
+                <Settings className="size-3.5" />
+                Plantillas
+              </Button>
+              <Button type="button" size="sm" onClick={colpo.openCreateModal}>
+                <Plus className="size-3.5" />
+                Nueva Colposcopía
+              </Button>
+            </>
           ) : null}
         </div>
       </div>
@@ -768,6 +813,9 @@ export function TabChequeos({
         open={eco.dialogOpen}
         onOpenChange={eco.onDialogOpenChange}
         patient={patient}
+        background={background}
+        lastUltrasound={lastUltrasound}
+        lastColposcopy={lastColposcopy}
         editingItem={eco.editingItem}
         form={eco.form}
         isSubmitting={eco.isSubmitting}
@@ -778,13 +826,27 @@ export function TabChequeos({
         watchedBirads={eco.watchedBirads}
         watchedEndometrium={eco.watchedEndometrium}
         watchedVolume={eco.watchedVolume}
-        presets={eco.presets}
+        templates={templateStore.ultrasoundTemplates}
+        canEditTemplates={canEdit}
+        isSavingTemplate={templateStore.isMutating}
         typeOptions={eco.typeOptions}
         uterusPositions={eco.uterusPositions}
         endometriumPatterns={eco.endometriumPatterns}
         slidingSignOptions={eco.slidingSignOptions}
         biradsOptions={eco.biradsOptions}
-        onApplyPreset={eco.applyPreset}
+        onApplyTemplate={eco.applyTemplate}
+        onBuildTemplatePayload={eco.buildTemplatePayloadFromForm}
+        onSaveAsTemplate={async (name, description, payload) => {
+          const res = await templateStore.createTemplate({
+            scope: "ULTRASOUND",
+            subType: payload.ultrasoundType,
+            name,
+            description: description || null,
+            payload,
+          });
+          return res.success;
+        }}
+        onOpenTemplatesManager={() => setTemplatesManagerScope("ULTRASOUND")}
         onAutoCalculateVolume={eco.autoCalculateVolume}
         onUploadFiles={eco.handleUploadFiles}
         onUpdateImageCaption={eco.updateDraftImageCaption}
@@ -854,6 +916,9 @@ export function TabChequeos({
         open={colpo.dialogOpen}
         onOpenChange={colpo.onDialogOpenChange}
         patient={patient}
+        background={background}
+        lastUltrasound={lastUltrasound}
+        lastColposcopy={lastColposcopy}
         editingItem={colpo.editingItem}
         form={colpo.form}
         isSubmitting={colpo.isSubmitting}
@@ -862,6 +927,9 @@ export function TabChequeos({
         consultations={consultations}
         watchedValues={colpo.watchedValues}
         classification={colpo.classification}
+        templates={templateStore.colposcopyTemplates}
+        canEditTemplates={canEdit}
+        isSavingTemplate={templateStore.isMutating}
         scjOptions={colpo.scjOptions}
         tzOptions={colpo.tzOptions}
         schillerOptions={colpo.schillerOptions}
@@ -869,6 +937,20 @@ export function TabChequeos({
         onToggleClockHours={colpo.handleToggleClockHours}
         onToggleBiopsyTaken={colpo.handleToggleBiopsyTaken}
         onApplyClassificationSuggestion={colpo.applyClassificationSuggestion}
+        onApplyTemplate={colpo.applyTemplate}
+        onApplyNormalDefaults={colpo.applyNormalDefaults}
+        onBuildTemplatePayload={colpo.buildTemplatePayloadFromForm}
+        onSaveAsTemplate={async (name, description, payload) => {
+          const res = await templateStore.createTemplate({
+            scope: "COLPOSCOPY",
+            subType: "CUSTOM",
+            name,
+            description: description || null,
+            payload,
+          });
+          return res.success;
+        }}
+        onOpenTemplatesManager={() => setTemplatesManagerScope("COLPOSCOPY")}
         onUploadFiles={colpo.handleUploadFiles}
         onUpdateImageCaption={colpo.updateDraftImageCaption}
         onRemoveImage={colpo.removeDraftImage}
@@ -932,6 +1014,37 @@ export function TabChequeos({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ClinicalTemplatesManagerModal
+        open={Boolean(templatesManagerScope)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setTemplatesManagerScope(null);
+        }}
+        scope={templatesManagerScope ?? "ULTRASOUND"}
+        templates={
+          templatesManagerScope === "COLPOSCOPY"
+            ? templateStore.colposcopyTemplates
+            : templateStore.ultrasoundTemplates
+        }
+        canDeleteOfficial={canDelete}
+        isMutating={templateStore.isMutating}
+        onApplyTemplate={
+          (templatesManagerScope === "ULTRASOUND" && eco.dialogOpen) ||
+          (templatesManagerScope === "COLPOSCOPY" && colpo.dialogOpen)
+            ? (tmpl) => {
+                if (tmpl.scope === "ULTRASOUND") {
+                  eco.applyTemplate(tmpl);
+                } else {
+                  colpo.applyTemplate(tmpl);
+                }
+              }
+            : undefined
+        }
+        onCreateTemplate={templateStore.createTemplate}
+        onUpdateTemplate={templateStore.updateTemplate}
+        onDeleteTemplate={templateStore.deleteTemplate}
+        onRestoreOfficialTemplates={templateStore.restoreOfficialTemplates}
+      />
     </div>
   );
 }

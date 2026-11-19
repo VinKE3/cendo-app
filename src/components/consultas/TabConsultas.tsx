@@ -54,8 +54,13 @@ import {
   useConsultas,
   type ConsultationCountsDelta,
 } from "@/features/consultas/hooks/use-consultas";
+import type { ColposcopyReportItem } from "@/features/colposcopia/colposcopia.schema";
+import type { UltrasoundReportItem } from "@/features/ecografias/ecografias.schema";
 import type { LabOrderItem } from "@/features/laboratorio/laboratorio.schema";
-import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
+import type {
+  PatientBackgroundItem,
+  PatientDirectoryItem,
+} from "@/features/pacientes/pacientes.schema";
 import type { MedicalPrescriptionItem } from "@/features/recetas/recetas.schema";
 import { formatPeruDateDisplay } from "@/lib/utils";
 import { generateConsultationWhatsAppUrl } from "@/lib/whatsapp-share";
@@ -64,6 +69,9 @@ import { ConsultationPrintModal } from "./ConsultationPrintModal";
 
 interface TabConsultasProps {
   patient: PatientDirectoryItem;
+  background?: PatientBackgroundItem | null;
+  lastUltrasound?: UltrasoundReportItem | null;
+  lastColposcopy?: ColposcopyReportItem | null;
   initialConsultations: MedicalConsultationItem[];
   initialReasons: CatalogCategoryItem[];
   formContext: ConsultationFormContext;
@@ -86,6 +94,9 @@ interface TabConsultasProps {
 
 export function TabConsultas({
   patient,
+  background,
+  lastUltrasound,
+  lastColposcopy,
   initialConsultations,
   initialReasons,
   formContext,
@@ -522,6 +533,9 @@ export function TabConsultas({
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         patient={patient}
+        background={background}
+        lastUltrasound={lastUltrasound}
+        lastColposcopy={lastColposcopy}
         editingItem={editingItem}
         lastConsultation={lastConsultation}
         form={form}

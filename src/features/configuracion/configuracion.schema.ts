@@ -43,6 +43,7 @@ export interface DoctorConfigProfile {
   clinicalRole: string;
   clinicName: string;
   clinicAddress: string;
+  googleMapsUrl: string;
   phone: string;
   contactEmail: string;
   hasSignature: boolean;
@@ -123,6 +124,23 @@ export const updateDoctorConfigSchema = z
       .string()
       .trim()
       .max(240, "Dirección de sede demasiado larga."),
+    googleMapsUrl: z
+      .string()
+      .trim()
+      .max(300, "Enlace de Google Maps demasiado largo.")
+      .refine(
+        (val) => {
+          if (!val) return true;
+          try {
+            const parsed = new URL(val);
+            return parsed.protocol === "https:" || parsed.protocol === "http:";
+          } catch {
+            return false;
+          }
+        },
+        "Ingrese una URL válida de Google Maps que inicie con https:// o http://."
+      )
+      .optional(),
     showSignatureByDefault: z.boolean(),
   })
   .strict();

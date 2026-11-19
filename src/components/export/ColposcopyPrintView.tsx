@@ -35,30 +35,59 @@ function FindingRow({
   isPositive?: boolean;
   tone?: "normal" | "warning" | "destructive";
 }) {
-  const pillClass = isPositive
+  const boxClass = isPositive
     ? tone === "destructive"
-      ? "bg-destructive text-destructive-foreground font-bold"
+      ? "border-destructive bg-destructive text-destructive-foreground"
       : tone === "warning"
-        ? "bg-warning text-warning-foreground font-bold"
-        : "bg-success text-success-foreground font-bold"
-    : "border border-border bg-card text-muted-foreground";
+        ? "border-warning bg-warning text-warning-foreground"
+        : "border-success bg-success text-success-foreground"
+    : "border-border bg-card text-transparent";
+
+  const pillClass =
+    tone === "destructive"
+      ? "bg-destructive text-destructive-foreground"
+      : tone === "warning"
+        ? "bg-warning text-warning-foreground"
+        : "bg-success text-success-foreground";
+
+  const rowBg = isPositive
+    ? tone === "destructive"
+      ? "bg-destructive/10 text-foreground font-semibold"
+      : tone === "warning"
+        ? "bg-warning/15 text-foreground font-semibold"
+        : "bg-success/10 text-foreground font-semibold"
+    : "text-muted-foreground";
 
   return (
     <div
       className={cn(
-        "flex items-center justify-between rounded px-2 py-0.5 text-[9px]",
-        isPositive ? "bg-muted/60 font-semibold text-foreground" : "text-muted-foreground"
+        "flex items-center justify-between gap-1.5 rounded px-1.5 py-[2px] text-[8.5px] leading-tight",
+        rowBg
       )}
     >
-      <span className="truncate pr-2">{label}</span>
-      <span
-        className={cn(
-          "shrink-0 rounded px-1.5 py-0.5 font-mono text-[8px] uppercase",
-          pillClass
-        )}
-      >
-        {isPositive ? "Positivo" : "Negativo"}
-      </span>
+      <div className="flex min-w-0 items-center gap-1.5">
+        <span
+          aria-hidden="true"
+          className={cn(
+            "inline-flex size-3 shrink-0 items-center justify-center rounded-[2px] border text-[8px] font-bold leading-none",
+            boxClass
+          )}
+        >
+          {isPositive ? "✓" : ""}
+        </span>
+        <span className="truncate">{label}</span>
+      </div>
+
+      {isPositive ? (
+        <span
+          className={cn(
+            "shrink-0 rounded px-1.5 py-[1px] font-mono text-[7.5px] font-bold uppercase",
+            pillClass
+          )}
+        >
+          POSITIVO
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -142,7 +171,7 @@ export function ColposcopyPrintView({
             <div className="flex items-center gap-3">
               <BrandLogo size="md" showText={false} />
               <div>
-                <h1 className="font-serif text-lg font-bold tracking-tight text-primary">
+                <h1 className="font-sans text-lg font-extrabold tracking-tight text-primary">
                   CENDO • CENTRO DE ENDOMETRIOSIS
                 </h1>
                 <p className="text-[11px] font-medium text-foreground">
@@ -238,11 +267,11 @@ export function ColposcopyPrintView({
             </div>
           </div>
 
-          {/* 3. Matriz IFCPC 2011 (2 Columnas) */}
+          {/* 3. Matriz IFCPC 2011 Desglosada (Solo marcados los positivos) */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5 rounded-lg border border-border bg-card p-2.5">
-              <h3 className="border-b border-border pb-1 text-[9.5px] font-bold tracking-wider text-primary uppercase">
-                Hallazgos Normales & Grado 1 (Menor)
+            <div className="space-y-0.5 rounded-lg border border-border bg-card p-2.5">
+              <h3 className="mb-1 border-b border-border pb-1 text-[9.5px] font-bold tracking-wider text-primary uppercase">
+                Hallazgos Normales, Grado 1 (Menor) & Misceláneos
               </h3>
               <FindingRow
                 label="Epitelio escamoso maduro"
@@ -255,8 +284,13 @@ export function ColposcopyPrintView({
                 tone="normal"
               />
               <FindingRow
-                label="Quistes de Naboth / Glándulas"
-                isPositive={Boolean(ext.nabothCyst || ext.cryptOpenings)}
+                label="Quistes de Naboth"
+                isPositive={Boolean(ext.nabothCyst)}
+                tone="normal"
+              />
+              <FindingRow
+                label="Aberturas glandulares"
+                isPositive={Boolean(ext.cryptOpenings)}
                 tone="normal"
               />
               <FindingRow
@@ -279,17 +313,35 @@ export function ColposcopyPrintView({
                 isPositive={report.finePunctation}
                 tone="warning"
               />
+              <FindingRow
+                label="Pólipo / Condiloma cervical"
+                isPositive={Boolean(ext.polyp || ext.condyloma)}
+                tone="warning"
+              />
+              <FindingRow
+                label="Inflamación / Cervicitis"
+                isPositive={Boolean(ext.inflammation)}
+                tone="warning"
+              />
+              <FindingRow
+                label="ZT congénita / Foco endometriosis"
+                isPositive={Boolean(ext.congenitalTZ || ext.endometriosisFoci)}
+                tone="normal"
+              />
             </div>
 
-            <div className="space-y-1.5 rounded-lg border border-border bg-card p-2.5">
-              <h3 className="border-b border-border pb-1 text-[9.5px] font-bold tracking-wider text-primary uppercase">
+            <div className="space-y-0.5 rounded-lg border border-border bg-card p-2.5">
+              <h3 className="mb-1 border-b border-border pb-1 text-[9.5px] font-bold tracking-wider text-primary uppercase">
                 Grado 2 (Mayor) & Sospecha de Invasión
               </h3>
               <FindingRow
-                label="Epitelio acetoblanco denso / rápido"
-                isPositive={Boolean(
-                  report.denseAcetowhiteEpithelium || ext.rapidAcetowhite
-                )}
+                label="Epitelio acetoblanco denso"
+                isPositive={report.denseAcetowhiteEpithelium}
+                tone="destructive"
+              />
+              <FindingRow
+                label="Acetoblanco de aparición rápida"
+                isPositive={Boolean(ext.rapidAcetowhite)}
                 tone="destructive"
               />
               <FindingRow
@@ -303,10 +355,23 @@ export function ColposcopyPrintView({
                 tone="destructive"
               />
               <FindingRow
-                label="Borde neto / Límite interno / Cresta"
-                isPositive={Boolean(
-                  ext.sharpBorders || ext.innerBorderSign || ext.ridgeSign
-                )}
+                label="Bordes netos delimitados"
+                isPositive={Boolean(ext.sharpBorders)}
+                tone="destructive"
+              />
+              <FindingRow
+                label="Signo del límite interno"
+                isPositive={Boolean(ext.innerBorderSign)}
+                tone="destructive"
+              />
+              <FindingRow
+                label="Signo de la cresta (Ridge sign)"
+                isPositive={Boolean(ext.ridgeSign)}
+                tone="destructive"
+              />
+              <FindingRow
+                label="Orificios glandulares engrosados"
+                isPositive={Boolean(ext.thickenedGlands)}
                 tone="destructive"
               />
               <FindingRow
@@ -315,14 +380,17 @@ export function ColposcopyPrintView({
                 tone="warning"
               />
               <FindingRow
-                label="Vasos atípicos / Vasos frágiles"
-                isPositive={Boolean(
-                  report.atypicalVessels || ext.fragileVessels
-                )}
+                label="Vasos atípicos"
+                isPositive={report.atypicalVessels}
                 tone="destructive"
               />
               <FindingRow
-                label="Superficie irregular / Exofítica / Necrosis"
+                label="Vasos frágiles"
+                isPositive={Boolean(ext.fragileVessels)}
+                tone="destructive"
+              />
+              <FindingRow
+                label="Superficie irregular / Exofítica / Necrosis / Tumor"
                 isPositive={Boolean(
                   ext.irregularSurface ||
                     ext.exophyticLesion ||
@@ -425,7 +493,7 @@ export function ColposcopyPrintView({
               <div className="flex items-center gap-2.5">
                 <BrandLogo size="sm" showText={false} />
                 <div>
-                  <h2 className="font-serif text-base font-bold text-primary">
+                  <h2 className="font-sans text-base font-extrabold tracking-tight text-primary">
                     ANEXO FOTOGRÁFICO DE COLPOSCOPÍA ({pageIdx + 1} /{" "}
                     {photoChunks.length})
                   </h2>

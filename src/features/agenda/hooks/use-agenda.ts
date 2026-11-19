@@ -589,7 +589,11 @@ export function useAgenda({
   const getDoctorClinicInfo = (doctorId: string | null) => {
     const doc = doctors.find((d) => d.id === doctorId) ?? doctors[0];
     return doc
-      ? { clinicAddress: doc.clinicAddress, phone: doc.phone }
+      ? {
+          clinicAddress: doc.clinicAddress,
+          phone: doc.phone,
+          googleMapsUrl: doc.googleMapsUrl,
+        }
       : undefined;
   };
 

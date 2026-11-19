@@ -209,6 +209,7 @@ export function ConfiguracionView({ initialProfile }: ConfiguracionViewProps) {
       rne: profile.rne,
       phone: profile.phone,
       clinicAddress: profile.clinicAddress,
+      googleMapsUrl: profile.googleMapsUrl,
       showSignatureByDefault: profile.showSignatureByDefault,
     },
   });
@@ -387,6 +388,7 @@ export function ConfiguracionView({ initialProfile }: ConfiguracionViewProps) {
         rne: profile.rne,
         phone: profile.phone,
         clinicAddress: profile.clinicAddress,
+        googleMapsUrl: profile.googleMapsUrl,
         showSignatureByDefault: nextValue,
       };
 
@@ -1043,6 +1045,26 @@ export function ConfiguracionView({ initialProfile }: ConfiguracionViewProps) {
                   {form.formState.errors.clinicAddress ? (
                     <p className="text-xs text-destructive">
                       {form.formState.errors.clinicAddress.message}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="space-y-1.5">
+                  <label htmlFor="googleMapsUrl" className="block text-xs font-semibold text-foreground">
+                    Enlace corto de Google Maps (Opcional)
+                  </label>
+                  <Input
+                    id="googleMapsUrl"
+                    placeholder="https://maps.app.goo.gl/..."
+                    {...form.register("googleMapsUrl")}
+                    disabled={isSavingProfile}
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Si lo registra, los recordatorios de citas y mensajes de tarifas por WhatsApp usarán este enlace breve en lugar de generar una búsqueda larga.
+                  </p>
+                  {form.formState.errors.googleMapsUrl ? (
+                    <p className="text-xs text-destructive">
+                      {form.formState.errors.googleMapsUrl.message}
                     </p>
                   ) : null}
                 </div>

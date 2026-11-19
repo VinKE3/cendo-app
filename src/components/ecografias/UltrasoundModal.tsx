@@ -1,30 +1,45 @@
 "use client";
 
-import type { BaseSyntheticEvent } from "react";
+import { useState, type BaseSyntheticEvent, type FormEvent } from "react";
 import {
   Activity,
   AlertTriangle,
+  BookmarkPlus,
   Calculator,
   Camera,
   ImagePlus,
   Loader2,
   Printer,
   Save,
+  Settings,
   Sparkles,
   Trash2,
 } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
+import { toast } from "sonner";
+import {
+  PatientBackgroundQuickPanel,
+  ViewBackgroundButton,
+} from "@/components/pacientes/PatientBackgroundQuickPanel";
 import type { ClinicalImageRecord } from "@/db/schema/specialty";
+import {
+  ultrasoundTemplatePayloadSchema,
+  type UltrasoundClinicalTemplateItem,
+  type UltrasoundTemplatePayload,
+} from "@/features/clinical-templates/clinical-templates.schema";
+import type { ColposcopyReportItem } from "@/features/colposcopia/colposcopia.schema";
 import type { MedicalConsultationItem } from "@/features/consultas/consultas.schema";
 import {
   ULTRASOUND_TYPE_LABELS,
   type CreateUltrasoundInput,
-  type UltrasoundPreset,
   type UltrasoundReportItem,
   type UltrasoundType,
 } from "@/features/ecografias/ecografias.schema";
 import { toOptionalNumber } from "@/features/ecografias/hooks/use-ecografias";
-import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
+import type {
+  PatientBackgroundItem,
+  PatientDirectoryItem,
+} from "@/features/pacientes/pacientes.schema";
 import { buildClinicalImageViewUrl } from "@/lib/clinical-images";
 import { cn, formatPeruDateDisplay } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +59,9 @@ interface UltrasoundModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   patient: PatientDirectoryItem;
+  background?: PatientBackgroundItem | null;
+  lastUltrasound?: UltrasoundReportItem | null;
+  lastColposcopy?: ColposcopyReportItem | null;
   editingItem: UltrasoundReportItem | null;
   form: UseFormReturn<CreateUltrasoundInput>;
   isSubmitting: boolean;
@@ -54,7 +72,9 @@ interface UltrasoundModalProps {
   watchedBirads?: string;
   watchedEndometrium?: number;
   watchedVolume?: number;
-  presets: UltrasoundPreset[];
+  templates: UltrasoundClinicalTemplateItem[];
+  canEditTemplates?: boolean;
+  isSavingTemplate?: boolean;
   typeOptions: readonly UltrasoundType[];
   uterusPositions: readonly ("AVF" | "RVF" | "Indiferente")[];
   endometriumPatterns: readonly (
@@ -73,7 +93,14 @@ interface UltrasoundModalProps {
     | "BI-RADS 4C"
     | "BI-RADS 5"
   )[];
-  onApplyPreset: (preset: UltrasoundPreset) => void;
+  onApplyTemplate: (template: UltrasoundClinicalTemplateItem) => void;
+  onBuildTemplatePayload: () => UltrasoundTemplatePayload;
+  onSaveAsTemplate: (
+    name: string,
+    description: string,
+    payload: UltrasoundTemplatePayload
+  ) => Promise<boolean>;
+  onOpenTemplatesManager?: () => void;
   onAutoCalculateVolume: (dimsText?: string) => void;
   onUploadFiles: (files: FileList | null) => Promise<void>;
   onUpdateImageCaption: (index: number, caption: string) => void;
@@ -89,6 +116,9 @@ export function UltrasoundModal({
   open,
   onOpenChange,
   patient,
+  background,
+  lastUltrasound,
+  lastColposcopy,
   editingItem,
   form,
   isSubmitting,
@@ -99,13 +129,18 @@ export function UltrasoundModal({
   watchedBirads,
   watchedEndometrium,
   watchedVolume,
-  presets,
+  templates,
+  canEditTemplates = false,
+  isSavingTemplate = false,
   typeOptions,
   uterusPositions,
   endometriumPatterns,
   slidingSignOptions,
   biradsOptions,
-  onApplyPreset,
+  onApplyTemplate,
+  onBuildTemplatePayload,
+  onSaveAsTemplate,
+  onOpenTemplatesManager,
   onAutoCalculateVolume,
   onUploadFiles,
   onUpdateImageCaption,
@@ -117,6 +152,51 @@ export function UltrasoundModal({
     register,
     formState: { errors },
   } = form;
+
+  const [showBackground, setShowBackground] = useState(false);
+  const [pendingTemplate, setPendingTemplate] =
+    useState<UltrasoundClinicalTemplateItem | null>(null);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [tplName, setTplName] = useState("");
+  const [tplDesc, setTplDesc] = useState("");
+
+  const orderedTemplates = [...templates].sort((a, b) => {
+    const aMatch = a.payload.ultrasoundType === watchedUltrasoundType ? 0 : 1;
+    const bMatch = b.payload.ultrasoundType === watchedUltrasoundType ? 0 : 1;
+    return aMatch - bMatch;
+  });
+
+  const handleTemplateChipClick = (template: UltrasoundClinicalTemplateItem) => {
+    if (editingItem) {
+      setPendingTemplate(template);
+      return;
+    }
+    onApplyTemplate(template);
+  };
+
+  const handleSaveTemplateSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    const cleanName = tplName.trim();
+    if (cleanName.length < 2) {
+      toast.error("Ingrese un nombre de al menos 2 caracteres.");
+      return;
+    }
+    const rawPayload = onBuildTemplatePayload();
+    const parsed = ultrasoundTemplatePayloadSchema.safeParse(rawPayload);
+    if (!parsed.success) {
+      toast.error(
+        parsed.error.issues[0]?.message ||
+          "Complete al menos la indicación y conclusión antes de guardar como plantilla."
+      );
+      return;
+    }
+    const ok = await onSaveAsTemplate(cleanName, tplDesc.trim(), parsed.data);
+    if (ok) {
+      setSaveTemplateOpen(false);
+      setTplName("");
+      setTplDesc("");
+    }
+  };
 
   const isGynMode =
     watchedUltrasoundType === "TRANSVAGINAL" ||
@@ -140,51 +220,99 @@ export function UltrasoundModal({
     watchedEndometrium >= 15;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-5xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Activity className="size-5 text-primary" />
-            {editingItem
-              ? "Editar Informe Ecográfico Especializado"
-              : "Nueva Ecografía Especializada CENDO"}
-          </DialogTitle>
-          <DialogDescription>
-            Paciente: <strong>{patient.fullName}</strong> • {patient.documentType}{" "}
-            {patient.documentNumber} ({patient.age} años)
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-5xl">
+          <DialogHeader>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:pr-8">
+              <div className="space-y-1">
+                <DialogTitle className="flex items-center gap-2">
+                  <Activity className="size-5 text-primary" />
+                  {editingItem
+                    ? "Editar Informe Ecográfico Especializado"
+                    : "Nueva Ecografía Especializada CENDO"}
+                </DialogTitle>
+                <DialogDescription>
+                  Paciente: <strong>{patient.fullName}</strong> •{" "}
+                  {patient.documentType} {patient.documentNumber} ({patient.age}{" "}
+                  años)
+                </DialogDescription>
+              </div>
+              <ViewBackgroundButton
+                open={showBackground}
+                onToggle={() => setShowBackground((prev) => !prev)}
+                background={background}
+              />
+            </div>
+          </DialogHeader>
 
-        <form onSubmit={onSubmit} className="space-y-5">
-          {/* Presets Clínicos CENDO en 1 Clic */}
-          <div className="space-y-2 rounded-xl border border-primary/20 bg-primary/5 p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="flex items-center gap-1.5 text-xs font-semibold text-primary">
-                <Sparkles className="size-3.5" />
-                Plantillas Diagnósticas Rápidas CENDO (1 clic)
-              </span>
-              <span className="font-mono text-[10px] text-muted-foreground">
-                Protocolo IDEA / MUSA / BI-RADS
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {presets.map((preset) => (
-                <button
-                  key={preset.id}
-                  type="button"
-                  onClick={() => onApplyPreset(preset)}
-                  className={cn(
-                    "cursor-pointer rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors",
-                    watchedUltrasoundType === preset.ultrasoundType
-                      ? "border-primary/40 bg-card text-foreground hover:bg-primary/10"
-                      : "border-border bg-card text-muted-foreground hover:text-foreground"
+          <PatientBackgroundQuickPanel
+            open={showBackground}
+            patient={patient}
+            background={background}
+            lastUltrasound={lastUltrasound}
+            lastColposcopy={lastColposcopy}
+          />
+
+          <form onSubmit={onSubmit} className="space-y-5">
+            {/* Plantillas Clínicas Editables CENDO */}
+            <div className="space-y-2 rounded-xl border border-primary/20 bg-primary/5 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-primary">
+                  <Sparkles className="size-3.5" />
+                  Plantillas Diagnósticas Rápidas CENDO (1 clic)
+                </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {canEditTemplates ? (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="xs"
+                        onClick={() => setSaveTemplateOpen(true)}
+                        className="bg-card"
+                      >
+                        <BookmarkPlus className="size-3.5 text-primary" />
+                        Guardar como plantilla
+                      </Button>
+                      {onOpenTemplatesManager ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="xs"
+                          onClick={onOpenTemplatesManager}
+                          className="bg-card"
+                        >
+                          <Settings className="size-3.5" />
+                          Gestionar
+                        </Button>
+                      ) : null}
+                    </>
+                  ) : (
+                    <span className="font-mono text-[10px] text-muted-foreground">
+                      Protocolo IDEA / MUSA / BI-RADS
+                    </span>
                   )}
-                >
-                  {preset.label}
-                </button>
-              ))}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {orderedTemplates.map((tmpl) => (
+                  <button
+                    key={tmpl.id}
+                    type="button"
+                    onClick={() => handleTemplateChipClick(tmpl)}
+                    className={cn(
+                      "cursor-pointer rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors",
+                      watchedUltrasoundType === tmpl.payload.ultrasoundType
+                        ? "border-primary/40 bg-card text-foreground hover:bg-primary/10"
+                        : "border-border bg-card text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {tmpl.name}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
           {/* 1. Datos Generales & Modalidad */}
           <div className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-12">
@@ -866,5 +994,111 @@ export function UltrasoundModal({
         </form>
       </DialogContent>
     </Dialog>
+
+    {/* Mini Dialog: Guardar estado actual como plantilla */}
+    <Dialog open={saveTemplateOpen} onOpenChange={setSaveTemplateOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <BookmarkPlus className="size-4 text-primary" />
+            Guardar Informe Actual como Plantilla
+          </DialogTitle>
+          <DialogDescription>
+            La modalidad, indicación, hallazgos, conclusión y recomendaciones
+            actuales quedarán disponibles para cualquier paciente.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSaveTemplateSubmit} className="space-y-3">
+          <div className="space-y-1.5">
+            <label
+              htmlFor="eco-save-tpl-name"
+              className="block text-xs font-semibold text-foreground"
+            >
+              Nombre de la Plantilla *
+            </label>
+            <Input
+              id="eco-save-tpl-name"
+              value={tplName}
+              onChange={(e) => setTplName(e.target.value)}
+              placeholder="Ej. DIU Normoinserto / Control Folículos"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label
+              htmlFor="eco-save-tpl-desc"
+              className="block text-xs font-semibold text-foreground"
+            >
+              Descripción Breve (Opcional)
+            </label>
+            <Input
+              id="eco-save-tpl-desc"
+              value={tplDesc}
+              onChange={(e) => setTplDesc(e.target.value)}
+              placeholder="Indicaciones o detalle rápido"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setSaveTemplateOpen(false)}
+              disabled={isSavingTemplate}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isSavingTemplate}>
+              {isSavingTemplate ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Save className="size-4" />
+              )}
+              Guardar Plantilla
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+
+    {/* Confirmación de sobrescritura en modo edición */}
+    <Dialog
+      open={Boolean(pendingTemplate)}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) setPendingTemplate(null);
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>¿Aplicar Plantilla Sobre Informe en Edición?</DialogTitle>
+          <DialogDescription>
+            Se reemplazarán la modalidad, hallazgos y conclusión actuales por la
+            plantilla{" "}
+            <strong className="text-foreground">{pendingTemplate?.name}</strong>.
+            La fecha del examen, consulta vinculada y fotografías subidas se
+            conservarán intactas.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setPendingTemplate(null)}
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            onClick={() => {
+              if (pendingTemplate) {
+                onApplyTemplate(pendingTemplate);
+                setPendingTemplate(null);
+              }
+            }}
+          >
+            Sí, Aplicar Plantilla
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </>
   );
 }

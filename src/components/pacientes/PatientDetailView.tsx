@@ -35,6 +35,7 @@ import {
   type PatientDetailTab,
 } from "@/features/pacientes/hooks/use-patient-detail";
 import type { CatalogCategoryItem } from "@/features/catalog-categories/catalog-categories.schema";
+import type { ClinicalTemplateItem } from "@/features/clinical-templates/clinical-templates.schema";
 import type { ColposcopyReportItem } from "@/features/colposcopia/colposcopia.schema";
 import type {
   ConsultationFormContext,
@@ -70,6 +71,7 @@ interface PatientDetailViewProps {
   initialQuotes: ProcedureQuoteItem[];
   initialUltrasounds: UltrasoundReportItem[];
   initialColposcopies: ColposcopyReportItem[];
+  initialClinicalTemplates: ClinicalTemplateItem[];
   initialTariffs: ProcedureTariffItem[];
   consultationFormContext: ConsultationFormContext;
   canEdit: boolean;
@@ -105,6 +107,7 @@ export function PatientDetailView({
   initialQuotes,
   initialUltrasounds,
   initialColposcopies,
+  initialClinicalTemplates,
   initialTariffs,
   consultationFormContext,
   canEdit,
@@ -791,6 +794,9 @@ export function PatientDetailView({
       <div className={activeTab === "consultas" ? "block" : "hidden"}>
         <TabConsultas
           patient={patient}
+          background={background}
+          lastUltrasound={ultrasoundsList[0] ?? null}
+          lastColposcopy={colposcopiesList[0] ?? null}
           initialConsultations={initialConsultations}
           initialReasons={initialConsultationReasons}
           formContext={consultationFormContext}
@@ -816,10 +822,12 @@ export function PatientDetailView({
       <div className={activeTab === "chequeos" ? "block" : "hidden"}>
         <TabChequeos
           patient={patient}
+          background={background}
           ultrasounds={ultrasoundsList}
           onUltrasoundsChange={setUltrasoundsList}
           colposcopies={colposcopiesList}
           onColposcopiesChange={setColposcopiesList}
+          initialClinicalTemplates={initialClinicalTemplates}
           consultations={consultationsList}
           checkupsCount={liveCounts.checkups}
           canEdit={canEdit}
@@ -832,6 +840,7 @@ export function PatientDetailView({
         <TabRecetas
           ref={recetasRef}
           patient={patient}
+          background={background}
           prescriptions={prescriptionsList}
           onPrescriptionsChange={setPrescriptionsList}
           vademecumOptions={consultationFormContext.vademecumOptions}

@@ -56,6 +56,7 @@ function mapConfigProfile(
     clinicalRole: row.clinicalRole,
     clinicName: row.clinicName,
     clinicAddress: row.clinicAddress,
+    googleMapsUrl: row.googleMapsUrl ?? "",
     phone: row.phone,
     contactEmail: row.contactEmail,
     hasSignature: Boolean(row.signatureUrl),
@@ -162,6 +163,11 @@ export async function updateOwnConfigProfile(
       throw new DomainError("La dirección de sede es obligatoria.");
     }
 
+    const nextGoogleMapsUrl =
+      input.googleMapsUrl !== undefined
+        ? input.googleMapsUrl.trim() || null
+        : current.googleMapsUrl;
+
     const [updated] = await db
       .update(profiles)
       .set({
@@ -172,6 +178,7 @@ export async function updateOwnConfigProfile(
         rne: input.rne.trim(),
         phone: input.phone.trim(),
         clinicAddress: cleanAddress,
+        googleMapsUrl: nextGoogleMapsUrl,
         showSignatureByDefault: input.showSignatureByDefault,
         updatedAt: now,
       })

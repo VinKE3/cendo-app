@@ -5,6 +5,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import type { ClinicalImageRecord } from "@/db/schema/specialty";
+import type {
+  UltrasoundClinicalTemplateItem,
+  UltrasoundTemplatePayload,
+} from "@/features/clinical-templates/clinical-templates.schema";
 import type { MedicalConsultationItem } from "@/features/consultas/consultas.schema";
 import { usePagination } from "@/hooks/use-pagination";
 import { compressClinicalImageFile } from "@/lib/image-compressor";
@@ -25,7 +29,6 @@ import {
   ULTRASOUND_TYPES,
   UTERUS_POSITIONS,
   type CreateUltrasoundInput,
-  type UltrasoundPreset,
   type UltrasoundReportItem,
 } from "../ecografias.schema";
 
@@ -34,6 +37,7 @@ export interface UseEcografiasParams {
   ultrasounds: UltrasoundReportItem[];
   onUltrasoundsChange: (next: UltrasoundReportItem[]) => void;
   consultations: MedicalConsultationItem[];
+  templates?: UltrasoundClinicalTemplateItem[];
 }
 
 export function toOptionalNumber(raw: unknown): number | undefined {
@@ -85,6 +89,7 @@ export function useEcografias({
   ultrasounds,
   onUltrasoundsChange,
   consultations,
+  templates = [],
 }: UseEcografiasParams) {
   const todayStr = useMemo(() => getPeruDateString(), []);
 
@@ -219,17 +224,17 @@ export function useEcografias({
     setEditingItem(null);
     setSaveAndPrintIntent(false);
     setDraftImages([]);
-    const defaultPreset = ULTRASOUND_PRESETS[0];
+    const firstTemplate = templates[0]?.payload ?? ULTRASOUND_PRESETS[0];
 
     form.reset({
       patientId,
       consultationId: consultations[0]?.id ?? "",
       reportDate: todayStr,
-      ultrasoundType: defaultPreset.ultrasoundType,
-      indication: defaultPreset.indication,
-      findings: toUltrasoundFormFindings(defaultPreset.findings),
-      conclusion: defaultPreset.conclusion,
-      recommendations: defaultPreset.recommendations,
+      ultrasoundType: firstTemplate.ultrasoundType,
+      indication: firstTemplate.indication,
+      findings: toUltrasoundFormFindings(firstTemplate.findings),
+      conclusion: firstTemplate.conclusion,
+      recommendations: firstTemplate.recommendations ?? "",
       images: [],
     });
     setDialogOpen(true);
@@ -255,18 +260,42 @@ export function useEcografias({
     setDialogOpen(true);
   };
 
-  const applyPreset = (preset: UltrasoundPreset) => {
-    form.setValue("ultrasoundType", preset.ultrasoundType, { shouldDirty: true });
-    form.setValue("indication", preset.indication, { shouldDirty: true });
+  const applyTemplate = (template: UltrasoundClinicalTemplateItem) => {
+    form.setValue("ultrasoundType", template.payload.ultrasoundType, {
+      shouldDirty: true,
+    });
+    form.setValue("indication", template.payload.indication, {
+      shouldDirty: true,
+    });
     const currentFindings = form.getValues("findings");
     form.setValue(
       "findings",
-      { ...currentFindings, ...toUltrasoundFormFindings(preset.findings) },
+      {
+        ...currentFindings,
+        ...toUltrasoundFormFindings(template.payload.findings),
+      },
       { shouldDirty: true }
     );
-    form.setValue("conclusion", preset.conclusion, { shouldDirty: true });
-    form.setValue("recommendations", preset.recommendations, { shouldDirty: true });
-    toast.success(`Plantilla aplicada: ${preset.label}`);
+    form.setValue("conclusion", template.payload.conclusion, {
+      shouldDirty: true,
+    });
+    form.setValue(
+      "recommendations",
+      template.payload.recommendations ?? "",
+      { shouldDirty: true }
+    );
+    toast.success(`Plantilla aplicada: ${template.name}`);
+  };
+
+  const buildTemplatePayloadFromForm = (): UltrasoundTemplatePayload => {
+    const vals = form.getValues();
+    return {
+      ultrasoundType: vals.ultrasoundType,
+      indication: vals.indication,
+      findings: vals.findings,
+      conclusion: vals.conclusion,
+      recommendations: vals.recommendations ?? "",
+    };
   };
 
   const autoCalculateVolume = (dimsText?: string) => {
@@ -457,7 +486,6 @@ export function useEcografias({
     watchedEndometrium,
     watchedDimensions,
     watchedVolume,
-    presets: ULTRASOUND_PRESETS,
     typeOptions: ULTRASOUND_TYPES,
     uterusPositions: UTERUS_POSITIONS,
     endometriumPatterns: ENDOMETRIUM_PATTERNS,
@@ -465,7 +493,8 @@ export function useEcografias({
     biradsOptions: BIRADS_OPTIONS,
     openCreateModal,
     openEditModal,
-    applyPreset,
+    applyTemplate,
+    buildTemplatePayloadFromForm,
     autoCalculateVolume,
     handleUploadFiles,
     updateDraftImageCaption,

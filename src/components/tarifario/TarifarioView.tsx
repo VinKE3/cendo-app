@@ -1,6 +1,16 @@
 "use client";
 
-import { Pencil, Plus, Receipt, Search, Tags, Trash2 } from "lucide-react";
+import { useState } from "react";
+import {
+  MessageCircle,
+  Pencil,
+  Plus,
+  Receipt,
+  Search,
+  Tags,
+  Trash2,
+  X,
+} from "lucide-react";
 import { ManageCategoriesModal } from "@/components/common/ManageCategoriesModal";
 import { TablePagination } from "@/components/common/TablePagination";
 import { Badge } from "@/components/ui/badge";
@@ -17,12 +27,15 @@ import {
 import type { CatalogCategoryItem } from "@/features/catalog-categories/catalog-categories.schema";
 import { useTarifario } from "@/features/tarifario/hooks/use-tarifario";
 import type { ProcedureTariffItem } from "@/features/tarifario/tarifario.schema";
+import type { CalendarClinicInfo } from "@/lib/calendar-export";
 import { cn, formatCurrency } from "@/lib/utils";
+import { generateTariffWhatsAppUrl } from "@/lib/whatsapp-share";
 import { TariffModal } from "./TariffModal";
 
 interface TarifarioViewProps {
   initialItems: ProcedureTariffItem[];
   initialCategories: CatalogCategoryItem[];
+  clinicInfo?: CalendarClinicInfo;
   canEdit: boolean;
   canDelete: boolean;
 }
@@ -30,11 +43,13 @@ interface TarifarioViewProps {
 export function TarifarioView({
   initialItems,
   initialCategories,
+  clinicInfo,
   canEdit,
   canDelete,
 }: TarifarioViewProps) {
   const {
     items,
+    allItems,
     totalCount,
     pagination,
     categories,
@@ -54,6 +69,52 @@ export function TarifarioView({
     onSubmit,
     handleDelete,
   } = useTarifario(initialItems, initialCategories);
+
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  const selectedItems = allItems.filter((row) => selectedIds.includes(row.id));
+  const pageItemIds = items.map((row) => row.id);
+  const allPageSelected =
+    pageItemIds.length > 0 && pageItemIds.every((id) => selectedIds.includes(id));
+
+  const toggleSelectId = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectPage = () => {
+    setSelectedIds((prev) => {
+      if (allPageSelected) {
+        return prev.filter((id) => !pageItemIds.includes(id));
+      }
+      const next = new Set(prev);
+      for (const id of pageItemIds) {
+        next.add(id);
+      }
+      return Array.from(next);
+    });
+  };
+
+  const sendTariffsWhatsApp = (targetItems: ProcedureTariffItem[]) => {
+    if (targetItems.length === 0) return;
+    const url = generateTariffWhatsAppUrl(
+      targetItems.map((t) => ({
+        code: t.code,
+        name: t.name,
+        category: t.category,
+        price: t.price,
+        description: t.description,
+      })),
+      clinicInfo
+    );
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const onDeleteRow = async (id: string) => {
+    await handleDelete(id);
+    setSelectedIds((prev) => prev.filter((item) => item !== id));
+  };
 
   return (
     <div className="space-y-6">
@@ -130,59 +191,128 @@ export function TarifarioView({
         </div>
       </div>
 
+      {selectedItems.length > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2.5">
+          <div className="text-xs text-foreground">
+            <strong className="text-primary">
+              {selectedItems.length}{" "}
+              {selectedItems.length === 1
+                ? "tarifa seleccionada"
+                : "tarifas seleccionadas"}
+            </strong>{" "}
+            <span className="font-mono text-muted-foreground">
+              • Total referencial:{" "}
+              {formatCurrency(
+                selectedItems.reduce((acc, row) => acc + Number(row.price || 0), 0)
+              )}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => sendTariffsWhatsApp(selectedItems)}
+            >
+              <MessageCircle className="size-3.5" />
+              Enviar {selectedItems.length} tarifa(s) por WhatsApp
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setSelectedIds([])}
+            >
+              <X className="size-3.5" />
+              Limpiar selección
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10 text-center">
+                <input
+                  type="checkbox"
+                  checked={allPageSelected}
+                  onChange={toggleSelectPage}
+                  aria-label="Seleccionar tarifas de esta página"
+                  className="size-3.5 cursor-pointer accent-primary"
+                />
+              </TableHead>
               <TableHead className="w-28">Código</TableHead>
               <TableHead>Procedimiento / Servicio</TableHead>
               <TableHead className="w-36">Categoría</TableHead>
               <TableHead className="w-28 text-right">Precio (S/)</TableHead>
               <TableHead className="w-24">Estado</TableHead>
-              {canEdit || canDelete ? (
-                <TableHead className="w-24 text-right">Acciones</TableHead>
-              ) : null}
+              <TableHead className="w-28 text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {items.length > 0 ? (
-              items.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-mono text-xs font-semibold text-primary">
-                    {item.code}
-                  </TableCell>
-                  <TableCell className="max-w-md whitespace-normal">
-                    <p className="font-medium text-foreground">{item.name}</p>
-                    {item.description ? (
-                      <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                        {item.description}
-                      </p>
-                    ) : null}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className="text-[11px]">
-                      {item.category}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right font-mono font-semibold text-foreground tabular-nums">
-                    {formatCurrency(item.price)}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "font-mono text-[10px]",
-                        item.active
-                          ? "border-success/40 bg-success/10 text-success"
-                          : "text-muted-foreground"
-                      )}
-                    >
-                      {item.active ? "ACTIVO" : "INACTIVO"}
-                    </Badge>
-                  </TableCell>
-                  {canEdit || canDelete ? (
+              items.map((item) => {
+                const isSelected = selectedIds.includes(item.id);
+                return (
+                  <TableRow
+                    key={item.id}
+                    className={isSelected ? "bg-primary/5" : undefined}
+                  >
+                    <TableCell className="text-center">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelectId(item.id)}
+                        aria-label={`Seleccionar ${item.code}`}
+                        className="size-3.5 cursor-pointer accent-primary"
+                      />
+                    </TableCell>
+                    <TableCell className="font-mono text-xs font-semibold text-primary">
+                      {item.code}
+                    </TableCell>
+                    <TableCell className="max-w-md whitespace-normal">
+                      <p className="font-medium text-foreground">{item.name}</p>
+                      {item.description ? (
+                        <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                          {item.description}
+                        </p>
+                      ) : null}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="text-[11px]">
+                        {item.category}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-mono font-semibold text-foreground tabular-nums">
+                      {formatCurrency(item.price)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "font-mono text-[10px]",
+                          item.active
+                            ? "border-success/40 bg-success/10 text-success"
+                            : "text-muted-foreground"
+                        )}
+                      >
+                        {item.active ? "ACTIVO" : "INACTIVO"}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="inline-flex items-center justify-end gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={() => sendTariffsWhatsApp([item])}
+                          aria-label={`Enviar ${item.code} por WhatsApp`}
+                          title="Enviar tarifa por WhatsApp"
+                          className="text-success hover:bg-success/10 hover:text-success"
+                        >
+                          <MessageCircle className="size-3.5" />
+                        </Button>
                         {canEdit ? (
                           <Button
                             type="button"
@@ -200,7 +330,7 @@ export function TarifarioView({
                             variant="ghost"
                             size="icon-xs"
                             disabled={deletingId === item.id}
-                            onClick={() => handleDelete(item.id)}
+                            onClick={() => void onDeleteRow(item.id)}
                             aria-label={`Eliminar ${item.code}`}
                             className="text-muted-foreground hover:text-destructive"
                           >
@@ -209,13 +339,13 @@ export function TarifarioView({
                         ) : null}
                       </div>
                     </TableCell>
-                  ) : null}
-                </TableRow>
-              ))
+                  </TableRow>
+                );
+              })
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={canEdit || canDelete ? 6 : 5}
+                  colSpan={7}
                   className="py-10 text-center text-sm text-muted-foreground"
                 >
                   No hay prestaciones que coincidan con el filtro actual.
