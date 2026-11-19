@@ -35,6 +35,7 @@ import { DomainError } from "@/lib/security/action-guard";
 import { downloadPrivateStorageObject } from "@/lib/supabase/storage";
 import { formatPeruDateDisplay } from "@/lib/utils";
 import {
+  autoOrderDossierItems,
   normalizeDossierConfig,
   type ClinicalCheckupItem,
 } from "../chequeos.schema";
@@ -1242,307 +1243,862 @@ async function drawColposcopySection(
     extendedFindings: colpo.extendedFindings,
   });
 
+  const ext = colpo.extendedFindings ?? {};
+  const inlinePhotos = colpo.images.slice(0, 4);
+  const overflowPhotos = colpo.images.slice(4);
+  const totalColpoPages = 2 + Math.ceil(overflowPhotos.length / 4);
+  const codeText = `N° COLP-${colpo.id.slice(0, 8).toUpperCase()}`;
+  const dateText = `Fecha: ${formatPeruDateDisplay(colpo.reportDate)}`;
+
+  // =========================================================================
+  // PÁGINA 1 DE COLPOSCOPÍA: FILIACIÓN + ANTECEDENTES + SECCIONES IFCPC I-VII
+  // =========================================================================
   const cursor = new PageCursor(assets, {
-    badgeText: "COLPOSCOPÍA DIGITAL IFCPC",
-    codeText: `N° COLP-${colpo.id.slice(0, 8).toUpperCase()}`,
-    dateText: `Fecha: ${formatPeruDateDisplay(colpo.reportDate)}`,
+    badgeText: `COLPOSCOPÍA DIGITAL (PÁG. 1/${totalColpoPages})`,
+    codeText,
+    dateText,
   });
 
   drawPatientStrip(
     cursor,
     patient,
-    `Clasificación IFCPC: ${classification.label} • ZT: ${colpo.transformationZoneType} • Schiller: ${colpo.schillerTest}`
+    `Validez: ${colpo.adequateColposcopy ? "Colposcopía Adecuada" : "Colposcopía Inadecuada"}  •  Clasificación IFCPC: ${classification.label}`
   );
 
-  // Bloque Antecedentes complementarios (Pág. 9 de informe.pdf)
-  if (background) {
-    cursor.ensureSpace(44);
-    cursor.page.drawRectangle({
-      x: MARGIN_X,
-      y: cursor.y - 38,
-      width: CONTENT_W,
-      height: 38,
-      color: C_BG_WARN,
-      borderColor: C_WARNING,
-      borderWidth: 0.6,
-    });
-    cursor.page.drawText("ANTECEDENTES COMPLEMENTARIOS", {
+  // Bloque Información Complementaria / Antecedentes (Pág. 9 de informe.pdf)
+  const bgBoxH = 42;
+  cursor.page.drawRectangle({
+    x: MARGIN_X,
+    y: cursor.y - bgBoxH,
+    width: CONTENT_W,
+    height: bgBoxH,
+    color: C_BG_SOFT,
+    borderColor: C_PRIMARY,
+    borderWidth: 0.6,
+  });
+  cursor.page.drawText(
+    "INFORMACIÓN COMPLEMENTARIA  •  ANTECEDENTES GINECO-OBSTÉTRICOS",
+    {
       x: MARGIN_X + 8,
       y: cursor.y - 11,
-      size: 7.5,
+      size: 7.4,
       font: assets.fontBold,
       color: C_PRIMARY,
-    });
-    const bgLine1 = sanitizeWinAnsi(
-      `Fórmula Obstétrica: ${background.obstetricFormula || "G0 P0000"}  •  FUR: ${
-        background.lastMenstrualPeriod
-          ? formatPeruDateDisplay(background.lastMenstrualPeriod)
-          : "No registra"
-      }  •  MAC: ${background.contraceptiveMethod || "Ninguno"}  •  IRS/NPS: ${
-        background.sexualDebutAge ?? "NA"
-      } / ${background.sexualPartnersCount ?? "NA"}`
-    );
-    const bgLine2 = sanitizeWinAnsi(
-      `PAP Previo: ${background.papHistory || "No refiere"}  •  Test VPH: ${
-        background.vphTestHistory || "No realizado"
-      }`
-    );
-    cursor.page.drawText(bgLine1.slice(0, 102), {
+    }
+  );
+  const bgLine1 = sanitizeWinAnsi(
+    `Fórmula Obstétrica: ${background?.obstetricFormula || "G0 P0000"}   •   FUR: ${
+      background?.lastMenstrualPeriod
+        ? formatPeruDateDisplay(background.lastMenstrualPeriod)
+        : "NA"
+    }   •   IRS / NPS: ${background?.sexualDebutAge ?? "NA"} / ${
+      background?.sexualPartnersCount ?? "NA"
+    }   •   MAC: ${background?.contraceptiveMethod || "Ninguno"}`
+  );
+  const bgLine2 = sanitizeWinAnsi(
+    `Resultado PAP Previo: ${background?.papHistory || "Pendiente / No refiere"}   •   Resultado Test VPH: ${
+      background?.vphTestHistory || "No se realizó"
+    }`
+  );
+  cursor.page.drawText(bgLine1.slice(0, 108), {
+    x: MARGIN_X + 8,
+    y: cursor.y - 23,
+    size: 7.8,
+    font: assets.fontRegular,
+    color: C_TEXT,
+  });
+  cursor.page.drawText(bgLine2.slice(0, 108), {
+    x: MARGIN_X + 8,
+    y: cursor.y - 34,
+    size: 7.8,
+    font: assets.fontRegular,
+    color: C_TEXT,
+  });
+  cursor.y -= bgBoxH + 7;
+
+  // Sección I: Criterios de Evaluación General (3 cajas)
+  const sec1H = 38;
+  cursor.page.drawRectangle({
+    x: MARGIN_X,
+    y: cursor.y - sec1H,
+    width: CONTENT_W,
+    height: sec1H,
+    color: C_WHITE,
+    borderColor: C_BORDER,
+    borderWidth: 0.7,
+  });
+  cursor.page.drawText(
+    "I. CRITERIOS DE EVALUACIÓN GENERAL (IFCPC RÍO DE JANEIRO 2011)",
+    {
       x: MARGIN_X + 8,
-      y: cursor.y - 22,
-      size: 7.8,
-      font: assets.fontRegular,
-      color: C_TEXT,
-    });
-    cursor.page.drawText(bgLine2.slice(0, 102), {
-      x: MARGIN_X + 8,
-      y: cursor.y - 32,
-      size: 7.8,
-      font: assets.fontRegular,
-      color: C_TEXT,
-    });
-    cursor.y -= 46;
+      y: cursor.y - 11,
+      size: 7.3,
+      font: assets.fontBold,
+      color: C_PRIMARY,
+    }
+  );
+  const c1Text = sanitizeWinAnsi(
+    `1. Adecuación: ${colpo.adequateColposcopy ? "Adecuada" : "Inadecuada"}${
+      !colpo.adequateColposcopy && ext.inadequateReason
+        ? ` (${ext.inadequateReason})`
+        : ""
+    }`
+  );
+  const c2Text = sanitizeWinAnsi(
+    `2. Unión Escamocolumnar (UEC): ${colpo.squamocolumnarJunctionVisible}`
+  );
+  const c3Text = sanitizeWinAnsi(
+    `3. Zona de Transformación: ${colpo.transformationZoneType}`
+  );
+  cursor.page.drawText(c1Text.slice(0, 38), {
+    x: MARGIN_X + 8,
+    y: cursor.y - 27,
+    size: 8,
+    font: assets.fontBold,
+    color: C_TEXT,
+  });
+  cursor.page.drawText(c2Text.slice(0, 40), {
+    x: MARGIN_X + 180,
+    y: cursor.y - 27,
+    size: 8,
+    font: assets.fontBold,
+    color: C_TEXT,
+  });
+  cursor.page.drawText(c3Text.slice(0, 34), {
+    x: MARGIN_X + 365,
+    y: cursor.y - 27,
+    size: 8,
+    font: assets.fontBold,
+    color: C_TEXT,
+  });
+  cursor.y -= sec1H + 7;
+
+  // Helper para dibujar tarjetas IFCPC II a VII en 2 columnas
+  interface IfcpcRowItem {
+    label: string;
+    pos: boolean;
+    severity: "n" | "w" | "d";
+    customRightText?: string;
   }
 
-  // Evaluación general IFCPC
-  cursor.drawKeyValue(
-    "Evaluación General",
-    `${colpo.adequateColposcopy ? "Adecuada" : "Inadecuada"}  •  ZSC: ${colpo.squamocolumnarJunctionVisible}  •  ZT: ${colpo.transformationZoneType}  •  Schiller: ${colpo.schillerTest}`,
-    8.5,
-    12
-  );
-  cursor.y -= 4;
-
-  // Matriz IFCPC 2011 en 2 columnas (solo positivos resaltados)
-  const ext = colpo.extendedFindings ?? {};
-  const leftItems: Array<{ label: string; pos: boolean; severity: "n" | "w" | "d" }> = [
-    { label: "Epitelio escamoso maduro", pos: colpo.matureSquamousEpithelium, severity: "n" },
-    { label: "Ectopia / Epitelio columnar", pos: colpo.ectopy, severity: "n" },
-    { label: "Quistes de Naboth", pos: Boolean(ext.nabothCyst), severity: "n" },
-    { label: "Aberturas glandulares", pos: Boolean(ext.cryptOpenings), severity: "n" },
-    { label: "Epitelio acetoblanco tenue (G1)", pos: colpo.thinAcetowhiteEpithelium, severity: "w" },
-    { label: "Borde irregular / geográfico (G1)", pos: colpo.irregularBorder, severity: "w" },
-    { label: "Mosaico fino (G1)", pos: colpo.fineMosaic, severity: "w" },
-    { label: "Punteado fino (G1)", pos: colpo.finePunctation, severity: "w" },
-    { label: "Pólipo / Condiloma cervical", pos: Boolean(ext.polyp || ext.condyloma), severity: "w" },
-    { label: "Inflamación / Cervicitis", pos: Boolean(ext.inflammation), severity: "w" },
-    { label: "ZT congénita / Endometriosis", pos: Boolean(ext.congenitalTZ || ext.endometriosisFoci), severity: "n" },
-  ];
-
-  const rightItems: Array<{ label: string; pos: boolean; severity: "n" | "w" | "d" }> = [
-    { label: "Epitelio acetoblanco denso (G2)", pos: colpo.denseAcetowhiteEpithelium, severity: "d" },
-    { label: "Acetoblanco aparición rápida (G2)", pos: Boolean(ext.rapidAcetowhite), severity: "d" },
-    { label: "Mosaico grueso (G2)", pos: colpo.coarseMosaic, severity: "d" },
-    { label: "Punteado grueso (G2)", pos: colpo.coarsePunctation, severity: "d" },
-    { label: "Bordes netos delimitados (G2)", pos: Boolean(ext.sharpBorders), severity: "d" },
-    { label: "Signo del límite interno (G2)", pos: Boolean(ext.innerBorderSign), severity: "d" },
-    { label: "Signo de la cresta (G2)", pos: Boolean(ext.ridgeSign), severity: "d" },
-    { label: "Orificios glandulares engrosados", pos: Boolean(ext.thickenedGlands), severity: "d" },
-    { label: "Leucoplasia / Erosión epitelial", pos: Boolean(ext.leukoplakia || ext.erosion), severity: "w" },
-    { label: "Vasos atípicos (Invasión)", pos: colpo.atypicalVessels, severity: "d" },
-    { label: "Vasos frágiles (Invasión)", pos: Boolean(ext.fragileVessels), severity: "d" },
-    {
-      label: "Sup. irregular / Exofítica / Necrosis",
-      pos: Boolean(
-        ext.irregularSurface || ext.exophyticLesion || ext.necrosis || ext.nodularTumor
-      ),
-      severity: "d",
-    },
-  ];
-
-  const maxRows = Math.max(leftItems.length, rightItems.length);
-  const rowH = 14;
-  const matrixH = 22 + maxRows * rowH;
-  cursor.ensureSpace(matrixH + 10);
-
   const colW = (CONTENT_W - 10) / 2;
-  const drawMatrixCol = (
+  const rowH = 13.5;
+  const headerH = 15;
+
+  const drawIfcpcCard = (
     x: number,
-    colTitle: string,
-    items: typeof leftItems
-  ) => {
+    topY: number,
+    title: string,
+    tag: string,
+    rows: IfcpcRowItem[],
+    footerLine?: string
+  ): number => {
+    const extraFooterH = footerLine ? 14 : 0;
+    const cardH = headerH + rows.length * rowH + 6 + extraFooterH;
+
     cursor.page.drawRectangle({
       x,
-      y: cursor.y - matrixH,
+      y: topY - cardH,
       width: colW,
-      height: matrixH,
+      height: cardH,
       color: C_WHITE,
       borderColor: C_BORDER,
       borderWidth: 0.7,
     });
-    cursor.page.drawText(sanitizeWinAnsi(colTitle.toUpperCase()), {
-      x: x + 8,
-      y: cursor.y - 12,
-      size: 7.5,
+
+    cursor.page.drawRectangle({
+      x,
+      y: topY - headerH,
+      width: colW,
+      height: headerH,
+      color: C_BG_SOFT,
+      borderColor: C_BORDER,
+      borderWidth: 0.5,
+    });
+
+    cursor.page.drawText(sanitizeWinAnsi(title), {
+      x: x + 6,
+      y: topY - 10.5,
+      size: 7.1,
       font: assets.fontBold,
       color: C_PRIMARY,
     });
 
-    let iy = cursor.y - 25;
-    for (const item of items) {
-      if (item.pos) {
+    const cleanTag = sanitizeWinAnsi(tag);
+    cursor.page.drawText(cleanTag, {
+      x: x + colW - 6 - assets.fontBold.widthOfTextAtSize(cleanTag, 6.5),
+      y: topY - 10.5,
+      size: 6.5,
+      font: assets.fontBold,
+      color: C_MUTED,
+    });
+
+    let iy = topY - headerH - 10.5;
+    for (const r of rows) {
+      if (r.pos && !r.customRightText) {
         cursor.page.drawRectangle({
-          x: x + 4,
-          y: iy - 3,
-          width: colW - 8,
+          x: x + 3,
+          y: iy - 2.5,
+          width: colW - 6,
           height: rowH - 1,
           color:
-            item.severity === "d"
+            r.severity === "d"
               ? C_BG_ALERT
-              : item.severity === "w"
+              : r.severity === "w"
                 ? C_BG_WARN
                 : C_BG_SOFT,
         });
       }
 
-      const mark = item.pos ? "[X]" : "[ ]";
-      const textColor = item.pos
-        ? item.severity === "d"
-          ? C_ALERT
-          : item.severity === "w"
-            ? C_PRIMARY
-            : C_SUCCESS
-        : C_MUTED;
+      const prefix = r.customRightText ? "" : r.pos ? "[X] " : "[ ] ";
+      cursor.page.drawText(sanitizeWinAnsi(`${prefix}${r.label}`).slice(0, 44), {
+        x: x + 6,
+        y: iy,
+        size: 7.3,
+        font: r.pos || r.customRightText ? assets.fontBold : assets.fontRegular,
+        color: r.pos || r.customRightText ? C_TEXT : C_MUTED,
+      });
 
-      cursor.page.drawText(
-        sanitizeWinAnsi(`${mark} ${item.label}`),
-        {
-          x: x + 8,
-          y: iy + 1,
-          size: 7.6,
-          font: item.pos ? assets.fontBold : assets.fontRegular,
-          color: item.pos ? C_TEXT : C_MUTED,
-        }
-      );
-
-      if (item.pos) {
-        const tag = "POSITIVO";
-        cursor.page.drawText(tag, {
-          x: x + colW - 8 - assets.fontBold.widthOfTextAtSize(tag, 6.8),
-          y: iy + 1,
-          size: 6.8,
+      if (r.customRightText) {
+        const valTxt = sanitizeWinAnsi(r.customRightText).slice(0, 26);
+        cursor.page.drawText(valTxt, {
+          x: x + colW - 6 - assets.fontBold.widthOfTextAtSize(valTxt, 7),
+          y: iy,
+          size: 7,
           font: assets.fontBold,
-          color: textColor,
+          color: C_PRIMARY,
+        });
+      } else if (r.pos) {
+        const badge = "POSITIVO";
+        const badgeColor =
+          r.severity === "d"
+            ? C_ALERT
+            : r.severity === "w"
+              ? C_PRIMARY
+              : C_SUCCESS;
+        cursor.page.drawText(badge, {
+          x: x + colW - 6 - assets.fontBold.widthOfTextAtSize(badge, 6.5),
+          y: iy,
+          size: 6.5,
+          font: assets.fontBold,
+          color: badgeColor,
         });
       }
 
       iy -= rowH;
     }
+
+    if (footerLine) {
+      cursor.page.drawLine({
+        start: { x: x + 6, y: iy + 8 },
+        end: { x: x + colW - 6, y: iy + 8 },
+        thickness: 0.4,
+        color: C_BORDER,
+      });
+      cursor.page.drawText(sanitizeWinAnsi(footerLine).slice(0, 52), {
+        x: x + 6,
+        y: iy - 1,
+        size: 7,
+        font: assets.fontRegular,
+        color: C_TEXT,
+      });
+    }
+
+    return topY - cardH - 6;
   };
 
-  drawMatrixCol(MARGIN_X, "Normales, Grado 1 (Menor) & Misc.", leftItems);
-  drawMatrixCol(MARGIN_X + colW + 10, "Grado 2 (Mayor) & Invasión", rightItems);
-  cursor.y -= matrixH + 10;
+  // Columna Izquierda: II, III y IV
+  let leftY = cursor.y;
+  leftY = drawIfcpcCard(
+    MARGIN_X,
+    leftY,
+    "II. HALLAZGOS NORMALES (FISIOLÓGICOS)",
+    "IFCPC 2011",
+    [
+      {
+        label: "Epitelio Escamoso Original: Maduro",
+        pos: colpo.matureSquamousEpithelium,
+        severity: "n",
+      },
+      {
+        label: "Ectopia / Epitelio Cilíndrico (Columnar)",
+        pos: colpo.ectopy,
+        severity: "n",
+      },
+      {
+        label: "Epitelio Metaplásico: Quistes de Naboth",
+        pos: Boolean(ext.nabothCyst),
+        severity: "n",
+      },
+      {
+        label: "Criptas / Aberturas Glandulares Abiertas",
+        pos: Boolean(ext.cryptOpenings),
+        severity: "n",
+      },
+      {
+        label: "Deciduosis en el Embarazo",
+        pos: Boolean(ext.deciduosis),
+        severity: "n",
+      },
+    ]
+  );
 
-  // Reloj cervical + Diagnóstico & Plan
+  leftY = drawIfcpcCard(
+    MARGIN_X,
+    leftY,
+    "III. HALLAZGOS ANORMALES • GRADO 1 (MENOR)",
+    "LIE-BG",
+    [
+      {
+        label: "Epitelio Acetoblanco Delgado / Tenue",
+        pos: colpo.thinAcetowhiteEpithelium,
+        severity: "w",
+      },
+      {
+        label: "Borde Irregular / Geográfico",
+        pos: colpo.irregularBorder,
+        severity: "w",
+      },
+      {
+        label: "Mosaico Fino",
+        pos: colpo.fineMosaic,
+        severity: "w",
+      },
+      {
+        label: "Punteado (Puntillado) Fino",
+        pos: colpo.finePunctation,
+        severity: "w",
+      },
+    ]
+  );
+
+  leftY = drawIfcpcCard(
+    MARGIN_X,
+    leftY,
+    "IV. HALLAZGOS ANORMALES • GRADO 2 (MAYOR)",
+    "LIE-AG",
+    [
+      {
+        label: "Epitelio Acetoblanco Denso / Nacarado",
+        pos: colpo.denseAcetowhiteEpithelium,
+        severity: "d",
+      },
+      {
+        label: "Aparición Rápida de Epitelio Acetoblanco",
+        pos: Boolean(ext.rapidAcetowhite),
+        severity: "d",
+      },
+      {
+        label: "Orificios Glandulares con Bordes Engrosados",
+        pos: Boolean(ext.thickenedGlands),
+        severity: "d",
+      },
+      {
+        label: "Mosaico Grueso",
+        pos: colpo.coarseMosaic,
+        severity: "d",
+      },
+      {
+        label: "Punteado (Puntillado) Grueso",
+        pos: colpo.coarsePunctation,
+        severity: "d",
+      },
+      {
+        label: "Bordes Delimitados / Cortantes",
+        pos: Boolean(ext.sharpBorders),
+        severity: "d",
+      },
+      {
+        label: "Signo del Límite del Borde Interno",
+        pos: Boolean(ext.innerBorderSign),
+        severity: "d",
+      },
+      {
+        label: "Signo de la Cresta o Sobreelevado (Ridge)",
+        pos: Boolean(ext.ridgeSign),
+        severity: "d",
+      },
+    ]
+  );
+
+  // Columna Derecha: V, VI y VII
+  const rightX = MARGIN_X + colW + 10;
+  let rightY = cursor.y;
+  rightY = drawIfcpcCard(
+    rightX,
+    rightY,
+    "V. NO ESPECÍFICOS & TEST DE SCHILLER",
+    "LUGOL",
+    [
+      {
+        label: "Leucoplasia (Queratosis / Hiperqueratosis)",
+        pos: Boolean(ext.leukoplakia),
+        severity: "w",
+      },
+      {
+        label: "Erosión / Ulceración Epitelial",
+        pos: Boolean(ext.erosion),
+        severity: "w",
+      },
+      {
+        label: "Test de Schiller (Lugol):",
+        pos: false,
+        severity: "n",
+        customRightText: colpo.schillerTest,
+      },
+    ]
+  );
+
+  rightY = drawIfcpcCard(
+    rightX,
+    rightY,
+    "VI. SOSPECHA DE INVASIÓN NEOPLÁSICA",
+    "ALERTA",
+    [
+      {
+        label: "Vasos Atípicos / Calibre Irregular",
+        pos: colpo.atypicalVessels,
+        severity: "d",
+      },
+      {
+        label: "Vasos Delgados / Fragilidad Vascular",
+        pos: Boolean(ext.fragileVessels),
+        severity: "d",
+      },
+      {
+        label: "Superficie Irregular / Nodular",
+        pos: Boolean(ext.irregularSurface),
+        severity: "d",
+      },
+      {
+        label: "Lesión Exofítica Creciente",
+        pos: Boolean(ext.exophyticLesion),
+        severity: "d",
+      },
+      {
+        label: "Necrosis / Ulceración Necrótica",
+        pos: Boolean(ext.necrosis),
+        severity: "d",
+      },
+      {
+        label: "Tumoración Nodular Visible",
+        pos: Boolean(ext.nodularTumor),
+        severity: "d",
+      },
+    ]
+  );
+
+  rightY = drawIfcpcCard(
+    rightX,
+    rightY,
+    "VII. HALLAZGOS VARIOS / MISCELÁNEOS",
+    "OTROS",
+    [
+      {
+        label: "Zona de Transformación Congénita",
+        pos: Boolean(ext.congenitalTZ),
+        severity: "n",
+      },
+      {
+        label: "Condiloma / Excrecencia VPH",
+        pos: Boolean(ext.condyloma),
+        severity: "w",
+      },
+      {
+        label: "Pólipo (Exocervical / Endocervical)",
+        pos: Boolean(ext.polyp),
+        severity: "w",
+      },
+      {
+        label: "Inflamación / Cervicitis",
+        pos: Boolean(ext.inflammation),
+        severity: "w",
+      },
+      {
+        label: "Estenosis del Canal Cervical",
+        pos: Boolean(ext.stenosis),
+        severity: "w",
+      },
+      {
+        label: "Anomalías Post-Tratamiento",
+        pos: Boolean(ext.postTreatmentAnomaly),
+        severity: "w",
+      },
+      {
+        label: "Focos de Endometriosis Cervical",
+        pos: Boolean(ext.endometriosisFoci),
+        severity: "w",
+      },
+    ],
+    `Otros: ${ext.otherFindings?.trim() || "Ninguno"}`
+  );
+
+  const page1BottomNote =
+    "Continua en Pagina 2: Mapeo de Biopsia (Reloj Cervical), Diagnostico, Plan de Manejo y Registro Fotografico";
+  cursor.page.drawText(page1BottomNote, {
+    x:
+      PAGE_W / 2 -
+      assets.fontRegular.widthOfTextAtSize(page1BottomNote, 7.5) / 2,
+    y: Math.max(assets.footerSafeY - 6, Math.min(leftY, rightY) - 10),
+    size: 7.5,
+    font: assets.fontRegular,
+    color: C_MUTED,
+  });
+
+  // =========================================================================
+  // PÁGINA 2 DE COLPOSCOPÍA: BIOPSIA (RELOJ) + DIAGNÓSTICO + FOTOS + FIRMA
+  // =========================================================================
+  const page2 = assets.pdfDoc.addPage([PAGE_W, PAGE_H]);
+  let y2 = drawHeaderAndFooterOnPage(page2, assets, {
+    badgeText: `COLPOSCOPÍA DIGITAL (PÁG. 2/${totalColpoPages})`,
+    codeText,
+    dateText,
+  });
+
+  page2.drawText(
+    sanitizeWinAnsi(
+      `Paciente: ${patient.fullName} (${patient.documentType} ${patient.documentNumber})  •  Edad: ${patient.age} años`
+    ),
+    {
+      x: MARGIN_X,
+      y: y2,
+      size: 8.5,
+      font: assets.fontBold,
+      color: C_MUTED,
+    }
+  );
+  y2 -= 14;
+
+  // Bloque Superior Lado a Lado: BIOPSIA (Izquierda) + DIAGNÓSTICO & PLAN (Derecha)
+  const leftBoxW = 185;
+  const rightBoxW = CONTENT_W - leftBoxW - 10;
+  const rightBoxX = MARGIN_X + leftBoxW + 10;
+
   const diagLines = wrapText(
-    colpo.diagnosis,
+    `3. ${colpo.diagnosis.toUpperCase()}`,
     assets.fontBold,
-    9,
-    CONTENT_W - 150
+    8.5,
+    rightBoxW - 16
   );
   const planLines = wrapText(
     colpo.planRecommendations,
     assets.fontRegular,
-    8.5,
-    CONTENT_W - 150
+    8.3,
+    rightBoxW - 16
   );
-  const blockH = Math.max(122, 54 + diagLines.length * 11 + planLines.length * 11);
-  cursor.ensureSpace(blockH + 10);
+  const diagBoxH = Math.max(58, 36 + diagLines.length * 10.5);
+  const planBoxH = Math.max(66, 24 + planLines.length * 10.5);
+  const topBlockH = Math.max(132, diagBoxH + 8 + planBoxH);
 
-  cursor.page.drawRectangle({
+  // Caja Izquierda: Biopsia y Reloj Cervical
+  page2.drawRectangle({
     x: MARGIN_X,
-    y: cursor.y - blockH,
-    width: CONTENT_W,
-    height: blockH,
-    color: C_BG_SOFT,
+    y: y2 - topBlockH,
+    width: leftBoxW,
+    height: topBlockH,
+    color: C_WHITE,
     borderColor: C_PRIMARY,
     borderWidth: 0.7,
   });
-
-  drawCervicalClockVector(
-    cursor.page,
-    assets,
-    MARGIN_X + 66,
-    cursor.y - blockH / 2 - 4,
-    38,
-    colpo.biopsyClockHours
-  );
-  cursor.page.drawText("MAPA HORARIO CERVICAL", {
-    x: MARGIN_X + 18,
-    y: cursor.y - 13,
+  page2.drawRectangle({
+    x: MARGIN_X,
+    y: y2 - 15,
+    width: leftBoxW,
+    height: 15,
+    color: C_BG_SOFT,
+    borderColor: C_PRIMARY,
+    borderWidth: 0.5,
+  });
+  page2.drawText("BIOPSIA CERVICAL & MAPEO HORARIO", {
+    x: MARGIN_X + 8,
+    y: y2 - 10.5,
     size: 7.2,
     font: assets.fontBold,
     color: C_PRIMARY,
   });
 
-  cursor.page.drawLine({
-    start: { x: MARGIN_X + 132, y: cursor.y - 6 },
-    end: { x: MARGIN_X + 132, y: cursor.y - blockH + 6 },
-    thickness: 0.6,
-    color: C_BORDER,
+  const yesNoTxt = colpo.cervicalBiopsyTaken
+    ? "SI [X] (Biopsia Dirigida)     NO [ ]"
+    : "SI [ ]     NO [X] (Sin Biopsia)";
+  page2.drawText(yesNoTxt, {
+    x:
+      MARGIN_X +
+      (leftBoxW - assets.fontBold.widthOfTextAtSize(yesNoTxt, 7.5)) / 2,
+    y: y2 - 28,
+    size: 7.5,
+    font: assets.fontBold,
+    color: C_TEXT,
   });
 
-  let textY = cursor.y - 15;
-  const rx = MARGIN_X + 142;
-  cursor.page.drawText(
-    sanitizeWinAnsi(`DIAGNÓSTICO COLPOSCÓPICO  •  CIE-10: ${colpo.cie10Code}`),
-    {
-      x: rx,
-      y: textY,
-      size: 8,
-      font: assets.fontBold,
-      color: C_PRIMARY,
-    }
+  drawCervicalClockVector(
+    page2,
+    assets,
+    MARGIN_X + leftBoxW / 2,
+    y2 - topBlockH / 2 - 4,
+    34,
+    colpo.biopsyClockHours
   );
-  textY -= 13;
 
-  for (const dl of diagLines) {
-    cursor.page.drawText(dl, {
-      x: rx,
-      y: textY,
-      size: 9,
-      font: assets.fontBold,
-      color: C_TEXT,
-    });
-    textY -= 11;
-  }
-  textY -= 3;
-  for (const pl of planLines) {
-    cursor.page.drawText(pl, {
-      x: rx,
-      y: textY,
-      size: 8.5,
-      font: assets.fontRegular,
-      color: C_TEXT,
-    });
-    textY -= 11;
-  }
-
-  const biopsyTxt = colpo.cervicalBiopsyTaken
-    ? colpo.biopsyClockHours.length > 0
-      ? `Biopsia Cervical: Tomada en horas ${colpo.biopsyClockHours.map((h) => `${h}h`).join(", ")}`
-      : "Biopsia Cervical: Tomada (biopsia dirigida)"
-    : "Biopsia Cervical: No requerida en este acto";
-  cursor.page.drawText(sanitizeWinAnsi(biopsyTxt), {
-    x: rx,
-    y: cursor.y - blockH + 10,
-    size: 8,
+  const hoursSubTxt = sanitizeWinAnsi(
+    colpo.cervicalBiopsyTaken
+      ? colpo.biopsyClockHours.length > 0
+        ? `Horas: ${colpo.biopsyClockHours.map((h) => `${h}h`).join(", ")}`
+        : "Biopsia cervical tomada"
+      : "Sin toma de biopsia dirigida"
+  );
+  page2.drawText(hoursSubTxt, {
+    x:
+      MARGIN_X +
+      (leftBoxW - assets.fontBold.widthOfTextAtSize(hoursSubTxt, 7.3)) / 2,
+    y: y2 - topBlockH + 8,
+    size: 7.3,
     font: assets.fontBold,
     color: C_PRIMARY,
   });
 
-  cursor.y -= blockH + 8;
-
-  cursor.drawSignature(doctor, showDigitalSignature);
-
-  await appendPhotoAnnexPages(assets, colpo.images, {
-    title: "ANEXO FOTOGRÁFICO COLPOSCOPÍA",
-    codeText: `N° COLP-${colpo.id.slice(0, 8).toUpperCase()}`,
-    dateText: formatPeruDateDisplay(colpo.reportDate),
-    patientLabel: `${patient.fullName} (${patient.documentType} ${patient.documentNumber})`,
-    perPage: 4,
+  // Caja Derecha Superior: Diagnóstico Colposcópico Conclusivo
+  page2.drawRectangle({
+    x: rightBoxX,
+    y: y2 - diagBoxH,
+    width: rightBoxW,
+    height: diagBoxH,
+    color: C_BG_WARN,
+    borderColor: C_WARNING,
+    borderWidth: 0.7,
   });
+  page2.drawText("DIAGNÓSTICO COLPOSCÓPICO CONCLUSIVO", {
+    x: rightBoxX + 8,
+    y: y2 - 11,
+    size: 7.4,
+    font: assets.fontBold,
+    color: C_PRIMARY,
+  });
+  const cieTxt = sanitizeWinAnsi(`CIE-10: ${colpo.cie10Code}`);
+  page2.drawText(cieTxt, {
+    x: rightBoxX + rightBoxW - 8 - assets.fontBold.widthOfTextAtSize(cieTxt, 7.4),
+    y: y2 - 11,
+    size: 7.4,
+    font: assets.fontBold,
+    color: C_PRIMARY,
+  });
+
+  let dy = y2 - 24;
+  page2.drawText(
+    sanitizeWinAnsi(
+      `1. ${colpo.adequateColposcopy ? "COLPOSCOPÍA ADECUADA" : "COLPOSCOPÍA INADECUADA"}  •  UEC ${colpo.squamocolumnarJunctionVisible.toUpperCase()}`
+    ),
+    {
+      x: rightBoxX + 8,
+      y: dy,
+      size: 8.2,
+      font: assets.fontBold,
+      color: C_TEXT,
+    }
+  );
+  dy -= 10.5;
+  page2.drawText(
+    sanitizeWinAnsi(
+      `2. ZONA DE TRANSFORMACIÓN ${colpo.transformationZoneType.toUpperCase()}`
+    ),
+    {
+      x: rightBoxX + 8,
+      y: dy,
+      size: 8.2,
+      font: assets.fontBold,
+      color: C_TEXT,
+    }
+  );
+  dy -= 10.5;
+  for (const dl of diagLines) {
+    page2.drawText(dl, {
+      x: rightBoxX + 8,
+      y: dy,
+      size: 8.4,
+      font: assets.fontBold,
+      color: C_PRIMARY,
+    });
+    dy -= 10.5;
+  }
+
+  // Caja Derecha Inferior: Plan de Manejo y Conducta Recomendada
+  const planTopY = y2 - diagBoxH - 8;
+  const actualPlanH = topBlockH - diagBoxH - 8;
+  page2.drawRectangle({
+    x: rightBoxX,
+    y: planTopY - actualPlanH,
+    width: rightBoxW,
+    height: actualPlanH,
+    color: C_BG_SOFT,
+    borderColor: C_PRIMARY,
+    borderWidth: 0.7,
+  });
+  page2.drawText("PLAN DE MANEJO Y CONDUCTA RECOMENDADA", {
+    x: rightBoxX + 8,
+    y: planTopY - 11,
+    size: 7.4,
+    font: assets.fontBold,
+    color: C_PRIMARY,
+  });
+  let py = planTopY - 24;
+  for (const pl of planLines.slice(0, 5)) {
+    page2.drawText(pl, {
+      x: rightBoxX + 8,
+      y: py,
+      size: 8.3,
+      font: assets.fontRegular,
+      color: C_TEXT,
+    });
+    py -= 10.5;
+  }
+
+  y2 -= topBlockH + 10;
+
+  // Bloque Central: Registro Fotográfico Integrado en Página 2 (hasta 4 fotos)
+  const photoHeaderH = 16;
+  page2.drawRectangle({
+    x: MARGIN_X,
+    y: y2 - photoHeaderH,
+    width: CONTENT_W,
+    height: photoHeaderH,
+    color: C_BG_SOFT,
+    borderColor: C_PRIMARY,
+    borderWidth: 0.6,
+  });
+  page2.drawText(
+    sanitizeWinAnsi(
+      `IMÁGENES  •  REGISTRO FOTOGRÁFICO COLPOSCÓPICO DIGITAL (${colpo.images.length} ${
+        colpo.images.length === 1 ? "TOMA" : "TOMAS"
+      })`
+    ),
+    {
+      x: MARGIN_X + 8,
+      y: y2 - 11,
+      size: 7.4,
+      font: assets.fontBold,
+      color: C_PRIMARY,
+    }
+  );
+  y2 -= photoHeaderH + 6;
+
+  if (inlinePhotos.length === 0) {
+    const emptyPhotoH = 32;
+    page2.drawRectangle({
+      x: MARGIN_X,
+      y: y2 - emptyPhotoH,
+      width: CONTENT_W,
+      height: emptyPhotoH,
+      color: C_WHITE,
+      borderColor: C_BORDER,
+      borderWidth: 0.6,
+    });
+    page2.drawText(
+      "Sin capturas fotograficas digitales adjuntas en este informe.",
+      {
+        x: MARGIN_X + 12,
+        y: y2 - 19,
+        size: 8.2,
+        font: assets.fontRegular,
+        color: C_MUTED,
+      }
+    );
+    y2 -= emptyPhotoH + 12;
+  } else {
+    // Si son 1, 2 o 3 fotos: 1 fila horizontal (como la Pág. 10 de informe.pdf); si son 4: grilla 2x2 compacta
+    const cols =
+      inlinePhotos.length === 3 ? 3 : inlinePhotos.length === 1 ? 1 : 2;
+    const rows = inlinePhotos.length === 4 ? 2 : 1;
+    const gap = 8;
+    const maxPhotosAreaH = Math.max(
+      120,
+      Math.min(
+        rows === 2 ? 235 : 175,
+        y2 - (assets.footerSafeY + SIGNATURE_BLOCK_HEIGHT + 10)
+      )
+    );
+    const cellW = (CONTENT_W - gap * (cols - 1)) / cols;
+    const cellH = (maxPhotosAreaH - gap * (rows - 1)) / rows;
+    const capH = 15;
+    const imgBoxH = cellH - capH;
+
+    for (let idx = 0; idx < inlinePhotos.length; idx++) {
+      const col = idx % cols;
+      const row = Math.floor(idx / cols);
+      const cellX = MARGIN_X + col * (cellW + gap);
+      const cellTopY = y2 - row * (cellH + gap);
+
+      page2.drawRectangle({
+        x: cellX,
+        y: cellTopY - cellH,
+        width: cellW,
+        height: cellH,
+        color: C_WHITE,
+        borderColor: C_BORDER,
+        borderWidth: 0.7,
+      });
+
+      const downloaded = await downloadPrivateStorageObject({
+        bucket: "clinical-images",
+        path: inlinePhotos[idx].storagePath,
+      }).catch(() => null);
+
+      if (downloaded) {
+        const embedded = await embedImageSafe(
+          assets.pdfDoc,
+          new Uint8Array(downloaded.buffer)
+        );
+        if (embedded) {
+          const fitted = embedded.scaleToFit(cellW - 6, imgBoxH - 6);
+          page2.drawImage(embedded, {
+            x: cellX + (cellW - fitted.width) / 2,
+            y: cellTopY - imgBoxH + (imgBoxH - fitted.height) / 2,
+            width: fitted.width,
+            height: fitted.height,
+          });
+        }
+      }
+
+      page2.drawRectangle({
+        x: cellX,
+        y: cellTopY - cellH,
+        width: cellW,
+        height: capH,
+        color: C_BG_SOFT,
+        borderColor: C_BORDER,
+        borderWidth: 0.5,
+      });
+
+      const caption = sanitizeWinAnsi(
+        `${idx + 1}. ${inlinePhotos[idx].caption || `Captura ${idx + 1}`}`
+      ).slice(0, cols === 3 ? 28 : 44);
+      page2.drawText(caption, {
+        x: cellX + 5,
+        y: cellTopY - cellH + 4.5,
+        size: 7.2,
+        font: assets.fontBold,
+        color: C_TEXT,
+      });
+    }
+
+    y2 -= maxPhotosAreaH + 10;
+  }
+
+  // Firma digital del médico al pie de la Página 2
+  const sigTopY = Math.max(
+    assets.footerSafeY + SIGNATURE_BLOCK_HEIGHT - 8,
+    y2 - 4
+  );
+  drawSignatureBlock(page2, assets, doctor, showDigitalSignature, sigTopY);
+
+  // Si hubiera más de 4 fotos, las fotos 5..N van en hojas anexas adicionales
+  if (overflowPhotos.length > 0) {
+    await appendPhotoAnnexPages(assets, overflowPhotos, {
+      title: "ANEXO FOTOGRÁFICO ADICIONAL COLPOSCOPÍA",
+      codeText,
+      dateText,
+      patientLabel: `${patient.fullName} (${patient.documentType} ${patient.documentNumber})`,
+      perPage: 4,
+    });
+  }
 }
 
 export async function generateCheckupDossierPdf(params: {
@@ -1625,68 +2181,97 @@ export async function generateCheckupDossierPdf(params: {
     config.items
   );
 
-  const ecoIds = Array.from(
-    new Set(
-      config.items.filter((i) => i.kind === "ULTRASOUND").map((i) => i.refId)
-    )
-  );
-  const colpoIds = Array.from(
-    new Set(
-      config.items.filter((i) => i.kind === "COLPOSCOPY").map((i) => i.refId)
-    )
-  );
-  const docIds = Array.from(
-    new Set(
-      config.items.filter((i) => i.kind === "DOCUMENT").map((i) => i.refId)
-    )
-  );
-
-  // Lote 2 (<=3 queries): estudios propios + metadatos PDF externos
+  // Lote 2 (<=3 queries): todos los estudios activos de la paciente + PDFs externos
   const [ecoRows, colpoRows, docRows] = await Promise.all([
-    ecoIds.length > 0
-      ? db
-          .select()
-          .from(ultrasoundReports)
-          .where(
-            and(
-              eq(ultrasoundReports.tenantId, params.tenantId),
-              eq(ultrasoundReports.patientId, checkup.patientId),
-              isNull(ultrasoundReports.deletedAt),
-              inArray(ultrasoundReports.id, ecoIds)
-            )
-          )
-      : Promise.resolve([]),
-    colpoIds.length > 0
-      ? db
-          .select()
-          .from(colposcopyReports)
-          .where(
-            and(
-              eq(colposcopyReports.tenantId, params.tenantId),
-              eq(colposcopyReports.patientId, checkup.patientId),
-              isNull(colposcopyReports.deletedAt),
-              inArray(colposcopyReports.id, colpoIds)
-            )
-          )
-      : Promise.resolve([]),
-    docIds.length > 0
-      ? db
-          .select()
-          .from(patientDocuments)
-          .where(
-            and(
-              eq(patientDocuments.tenantId, params.tenantId),
-              eq(patientDocuments.patientId, checkup.patientId),
-              isNull(patientDocuments.deletedAt),
-              inArray(patientDocuments.id, docIds)
-            )
-          )
-      : Promise.resolve([]),
+    db
+      .select()
+      .from(ultrasoundReports)
+      .where(
+        and(
+          eq(ultrasoundReports.tenantId, params.tenantId),
+          eq(ultrasoundReports.patientId, checkup.patientId),
+          isNull(ultrasoundReports.deletedAt)
+        )
+      ),
+    db
+      .select()
+      .from(colposcopyReports)
+      .where(
+        and(
+          eq(colposcopyReports.tenantId, params.tenantId),
+          eq(colposcopyReports.patientId, checkup.patientId),
+          isNull(colposcopyReports.deletedAt)
+        )
+      ),
+    db
+      .select()
+      .from(patientDocuments)
+      .where(
+        and(
+          eq(patientDocuments.tenantId, params.tenantId),
+          eq(patientDocuments.patientId, checkup.patientId),
+          isNull(patientDocuments.deletedAt)
+        )
+      ),
   ]);
 
-  const ecoMap = new Map(ecoRows.map((r) => [r.id, mapUltrasoundRow(r)]));
-  const colpoMap = new Map(colpoRows.map((r) => [r.id, mapColposcopyRow(r)]));
+  const mappedEcos = ecoRows.map((r) => mapUltrasoundRow(r));
+  const mappedColpos = colpoRows.map((r) => mapColposcopyRow(r));
+  const ecoMap = new Map(mappedEcos.map((r) => [r.id, r]));
+  const colpoMap = new Map(mappedColpos.map((r) => [r.id, r]));
   const docMap = new Map(docRows.map((r) => [r.id, r]));
+
+  // Si hay estudios de la paciente agregados después de crear el chequeo, integrarlos en orden oficial CENDO
+  const mergedItems = [...config.items];
+  const hasDossierRef = (kind: "ULTRASOUND" | "COLPOSCOPY" | "DOCUMENT", refId: string) =>
+    mergedItems.some((entry) => entry.kind === kind && entry.refId === refId);
+
+  for (const eco of mappedEcos) {
+    if (!hasDossierRef("ULTRASOUND", eco.id)) {
+      mergedItems.push({
+        kind: "ULTRASOUND",
+        refId: eco.id,
+        label: `Ecografía (${eco.reportDate})`,
+      });
+    }
+  }
+  for (const colpo of mappedColpos) {
+    if (!hasDossierRef("COLPOSCOPY", colpo.id)) {
+      mergedItems.push({
+        kind: "COLPOSCOPY",
+        refId: colpo.id,
+        label: `Colposcopía IFCPC (${colpo.reportDate})`,
+      });
+    }
+  }
+  for (const docRow of docRows) {
+    if (!hasDossierRef("DOCUMENT", docRow.id)) {
+      mergedItems.push({
+        kind: "DOCUMENT",
+        refId: docRow.id,
+        label: `PDF: ${docRow.title}`,
+      });
+    }
+  }
+
+  const effectiveDossierItems = autoOrderDossierItems(
+    mergedItems,
+    mappedEcos,
+    docRows.map((d) => ({
+      id: d.id,
+      patientId: d.patientId,
+      documentType: d.documentType as "EXTERNO",
+      title: d.title,
+      documentDate: d.documentDate ?? checkup.checkupDate,
+      storagePath: d.storagePath,
+      fileName: d.fileName,
+      fileSize: d.fileSize ?? 0,
+      mimeType: d.mimeType,
+      notes: d.notes ?? "",
+      createdAt: d.createdAt.toISOString(),
+      updatedAt: d.updatedAt.toISOString(),
+    }))
+  );
 
   // Resolver firmas privadas de los médicos participantes
   const doctorIds = Array.from(
@@ -1837,7 +2422,7 @@ export async function generateCheckupDossierPdf(params: {
   }
 
   // 3. Iterar piezas ordenadas del dossier intercalando estudios propios y PDFs externos
-  for (const item of config.items) {
+  for (const item of effectiveDossierItems) {
     if (item.kind === "ULTRASOUND") {
       const eco = ecoMap.get(item.refId);
       if (!eco) continue;

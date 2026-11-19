@@ -181,13 +181,17 @@ export function useChequeos({
       ? [...explicitItems]
       : [...(form.getValues("dossierConfig.items") ?? [])];
 
-    // Si aún no hay ítems seleccionados, seleccionar automáticamente los estudios más recientes
-    if (items.length === 0) {
-      const candidateItems: CheckupDossierItemRecord[] = [];
+    // Si no se pasaron explicitItems (ej. botón "Sincronizar estudios" o creación inicial),
+    // agregar automáticamente cualquier estudio reciente o PDF externo que aún no esté vinculado.
+    if (!explicitItems) {
+      const candidateItems: CheckupDossierItemRecord[] = [...items];
+      const hasItem = (kind: CheckupDossierItemRecord["kind"], refId: string) =>
+        candidateItems.some((entry) => entry.kind === kind && entry.refId === refId);
+
       const latestBreast = ultrasounds.find(
         (u) => u.ultrasoundType === "MAMA_BILATERAL"
       );
-      if (latestBreast) {
+      if (latestBreast && !hasItem("ULTRASOUND", latestBreast.id)) {
         candidateItems.push({
           kind: "ULTRASOUND",
           refId: latestBreast.id,
@@ -204,7 +208,7 @@ export function useChequeos({
       const latestTv = ultrasounds.find(
         (u) => u.ultrasoundType !== "MAMA_BILATERAL"
       );
-      if (latestTv) {
+      if (latestTv && !hasItem("ULTRASOUND", latestTv.id)) {
         candidateItems.push({
           kind: "ULTRASOUND",
           refId: latestTv.id,
@@ -219,7 +223,7 @@ export function useChequeos({
       }
 
       const latestColpo = colposcopies[0];
-      if (latestColpo) {
+      if (latestColpo && !hasItem("COLPOSCOPY", latestColpo.id)) {
         candidateItems.push({
           kind: "COLPOSCOPY",
           refId: latestColpo.id,
@@ -234,11 +238,13 @@ export function useChequeos({
       }
 
       for (const doc of allDocs.slice(0, 6)) {
-        candidateItems.push({
-          kind: "DOCUMENT",
-          refId: doc.id,
-          label: `PDF: ${doc.title}`,
-        });
+        if (!hasItem("DOCUMENT", doc.id)) {
+          candidateItems.push({
+            kind: "DOCUMENT",
+            refId: doc.id,
+            label: `PDF: ${doc.title}`,
+          });
+        }
       }
 
       items = autoOrderDossierItems(candidateItems, ultrasounds, allDocs);
@@ -259,17 +265,23 @@ export function useChequeos({
       ultrasounds.find(
         (u) =>
           selectedEcoIds.includes(u.id) && u.ultrasoundType === "MAMA_BILATERAL"
-      ) ?? ultrasounds.find((u) => u.ultrasoundType === "MAMA_BILATERAL");
+      ) ??
+      (explicitItems
+        ? undefined
+        : ultrasounds.find((u) => u.ultrasoundType === "MAMA_BILATERAL"));
 
     const tvEco =
       ultrasounds.find(
         (u) =>
           selectedEcoIds.includes(u.id) && u.ultrasoundType !== "MAMA_BILATERAL"
-      ) ?? ultrasounds.find((u) => u.ultrasoundType !== "MAMA_BILATERAL");
+      ) ??
+      (explicitItems
+        ? undefined
+        : ultrasounds.find((u) => u.ultrasoundType !== "MAMA_BILATERAL"));
 
     const colpo =
       colposcopies.find((c) => selectedColpoIds.includes(c.id)) ??
-      colposcopies[0];
+      (explicitItems ? undefined : colposcopies[0]);
 
     const selectedDocs = allDocs.filter((d) => selectedDocIds.includes(d.id));
     const hasPapDoc = selectedDocs.some(
@@ -427,7 +439,7 @@ export function useChequeos({
     form.reset(
       buildDefaultCheckupValues(patientId, todayStr, consultations[0]?.id ?? "")
     );
-    syncFromStudiesAndDocuments([], true);
+    syncFromStudiesAndDocuments(undefined, true);
     setDialogOpen(true);
   };
 
@@ -469,13 +481,11 @@ export function useChequeos({
       (entry) => entry.kind === kind && entry.refId === refId
     );
     if (exists) {
-      form.setValue(
-        "dossierConfig.items",
-        current.filter(
-          (entry) => !(entry.kind === kind && entry.refId === refId)
-        ),
-        { shouldDirty: true }
+      const filtered = current.filter(
+        (entry) => !(entry.kind === kind && entry.refId === refId)
       );
+      form.setValue("dossierConfig.items", filtered, { shouldDirty: true });
+      syncFromStudiesAndDocuments(filtered, true);
       return;
     }
 
@@ -500,6 +510,7 @@ export function useChequeos({
       patientDocuments
     );
     form.setValue("dossierConfig.items", next, { shouldDirty: true });
+    syncFromStudiesAndDocuments(next, true);
   };
 
   const moveDossierItem = (index: number, delta: -1 | 1) => {

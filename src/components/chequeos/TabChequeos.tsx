@@ -1043,8 +1043,13 @@ export function TabChequeos({
                                     type="button"
                                     variant="ghost"
                                     size="icon-xs"
-                                    title="Vista Previa Ejecutiva / Imprimir"
-                                    onClick={() => cheq.setPrintingItem(item)}
+                                    title="Vista Previa Completa / Imprimir Chequeo"
+                                    onClick={() => {
+                                      cheq.setShowCoverPage(
+                                        item.dossierConfig.includeCoverPage
+                                      );
+                                      cheq.setPrintingItem(item);
+                                    }}
                                   >
                                     <Printer className="size-3.5" />
                                   </Button>
@@ -1404,6 +1409,10 @@ export function TabChequeos({
       <CheckupPrintModal
         checkup={cheq.printingItem}
         patient={patient}
+        background={background}
+        ultrasounds={ultrasounds}
+        colposcopies={colposcopies}
+        patientDocuments={patientDocuments}
         showCoverPage={cheq.showCoverPage}
         onShowCoverPageChange={cheq.setShowCoverPage}
         canEdit={canEdit}

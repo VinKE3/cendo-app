@@ -143,7 +143,8 @@ export function printHtmlElement(
           page-break-after: always !important;
           break-after: page !important;
         }
-        .page-sheet:last-child {
+        #print-root > .page-sheet:last-child,
+        #print-root > *:last-child > .page-sheet:last-child {
           page-break-after: avoid !important;
           break-after: avoid !important;
         }

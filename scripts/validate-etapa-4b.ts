@@ -160,6 +160,7 @@ async function main() {
   const serverProc = startProductionServer();
   const cleanupDocIds = new Set<string>();
   const cleanupCheckupIds = new Set<string>();
+  const cleanupColpoIds = new Set<string>();
   let drPatrickCookie = "";
 
   try {
@@ -345,11 +346,61 @@ async function main() {
       refId: docMama.id,
       label: docMama.title,
     });
-    if (primaryColpos[0]) {
+    let testColpoId = primaryColpos[0]?.id ?? "";
+    if (!testColpoId) {
+      const tempColpoRes = await fetch(`${BASE_URL}/api/colposcopia`, {
+        method: "POST",
+        headers: {
+          Cookie: drPatrickCookie,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          patientId: primaryPatient.id,
+          consultationId: "",
+          reportDate: todayStr,
+          adequateColposcopy: true,
+          squamocolumnarJunctionVisible: "Visible",
+          transformationZoneType: "Tipo 1",
+          matureSquamousEpithelium: true,
+          ectopy: true,
+          thinAcetowhiteEpithelium: true,
+          denseAcetowhiteEpithelium: false,
+          irregularBorder: true,
+          fineMosaic: false,
+          coarseMosaic: false,
+          finePunctation: false,
+          coarsePunctation: false,
+          atypicalVessels: false,
+          extendedFindings: {
+            nabothCyst: false,
+            cryptOpenings: false,
+            inflammation: true,
+            otherFindings: "Ninguno",
+          },
+          schillerTest: "Positivo (Yodo Negativo Focal)",
+          cervicalBiopsyTaken: false,
+          biopsyClockHours: [],
+          images: [],
+          diagnosis: "Descartar displasia cervical • Se sugiere biopsia de cérvix",
+          planRecommendations: "Correlacionar con resultado PAP / Test VPH.",
+          cie10Code: "N87.0",
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+      assert.equal(tempColpoRes.status, 201);
+      const tempColpoJson = (await tempColpoRes.json()) as {
+        success: boolean;
+        data: { id: string };
+      };
+      testColpoId = tempColpoJson.data.id;
+      cleanupColpoIds.add(testColpoId);
+    }
+
+    if (testColpoId) {
       dossierItems.push({
         kind: "COLPOSCOPY",
-        refId: primaryColpos[0].id,
-        label: "Colposcopía Digital IFCPC",
+        refId: testColpoId,
+        label: "Colposcopía Digital IFCPC (2 Páginas)",
       });
     }
     dossierItems.push({
@@ -459,7 +510,7 @@ async function main() {
       1 + // Carátula CENDO
       (primaryEcos[0] ? 1 : 0) +
       2 + // docMama (2 páginas)
-      (primaryColpos[0] ? 1 : 0) +
+      (testColpoId ? 2 : 0) + // Colposcopía IFCPC formato oficial 2 páginas
       1; // docPap (1 página)
     assert.ok(
       defaultPages >= minExpectedPages,
@@ -545,6 +596,18 @@ async function main() {
     }
     cleanupDocIds.clear();
 
+    for (const colpoId of cleanupColpoIds) {
+      await fetch(
+        `${BASE_URL}/api/colposcopia?id=${encodeURIComponent(colpoId)}`,
+        {
+          method: "DELETE",
+          headers: { Cookie: drPatrickCookie },
+          signal: AbortSignal.timeout(15000),
+        }
+      );
+    }
+    cleanupColpoIds.clear();
+
     if (existingPrimaryCheckups.length === 0) {
       const demoItems: Array<{
         kind: "ULTRASOUND" | "COLPOSCOPY";
@@ -629,6 +692,16 @@ async function main() {
       for (const docId of cleanupDocIds) {
         await fetch(
           `${BASE_URL}/api/patient-documents?id=${encodeURIComponent(docId)}`,
+          {
+            method: "DELETE",
+            headers: { Cookie: drPatrickCookie },
+            signal: AbortSignal.timeout(5000),
+          }
+        ).catch(() => {});
+      }
+      for (const colpoId of cleanupColpoIds) {
+        await fetch(
+          `${BASE_URL}/api/colposcopia?id=${encodeURIComponent(colpoId)}`,
           {
             method: "DELETE",
             headers: { Cookie: drPatrickCookie },
