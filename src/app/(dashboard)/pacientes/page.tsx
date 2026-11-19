@@ -1,28 +1,19 @@
-import { Users } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PatientsDirectoryView } from "@/components/pacientes/PatientsDirectoryView";
+import { listPatients } from "@/features/pacientes/services/pacientes.service";
 import { requireSessionDoctor } from "@/lib/security/server-session";
 
-export default async function PacientesPlaceholderPage() {
-  await requireSessionDoctor();
+export default async function PacientesPage() {
+  const doctor = await requireSessionDoctor();
+  const items = await listPatients(doctor.tenantId);
+
+  const canEdit = doctor.role === "admin" || doctor.role === "moderator";
+  const canDelete = doctor.role === "admin";
 
   return (
-    <Card className="border border-border bg-card">
-      <CardHeader className="border-b border-border">
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Users className="size-4 text-primary" />
-            Pacientes e Historias Clínicas
-          </CardTitle>
-          <Badge variant="outline" className="font-mono text-xs">
-            FASE 2
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="pt-4 text-sm text-muted-foreground">
-        Módulo listo en esquema PostgreSQL (`patients`, `patient_backgrounds`). Se
-        habilitará en la siguiente fase junto a la ficha unificada (`/pacientes/[id]`).
-      </CardContent>
-    </Card>
+    <PatientsDirectoryView
+      initialItems={items}
+      canEdit={canEdit}
+      canDelete={canDelete}
+    />
   );
 }

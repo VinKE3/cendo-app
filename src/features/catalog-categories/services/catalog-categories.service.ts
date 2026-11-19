@@ -1,7 +1,9 @@
-import { and, asc, count, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, count, eq, isNull, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   catalogCategories,
+  medicalAppointments,
+  medicalConsultations,
   medicationsVademecum,
   proceduresTariff,
 } from "@/db/schema";
@@ -13,6 +15,182 @@ import type {
   CreateCategoryInput,
   RenameCategoryInput,
 } from "../catalog-categories.schema";
+
+export const LEGACY_APPOINTMENT_TYPE_MAP: Record<string, string> = {
+  CONSULTA_PRIMERA_VEZ: "Consulta Ginecológica (Primera Vez)",
+  CONTROL_GINECOLOGICO: "Control Ginecológico Periódico",
+  CHEQUEO_INTEGRAL: "Chequeo Preventivo Integral CENDO",
+  CONTROL_PRENATAL: "Control Prenatal Oficial (MINSA/CLAP)",
+  COLPOSCOPIA: "Colposcopía Especializada & IFCPC",
+  ECOGRAFIA: "Ecografía Especializada (TV / Mama / Obstétrica)",
+  PROCEDIMIENTO_MENOR: "Procedimiento Menor (Biopsia / LEEP / DIU)",
+};
+
+export const DEFAULT_APPOINTMENT_TYPES = [
+  "Consulta Ginecológica (Primera Vez)",
+  "Control Ginecológico Periódico",
+  "Chequeo Preventivo Integral CENDO",
+  "Control Prenatal Oficial (MINSA/CLAP)",
+  "Colposcopía Especializada & IFCPC",
+  "Ecografía Especializada (TV / Mama / Obstétrica)",
+  "Procedimiento Menor (Biopsia / LEEP / DIU)",
+] as const;
+
+export const DEFAULT_CONSULTATION_REASONS = [
+  "Control ginecológico anual preventivo",
+  "Dolor pélvico crónico y dismenorrea progresiva",
+  "Seguimiento de endometriosis pélvica",
+  "Control prenatal programado",
+  "Control de resultados PAP / VPH / Colposcopía",
+  "Sangrado uterino anormal / Menorragia",
+  "Evaluación de quiste ovárico / Miomatosis",
+  "Consejería anticonceptiva / Planificación familiar",
+] as const;
+
+function normalizeAppointmentTypeKey(raw: string): string {
+  const upper = raw.trim().toUpperCase();
+  const mapped = LEGACY_APPOINTMENT_TYPE_MAP[upper];
+  return (mapped ?? raw).trim().toLowerCase();
+}
+
+function findLegacyKeysForLabel(label: string): string[] {
+  const target = label.trim().toLowerCase();
+  return Object.entries(LEGACY_APPOINTMENT_TYPE_MAP)
+    .filter(([, mappedLabel]) => mappedLabel.trim().toLowerCase() === target)
+    .map(([key]) => key);
+}
+
+async function ensureDefaultCategoriesForScope(
+  tenantId: string,
+  scope: CategoryScope
+) {
+  const defaults =
+    scope === "appointment_type"
+      ? DEFAULT_APPOINTMENT_TYPES
+      : scope === "consultation_reason"
+        ? DEFAULT_CONSULTATION_REASONS
+        : null;
+
+  if (!defaults) return;
+
+  const [existing] = await db
+    .select({ id: catalogCategories.id })
+    .from(catalogCategories)
+    .where(
+      and(
+        eq(catalogCategories.tenantId, tenantId),
+        eq(catalogCategories.scope, scope),
+        isNull(catalogCategories.deletedAt)
+      )
+    )
+    .limit(1);
+
+  if (existing) return;
+
+  for (const name of defaults) {
+    await db
+      .insert(catalogCategories)
+      .values({
+        tenantId,
+        scope,
+        name,
+      })
+      .onConflictDoNothing();
+  }
+}
+
+async function getUsageMapByScope(
+  tenantId: string,
+  scope: CategoryScope
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+
+  if (scope === "tariff") {
+    const rows = await db
+      .select({
+        key: proceduresTariff.category,
+        total: count(),
+      })
+      .from(proceduresTariff)
+      .where(
+        and(
+          eq(proceduresTariff.tenantId, tenantId),
+          isNull(proceduresTariff.deletedAt)
+        )
+      )
+      .groupBy(proceduresTariff.category);
+
+    for (const r of rows) {
+      const k = r.key.trim().toLowerCase();
+      map.set(k, (map.get(k) ?? 0) + Number(r.total));
+    }
+    return map;
+  }
+
+  if (scope === "vademecum") {
+    const rows = await db
+      .select({
+        key: medicationsVademecum.therapeuticGroup,
+        total: count(),
+      })
+      .from(medicationsVademecum)
+      .where(
+        and(
+          eq(medicationsVademecum.tenantId, tenantId),
+          isNull(medicationsVademecum.deletedAt)
+        )
+      )
+      .groupBy(medicationsVademecum.therapeuticGroup);
+
+    for (const r of rows) {
+      const k = r.key.trim().toLowerCase();
+      map.set(k, (map.get(k) ?? 0) + Number(r.total));
+    }
+    return map;
+  }
+
+  if (scope === "appointment_type") {
+    const rows = await db
+      .select({
+        key: medicalAppointments.appointmentType,
+        total: count(),
+      })
+      .from(medicalAppointments)
+      .where(
+        and(
+          eq(medicalAppointments.tenantId, tenantId),
+          isNull(medicalAppointments.deletedAt)
+        )
+      )
+      .groupBy(medicalAppointments.appointmentType);
+
+    for (const r of rows) {
+      const k = normalizeAppointmentTypeKey(r.key);
+      map.set(k, (map.get(k) ?? 0) + Number(r.total));
+    }
+    return map;
+  }
+
+  const rows = await db
+    .select({
+      key: medicalConsultations.reasonForVisit,
+      total: count(),
+    })
+    .from(medicalConsultations)
+    .where(
+      and(
+        eq(medicalConsultations.tenantId, tenantId),
+        isNull(medicalConsultations.deletedAt)
+      )
+    )
+    .groupBy(medicalConsultations.reasonForVisit);
+
+  for (const r of rows) {
+    const k = r.key.trim().toLowerCase();
+    map.set(k, (map.get(k) ?? 0) + Number(r.total));
+  }
+  return map;
+}
 
 async function countScopeUsage(
   tenantId: string,
@@ -35,14 +213,53 @@ async function countScopeUsage(
     return Number(row?.value ?? 0);
   }
 
+  if (scope === "vademecum") {
+    const [row] = await db
+      .select({ value: count() })
+      .from(medicationsVademecum)
+      .where(
+        and(
+          eq(medicationsVademecum.tenantId, tenantId),
+          isNull(medicationsVademecum.deletedAt),
+          sql`LOWER(TRIM(${medicationsVademecum.therapeuticGroup})) = ${cleanName}`
+        )
+      );
+    return Number(row?.value ?? 0);
+  }
+
+  if (scope === "appointment_type") {
+    const legacyKeys = findLegacyKeysForLabel(categoryName);
+    const matchCondition =
+      legacyKeys.length > 0
+        ? or(
+            sql`LOWER(TRIM(${medicalAppointments.appointmentType})) = ${cleanName}`,
+            ...legacyKeys.map(
+              (key) => sql`UPPER(TRIM(${medicalAppointments.appointmentType})) = ${key}`
+            )
+          )
+        : sql`LOWER(TRIM(${medicalAppointments.appointmentType})) = ${cleanName}`;
+
+    const [row] = await db
+      .select({ value: count() })
+      .from(medicalAppointments)
+      .where(
+        and(
+          eq(medicalAppointments.tenantId, tenantId),
+          isNull(medicalAppointments.deletedAt),
+          matchCondition
+        )
+      );
+    return Number(row?.value ?? 0);
+  }
+
   const [row] = await db
     .select({ value: count() })
-    .from(medicationsVademecum)
+    .from(medicalConsultations)
     .where(
       and(
-        eq(medicationsVademecum.tenantId, tenantId),
-        isNull(medicationsVademecum.deletedAt),
-        sql`LOWER(TRIM(${medicationsVademecum.therapeuticGroup})) = ${cleanName}`
+        eq(medicalConsultations.tenantId, tenantId),
+        isNull(medicalConsultations.deletedAt),
+        sql`LOWER(TRIM(${medicalConsultations.reasonForVisit})) = ${cleanName}`
       )
     );
   return Number(row?.value ?? 0);
@@ -52,27 +269,28 @@ export async function listCategories(
   tenantId: string,
   scope: CategoryScope
 ): Promise<CatalogCategoryItem[]> {
-  const rows = await db
-    .select()
-    .from(catalogCategories)
-    .where(
-      and(
-        eq(catalogCategories.tenantId, tenantId),
-        eq(catalogCategories.scope, scope),
-        isNull(catalogCategories.deletedAt)
+  await ensureDefaultCategoriesForScope(tenantId, scope);
+
+  const [rows, usageMap] = await Promise.all([
+    db
+      .select()
+      .from(catalogCategories)
+      .where(
+        and(
+          eq(catalogCategories.tenantId, tenantId),
+          eq(catalogCategories.scope, scope),
+          isNull(catalogCategories.deletedAt)
+        )
       )
-    )
-    .orderBy(asc(catalogCategories.name));
+      .orderBy(asc(catalogCategories.name)),
+    getUsageMapByScope(tenantId, scope),
+  ]);
 
-  const counts = await Promise.all(
-    rows.map((row) => countScopeUsage(tenantId, scope, row.name))
-  );
-
-  return rows.map((row, idx) => ({
+  return rows.map((row) => ({
     id: row.id,
     scope,
     name: row.name,
-    usageCount: counts[idx] ?? 0,
+    usageCount: usageMap.get(row.name.trim().toLowerCase()) ?? 0,
   }));
 }
 
@@ -98,7 +316,7 @@ async function assertNoDuplicateCategory(
     .limit(1);
 
   if (dup) {
-    throw new DomainError(`La categoría "${dup.name}" ya existe.`);
+    throw new DomainError(`El elemento "${dup.name}" ya existe en este catálogo.`);
   }
 }
 
@@ -161,15 +379,21 @@ export async function renameCategory(
     .limit(1);
 
   if (!existing) {
-    throw new DomainError("Categoría no encontrada.");
+    throw new DomainError("Elemento no encontrado o sin acceso autorizado.");
   }
 
   await assertNoDuplicateCategory(tenantId, input.scope, input.name, input.id);
 
+  const oldLower = existing.name.trim().toLowerCase();
+
   await db.transaction(async (tx) => {
     await tx
       .update(catalogCategories)
-      .set({ name: input.name, updatedBy: ctx.userId })
+      .set({
+        name: input.name,
+        updatedBy: ctx.userId,
+        updatedAt: new Date(),
+      })
       .where(eq(catalogCategories.id, input.id));
 
     if (input.scope === "tariff") {
@@ -180,10 +404,10 @@ export async function renameCategory(
           and(
             eq(proceduresTariff.tenantId, tenantId),
             isNull(proceduresTariff.deletedAt),
-            sql`LOWER(TRIM(${proceduresTariff.category})) = ${existing.name.trim().toLowerCase()}`
+            sql`LOWER(TRIM(${proceduresTariff.category})) = ${oldLower}`
           )
         );
-    } else {
+    } else if (input.scope === "vademecum") {
       await tx
         .update(medicationsVademecum)
         .set({ therapeuticGroup: input.name, updatedBy: ctx.userId })
@@ -191,7 +415,40 @@ export async function renameCategory(
           and(
             eq(medicationsVademecum.tenantId, tenantId),
             isNull(medicationsVademecum.deletedAt),
-            sql`LOWER(TRIM(${medicationsVademecum.therapeuticGroup})) = ${existing.name.trim().toLowerCase()}`
+            sql`LOWER(TRIM(${medicationsVademecum.therapeuticGroup})) = ${oldLower}`
+          )
+        );
+    } else if (input.scope === "appointment_type") {
+      const legacyKeys = findLegacyKeysForLabel(existing.name);
+      const matchCondition =
+        legacyKeys.length > 0
+          ? or(
+              sql`LOWER(TRIM(${medicalAppointments.appointmentType})) = ${oldLower}`,
+              ...legacyKeys.map(
+                (key) => sql`UPPER(TRIM(${medicalAppointments.appointmentType})) = ${key}`
+              )
+            )
+          : sql`LOWER(TRIM(${medicalAppointments.appointmentType})) = ${oldLower}`;
+
+      await tx
+        .update(medicalAppointments)
+        .set({ appointmentType: input.name, updatedBy: ctx.userId })
+        .where(
+          and(
+            eq(medicalAppointments.tenantId, tenantId),
+            isNull(medicalAppointments.deletedAt),
+            matchCondition
+          )
+        );
+    } else {
+      await tx
+        .update(medicalConsultations)
+        .set({ reasonForVisit: input.name, updatedBy: ctx.userId })
+        .where(
+          and(
+            eq(medicalConsultations.tenantId, tenantId),
+            isNull(medicalConsultations.deletedAt),
+            sql`LOWER(TRIM(${medicalConsultations.reasonForVisit})) = ${oldLower}`
           )
         );
     }
@@ -238,13 +495,13 @@ export async function deleteCategory(
     .limit(1);
 
   if (!existing) {
-    throw new DomainError("Categoría no encontrada.");
+    throw new DomainError("Elemento no encontrado o sin acceso autorizado.");
   }
 
   const usageCount = await countScopeUsage(ctx.tenantId, scope, existing.name);
   if (usageCount > 0) {
     throw new DomainError(
-      `No se puede eliminar "${existing.name}" porque tiene ${usageCount} registro(s) asignado(s). Cámbielos de categoría o elimínelos primero.`
+      `No se puede eliminar "${existing.name}" porque tiene ${usageCount} registro(s) asignado(s). Cámbielos o archívelos primero.`
     );
   }
 

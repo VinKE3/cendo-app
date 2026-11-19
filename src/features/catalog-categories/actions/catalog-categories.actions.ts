@@ -8,12 +8,26 @@ import {
   createCategorySchema,
   deleteCategorySchema,
   renameCategorySchema,
+  type CategoryScope,
 } from "../catalog-categories.schema";
 import {
   createCategory,
   deleteCategory,
   renameCategory,
 } from "../services/catalog-categories.service";
+
+function revalidateScopeRoute(scope: CategoryScope) {
+  if (scope === "tariff") {
+    revalidatePath("/tarifario");
+  } else if (scope === "vademecum") {
+    revalidatePath("/vademecum");
+  } else if (scope === "appointment_type") {
+    revalidatePath("/agenda");
+    revalidatePath("/dashboard");
+  } else {
+    revalidatePath("/pacientes");
+  }
+}
 
 export async function createCategoryAction(rawData: unknown) {
   const runner = await guardedAction({
@@ -22,12 +36,14 @@ export async function createCategoryAction(rawData: unknown) {
     action: async (input, ctx) => {
       const rate = mutationLimiter.check(`cat:${ctx.userId}`);
       if (!rate.success) {
-        throw new DomainError(`Demasiadas solicitudes. Espere ${rate.resetInSeconds}s.`);
+        throw new DomainError(
+          `Demasiadas solicitudes. Espere ${rate.resetInSeconds}s.`
+        );
       }
       const actor = await getSessionDoctorProfile(ctx.userId, ctx.tenantId);
       const actorName = actor ? `${actor.doctorTitle} ${actor.fullName}` : ctx.userId;
       const created = await createCategory(ctx, actorName, input);
-      revalidatePath(input.scope === "tariff" ? "/tarifario" : "/vademecum");
+      revalidateScopeRoute(input.scope);
       return created;
     },
   });
@@ -41,12 +57,14 @@ export async function renameCategoryAction(rawData: unknown) {
     action: async (input, ctx) => {
       const rate = mutationLimiter.check(`cat:${ctx.userId}`);
       if (!rate.success) {
-        throw new DomainError(`Demasiadas solicitudes. Espere ${rate.resetInSeconds}s.`);
+        throw new DomainError(
+          `Demasiadas solicitudes. Espere ${rate.resetInSeconds}s.`
+        );
       }
       const actor = await getSessionDoctorProfile(ctx.userId, ctx.tenantId);
       const actorName = actor ? `${actor.doctorTitle} ${actor.fullName}` : ctx.userId;
       const updated = await renameCategory(ctx, actorName, input);
-      revalidatePath(input.scope === "tariff" ? "/tarifario" : "/vademecum");
+      revalidateScopeRoute(input.scope);
       return updated;
     },
   });
@@ -61,7 +79,7 @@ export async function deleteCategoryAction(rawData: unknown) {
       const actor = await getSessionDoctorProfile(ctx.userId, ctx.tenantId);
       const actorName = actor ? `${actor.doctorTitle} ${actor.fullName}` : ctx.userId;
       const res = await deleteCategory(ctx, actorName, input.id, input.scope);
-      revalidatePath(input.scope === "tariff" ? "/tarifario" : "/vademecum");
+      revalidateScopeRoute(input.scope);
       return res;
     },
   });

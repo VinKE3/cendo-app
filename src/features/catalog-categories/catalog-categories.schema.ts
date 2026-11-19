@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-export const CATEGORY_SCOPES = ["tariff", "vademecum"] as const;
+export const CATEGORY_SCOPES = [
+  "tariff",
+  "vademecum",
+  "appointment_type",
+  "consultation_reason",
+] as const;
+
 export type CategoryScope = (typeof CATEGORY_SCOPES)[number];
 
 export interface CatalogCategoryItem {
@@ -9,6 +15,15 @@ export interface CatalogCategoryItem {
   name: string;
   usageCount: number;
 }
+
+const pgUuidSchema = (message: string) =>
+  z
+    .string()
+    .trim()
+    .regex(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      message
+    );
 
 export const createCategorySchema = z
   .object({
@@ -23,19 +38,19 @@ export const createCategorySchema = z
 
 export const renameCategorySchema = z
   .object({
-    id: z.string().uuid("ID de categoría inválido."),
+    id: pgUuidSchema("ID de categoría inválido."),
     scope: z.enum(CATEGORY_SCOPES),
     name: z
       .string()
       .trim()
       .min(2, "El nombre debe tener al menos 2 caracteres.")
-      .max(120),
+      .max(120, "El nombre no debe exceder 120 caracteres."),
   })
   .strict();
 
 export const deleteCategorySchema = z
   .object({
-    id: z.string().uuid("ID de categoría inválido."),
+    id: pgUuidSchema("ID de categoría inválido."),
     scope: z.enum(CATEGORY_SCOPES),
   })
   .strict();

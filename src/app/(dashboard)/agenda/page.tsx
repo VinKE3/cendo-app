@@ -1,29 +1,43 @@
-import { Calendar } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Suspense } from "react";
+import { AgendaView } from "@/components/agenda/AgendaView";
+import {
+  listActiveDoctorsForAgenda,
+  listAppointments,
+  listPatientsForAgendaSelect,
+} from "@/features/agenda/services/agenda.service";
+import { listCategories } from "@/features/catalog-categories/services/catalog-categories.service";
 import { requireSessionDoctor } from "@/lib/security/server-session";
 
-export default async function AgendaPlaceholderPage() {
-  await requireSessionDoctor();
+export default async function AgendaPage() {
+  const doctor = await requireSessionDoctor();
+
+  const [appointments, appointmentTypes, doctors, patients] = await Promise.all([
+    listAppointments(doctor.tenantId),
+    listCategories(doctor.tenantId, "appointment_type"),
+    listActiveDoctorsForAgenda(doctor.tenantId),
+    listPatientsForAgendaSelect(doctor.tenantId),
+  ]);
+
+  const canEdit = doctor.role === "admin" || doctor.role === "moderator";
+  const canDelete = doctor.role === "admin";
 
   return (
-    <Card className="border border-border bg-card">
-      <CardHeader className="border-b border-border">
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Calendar className="size-4 text-primary" />
-            Agenda de Citas Médicas
-          </CardTitle>
-          <Badge variant="outline" className="font-mono text-xs">
-            FASE 3
-          </Badge>
+    <Suspense
+      fallback={
+        <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
+          Cargando agenda médica...
         </div>
-      </CardHeader>
-      <CardContent className="pt-4 text-sm text-muted-foreground">
-        Módulo listo en esquema PostgreSQL (`medical_appointments`). Se habilitará en la
-        Fase 3 con validación anti-cruces, horario America/Lima y exportación a Google
-        Calendar / .ics.
-      </CardContent>
-    </Card>
+      }
+    >
+      <AgendaView
+        initialAppointments={appointments}
+        initialAppointmentTypes={appointmentTypes}
+        doctors={doctors}
+        initialPatients={patients}
+        currentDoctorId={doctor.id}
+        canEdit={canEdit}
+        canDelete={canDelete}
+      />
+    </Suspense>
   );
 }
