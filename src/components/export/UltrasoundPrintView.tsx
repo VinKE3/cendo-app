@@ -424,6 +424,25 @@ export function UltrasoundPrintView({
             ) : null}
           </div>
 
+          {isBreastMode ? (
+            <div className="rounded border border-border bg-muted/20 px-3 py-1.5 text-[9px] leading-snug text-muted-foreground">
+              <p>
+                <strong className="text-foreground">ACR BI-RADS:</strong> (0)
+                Requiere evaluación adicional • (1) Normal • (2) Hallazgo
+                benigno • (3) Control en 6 meses • (4) Sospecha de malignidad:
+                Biopsia • (5) Signos de malignidad • (6) Malignidad confirmada.
+              </p>
+              <p className="mt-0.5">
+                <strong className="text-foreground">
+                  Tipo de mama según ACR:
+                </strong>{" "}
+                (A) Ecotextura homogénea a predominio graso • (B) Ecotextura
+                homogénea fibroglandular • (C) Heterogéneamente densa • (D)
+                Extremadamente densa.
+              </p>
+            </div>
+          ) : null}
+
           {report.images.length > 0 ? (
             <p className="font-mono text-[10px] text-muted-foreground">
               * Adjunta {report.images.length} captura(s) ecográfica(s) en anexo

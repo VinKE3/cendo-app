@@ -524,3 +524,62 @@ export function generateColposcopyWhatsAppUrl(
     ? `https://wa.me/${targetPhone}?text=${encoded}`
     : `https://wa.me/?text=${encoded}`;
 }
+
+export interface CheckupWhatsAppPayload {
+  patientName: string;
+  patientPhone?: string | null;
+  checkupDate: string;
+  doctorName: string;
+  doctorCmp?: string | null;
+  reasonForConsultation: string;
+  breastBirads?: string | null;
+  colposcopyResult?: string | null;
+  papResult?: string | null;
+  vphResult?: string | null;
+  conclusions: string;
+  cie10Code?: string | null;
+  medicalPrescription?: string | null;
+  dossierItemsCount?: number;
+}
+
+export function generateCheckupWhatsAppUrl(
+  checkup: CheckupWhatsAppPayload,
+  clinicInfo?: CalendarClinicInfo | null
+): string {
+  const targetPhone = cleanPhoneForWhatsApp(checkup.patientPhone);
+  const address = clinicInfo?.clinicAddress?.trim() || DEFAULT_CLINIC_ADDRESS;
+  const phone = clinicInfo?.phone?.trim() || DEFAULT_CLINIC_PHONE;
+  const formattedDate = formatPeruDateDisplay(checkup.checkupDate);
+
+  const message = [
+    `📋 *Chequeo Ginecológico Preventivo Integral • CENDO*`,
+    ``,
+    `Estimada *${checkup.patientName}*, compartimos el resumen consolidado de su chequeo integral:`,
+    ``,
+    `🗓 *Fecha:* ${formattedDate}`,
+    `👩‍⚕️ *Especialista:* ${checkup.doctorName}${checkup.doctorCmp ? ` (CMP ${checkup.doctorCmp})` : ""}`,
+    checkup.breastBirads ? `🩺 *Eco Mamaria:* ${checkup.breastBirads}` : "",
+    checkup.colposcopyResult ? `🔬 *Colposcopía:* ${checkup.colposcopyResult}` : "",
+    checkup.papResult ? `🧪 *PAP:* ${checkup.papResult}` : "",
+    checkup.vphResult ? `🧬 *Test VPH:* ${checkup.vphResult}` : "",
+    checkup.dossierItemsCount
+      ? `📎 *Expediente PDF Unificado:* ${checkup.dossierItemsCount} estudio(s)/anexo(s) consolidados`
+      : "",
+    ``,
+    `*Conclusión Diagnóstica:*`,
+    `${checkup.conclusions}${checkup.cie10Code ? ` [CIE-10: ${checkup.cie10Code}]` : ""}`,
+    checkup.medicalPrescription?.trim()
+      ? `\n📌 *Plan e Indicaciones:*\n${checkup.medicalPrescription.trim()}`
+      : "",
+    ``,
+    `🏥 *Sede:* ${address}`,
+    `📞 *Central de Citas:* ${phone}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const encoded = encodeURIComponent(message);
+  return targetPhone
+    ? `https://wa.me/${targetPhone}?text=${encoded}`
+    : `https://wa.me/?text=${encoded}`;
+}

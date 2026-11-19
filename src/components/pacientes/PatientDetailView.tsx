@@ -35,6 +35,7 @@ import {
   type PatientDetailTab,
 } from "@/features/pacientes/hooks/use-patient-detail";
 import type { CatalogCategoryItem } from "@/features/catalog-categories/catalog-categories.schema";
+import type { ClinicalCheckupItem } from "@/features/chequeos/chequeos.schema";
 import type { ClinicalTemplateItem } from "@/features/clinical-templates/clinical-templates.schema";
 import type { ColposcopyReportItem } from "@/features/colposcopia/colposcopia.schema";
 import type {
@@ -42,6 +43,7 @@ import type {
   MedicalConsultationItem,
 } from "@/features/consultas/consultas.schema";
 import type { ProcedureQuoteItem } from "@/features/cotizaciones/cotizaciones.schema";
+import type { PatientDocumentItem } from "@/features/documentos/documentos.schema";
 import type { UltrasoundReportItem } from "@/features/ecografias/ecografias.schema";
 import type {
   LabOrderItem,
@@ -71,6 +73,8 @@ interface PatientDetailViewProps {
   initialQuotes: ProcedureQuoteItem[];
   initialUltrasounds: UltrasoundReportItem[];
   initialColposcopies: ColposcopyReportItem[];
+  initialCheckups: ClinicalCheckupItem[];
+  initialPatientDocuments: PatientDocumentItem[];
   initialClinicalTemplates: ClinicalTemplateItem[];
   initialTariffs: ProcedureTariffItem[];
   consultationFormContext: ConsultationFormContext;
@@ -107,6 +111,8 @@ export function PatientDetailView({
   initialQuotes,
   initialUltrasounds,
   initialColposcopies,
+  initialCheckups,
+  initialPatientDocuments,
   initialClinicalTemplates,
   initialTariffs,
   consultationFormContext,
@@ -129,6 +135,10 @@ export function PatientDetailView({
     useState<UltrasoundReportItem[]>(initialUltrasounds);
   const [colposcopiesList, setColposcopiesList] =
     useState<ColposcopyReportItem[]>(initialColposcopies);
+  const [checkupsList, setCheckupsList] =
+    useState<ClinicalCheckupItem[]>(initialCheckups);
+  const [documentsList, setDocumentsList] =
+    useState<PatientDocumentItem[]>(initialPatientDocuments);
 
   const {
     patient,
@@ -222,6 +232,8 @@ export function PatientDetailView({
     consultations: consultationsList.length,
     ultrasounds: ultrasoundsList.length,
     colposcopies: colposcopiesList.length,
+    checkups: checkupsList.length,
+    documents: documentsList.length,
     prescriptions: prescriptionsList.length,
     labOrders: labOrdersList.length,
     quotes: quotesList.length,
@@ -827,9 +839,12 @@ export function PatientDetailView({
           onUltrasoundsChange={setUltrasoundsList}
           colposcopies={colposcopiesList}
           onColposcopiesChange={setColposcopiesList}
+          checkups={checkupsList}
+          onCheckupsChange={setCheckupsList}
+          patientDocuments={documentsList}
+          onPatientDocumentsChange={setDocumentsList}
           initialClinicalTemplates={initialClinicalTemplates}
           consultations={consultationsList}
-          checkupsCount={liveCounts.checkups}
           canEdit={canEdit}
           canDelete={canDelete}
           onEmitBiopsyOrderFromColposcopy={handleEmitBiopsyOrderFromColposcopy}

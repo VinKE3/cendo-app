@@ -83,6 +83,22 @@ export interface QuoteItemRecord {
   finalPrice: number;
 }
 
+export type CheckupDossierItemKind = "ULTRASOUND" | "COLPOSCOPY" | "DOCUMENT";
+
+export interface CheckupDossierItemRecord {
+  kind: CheckupDossierItemKind;
+  refId: string;
+  label?: string;
+}
+
+export interface CheckupDossierConfigRecord {
+  coverTitle: string;
+  includeCoverPage: boolean;
+  includeSummarySheet: boolean;
+  showDigitalSignature: boolean;
+  items: CheckupDossierItemRecord[];
+}
+
 export const medicalConsultations = pgTable(
   "medical_consultations",
   {
@@ -158,6 +174,8 @@ export const clinicalCheckups = pgTable(
     conclusions: text("conclusions"),
     cie10Code: varchar("cie10_code", { length: 15 }),
     medicalPrescription: text("medical_prescription"),
+    status: varchar("status", { length: 24 }).default("EN_PROCESO").notNull(),
+    dossierConfig: jsonb("dossier_config").$type<CheckupDossierConfigRecord | null>(),
     createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
     updatedBy: uuid("updated_by").references(() => profiles.id, { onDelete: "set null" }),
     ...auditColumns,

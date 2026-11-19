@@ -1,4 +1,4 @@
-# Estado del Proyecto: Fase 4 — Etapa 4A Completada (Imágenes Privadas, Ecografías IDEA/BI-RADS & Colposcopía Digital IFCPC)
+# Estado del Proyecto: Fase 4 — Etapa 4B Completada (Chequeo Ginecológico Integral, PDFs Externos & Dossier PDF Unificado con `pdf-lib`)
 
 ## 1. Objetivo General
 Plataforma médica oficial de producción (**cendo-app**) para el Centro de Endometriosis y Ginecología Especializada **CENDO** (Sede Miraflores, Lima - Perú), liderado por el Director Médico **Dr. Patrick José Jacinto Gomero** (CMP 61693 | RNE 38657).
@@ -14,7 +14,7 @@ Plataforma médica oficial de producción (**cendo-app**) para el Centro de Endo
 - [x] Inicialización del entorno, Tailwind v4, `Lora` + `Inter` + `JetBrains Mono` y tokens semánticos institucionales CENDO
 - [x] Suite de componentes shadcn instalada (`Dialog`, `Sheet`, `Command`, `Table`, `Sonner`, etc.)
 - [x] Motor de seguridad Zero Trust (`crypto.ts`, `action-guard.ts`, `api-guard.ts`, `server-session.ts`, `proxy.ts`, `password.ts`)
-- [x] Esquemas completos Drizzle ORM (`src/db/schema/`, 22 tablas incluyendo `catalog_categories`, `clinical_templates`, `relations.ts` y `clinical_audit_logs`) + migraciones SQL versionadas con RLS (`0000`–`0003`)
+- [x] Esquemas completos Drizzle ORM (`src/db/schema/`, 22 tablas incluyendo `catalog_categories`, `clinical_templates`, `relations.ts`, `clinical_audit_logs` y soporte Dossier en `clinical_checkups`) + migraciones SQL versionadas con RLS (`0000`–`0004_kind_thor.sql`)
 - [x] Seed inicial (`src/db/seed.ts`): Sede Miraflores, 3 médicos, 5 plantillas lab, 10 tarifas, 5 fármacos y categorías dinámicas
 - [x] Módulo Auth (`src/features/auth/`, `/login` split-screen con `ForgotPasswordDialog`, `rememberMe`, `?redirect=`)
 - [x] Fase 1: Shell Clínico `(dashboard)` (`DashboardSidebar` + `Sheet` móvil, `DashboardHeader` + `ThemeToggle`, buscador global `Ctrl + K`)
@@ -38,12 +38,17 @@ Plataforma médica oficial de producción (**cendo-app**) para el Centro de Endo
   - **5 Ajustes del chat de WhatsApp:** tipografía estandarizada (`Inter` / `JetBrains Mono`) y propagación de clases `next/font` al popup en `src/lib/pdfGenerator.ts` y los 6 `PrintView`; envío 1-clic y multi-selección de tarifas por WhatsApp en `/tarifario` (`generateTariffWhatsAppUrl`, accesible para todos los roles); checklist IFCPC desglosada resaltando solo positivos en `ColposcopyPrintView`; título de modalidad ampliado (`text-lg font-extrabold`) en `UltrasoundPrintView`; recordatorio de cita corto por WhatsApp sin URL larga de Calendar + enlace corto `googleMapsUrl` editable en `/configuracion`.
   - **Panel reutilizable `Ver Antecedentes` (`PatientBackgroundQuickPanel` + `ViewBackgroundButton`)**: integrado con 0 latencia en la cabecera de Consultas, Recetas, Ecografías y Colposcopía (alertas de alergias/comorbilidades, FUR + amenorrea, paridad/MAC, PAP/VPH, cirugías previas y último estudio).
   - **Motor CRUD de Plantillas Clínicas Editables (`src/features/clinical-templates/`, `/api/clinical-templates`)**: auto-seed de 11 plantillas oficiales CENDO (7 Ecografía + 4 Colposcopía), botón `Marcar Normales` en Colposcopía, `Guardar como plantilla` desde ambos modales, confirmación antes de sobrescribir al editar, gestor completo (`ClinicalTemplatesManagerModal`) con RBAC (solo `admin` elimina oficiales) + restauración segura de plantillas base CENDO y validación E2E al 100% (`scripts/validate-mejoras-4a.ts`, 7/7 checks).
-- [ ] Fase 4 — Etapa 4B: `Chequeo Ginecológico Integral` + `Dossier PDF Unificado` con `pdf-lib`
+- [x] Fase 4 — Etapa 4B (`Chequeo Ginecológico Integral`, `PDFs Externos` y `Dossier PDF Unificado` con `pdf-lib`):
+  - **Migración `0004_kind_thor.sql` (22 tablas con RLS):** columnas `status` (`EN_PROCESO` / `COMPLETO`) y `dossier_config` (`jsonb`) en `clinical_checkups`.
+  - **Repositorio privado de PDFs externos (`patient_documents`, `/api/patient-documents`, `PatientPdfDropzoneCard`):** carga/descarga binaria en bucket privado `lab-reports` con validación `%PDF-` y tope 15 MB para placas `VINNO E35` y resultados externos `BIOLAQ` (PAP/VPH), accesible para subida/descarga por todos los roles autenticados (incluida asistente) y eliminación por médicos (`moderator`/`admin`).
+  - **Chequeo Ginecológico Preventivo Integral (`src/features/chequeos/`, `/api/chequeos`, `CheckupModal`, `CheckupPrintModal`, Sub-tab 3 en `TabChequeos`):** constructor visual de expediente enlazando `ultrasound_reports`, `colposcopy_reports` y `patient_documents` existentes con anti-IDOR en servidor, sincronización automática de hallazgos, auto-ordenamiento oficial CENDO y WhatsApp (`generateCheckupWhatsAppUrl`).
+  - **Generador Dossier PDF Unificado en servidor (`dossier-pdf.service.ts`, `/api/chequeos/[id]/dossier`):** carátula CENDO (`cendo-membrete.jpg` + `cendo-cenefa.jpg`), hoja resumen ejecutiva opcional (`includeSummarySheet=false` por defecto), reportes vectoriales de ecografías/colposcopía con control anti-huérfano de firma digital, anexos fotográficos privados y fusión `copyPages` lossless de PDFs externos, más leyenda ACR BI-RADS (`UltrasoundPrintView`) y antecedentes complementarios (`ColposcopyPrintView`).
+  - **Verificación integral:** `npx tsc --noEmit`, `npm run lint`, `npm run build` (34 rutas) y batería E2E (`scripts/validate-etapa-4b.ts`, 7/7 checks con validación binaria `pdf-lib`, anti-IDOR 400, auditoría `clinical_audit_logs`, SSR y chequeo demo idempotente en Gabriela Paredes).
 - [ ] Fase 4 — Continuación: `Procedimientos Menores` y `Control Prenatal MINSA / CLAP`
-- [ ] Fase 5: Documentos externos, Impresión A4 oficial CENDO, WhatsApp y Excel clínico (59 cols)
+- [ ] Fase 5: Documentos externos adicionales, Word / exportación clínica avanzada y Excel clínico (59 cols)
 
 ## 4. Tarea Actual
-- Analizar casuísticas clínicas, técnicas y de UX para **Fase 4 — Etapa 4B** (`Chequeo Ginecológico Integral` + `Dossier PDF Unificado` con `pdf-lib`) antes de su implementación.
+- Definir y analizar casuísticas clínicas y de flujo para **Fase 4 — Procedimientos Menores** (o **Control Prenatal MINSA / CLAP**) antes de su implementación.
 
 ## 5. Bloqueos / Notas
 - Nota de despliegue: Si el proyecto escala en entorno Serverless multi-instancia (Vercel), migrar `rate-limit.ts` a `@upstash/ratelimit`.

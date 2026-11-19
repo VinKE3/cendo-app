@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 import { PatientDetailView } from "@/components/pacientes/PatientDetailView";
 import { listCategories } from "@/features/catalog-categories/services/catalog-categories.service";
+import { listCheckupsByPatient } from "@/features/chequeos/services/chequeos.service";
 import { listClinicalTemplates } from "@/features/clinical-templates/services/clinical-templates.service";
 import { listColposcopiesByPatient } from "@/features/colposcopia/services/colposcopia.service";
 import {
@@ -10,6 +11,7 @@ import {
   listConsultationsByPatient,
 } from "@/features/consultas/services/consultas.service";
 import { listQuotesByPatient } from "@/features/cotizaciones/services/cotizaciones.service";
+import { listPatientDocumentsByPatient } from "@/features/documentos/services/documentos.service";
 import { listUltrasoundsByPatient } from "@/features/ecografias/services/ecografias.service";
 import {
   listLabOrdersByPatient,
@@ -61,7 +63,11 @@ export default async function PacienteDetailPage({
     doctor.tenantId,
     parsedId.data
   );
-  const tariffs = await listTariffs(doctor.tenantId);
+  const [checkups, patientDocuments, tariffs] = await Promise.all([
+    listCheckupsByPatient(doctor.tenantId, parsedId.data),
+    listPatientDocumentsByPatient(doctor.tenantId, parsedId.data),
+    listTariffs(doctor.tenantId),
+  ]);
 
   const canEdit = doctor.role === "admin" || doctor.role === "moderator";
   const canDelete = doctor.role === "admin";
@@ -84,6 +90,8 @@ export default async function PacienteDetailPage({
         initialQuotes={quotes}
         initialUltrasounds={ultrasounds}
         initialColposcopies={colposcopies}
+        initialCheckups={checkups}
+        initialPatientDocuments={patientDocuments}
         initialClinicalTemplates={clinicalTemplates}
         initialTariffs={tariffs}
         consultationFormContext={consultationFormContext}

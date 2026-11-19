@@ -29,6 +29,13 @@
       "when": 1795067913344,
       "tag": "0003_odd_baron_strucker",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795076221297,
+      "tag": "0004_kind_thor",
+      "breakpoints": true
     }
   ]
 }

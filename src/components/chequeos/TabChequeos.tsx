@@ -5,6 +5,8 @@ import {
   Activity,
   Camera,
   FileCheck2,
+  FileDown,
+  FileText,
   FlaskConical,
   Layers,
   Loader2,
@@ -16,7 +18,10 @@ import {
   Settings,
   Trash2,
 } from "lucide-react";
+import { CheckupModal } from "@/components/chequeos/CheckupModal";
+import { CheckupPrintModal } from "@/components/chequeos/CheckupPrintModal";
 import { ClinicalTemplatesManagerModal } from "@/components/chequeos/ClinicalTemplatesManagerModal";
+import { PatientPdfDropzoneCard } from "@/components/chequeos/PatientPdfDropzoneCard";
 import { ColposcopyModal } from "@/components/colposcopia/ColposcopyModal";
 import { ColposcopyPrintModal } from "@/components/colposcopia/ColposcopyPrintModal";
 import { TablePagination } from "@/components/common/TablePagination";
@@ -48,6 +53,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { ClinicalCheckupItem } from "@/features/chequeos/chequeos.schema";
+import { useChequeos } from "@/features/chequeos/hooks/use-chequeos";
 import type {
   ClinicalTemplateItem,
   ClinicalTemplateScope,
@@ -59,6 +66,7 @@ import {
 } from "@/features/colposcopia/colposcopia.schema";
 import { useColposcopia } from "@/features/colposcopia/hooks/use-colposcopia";
 import type { MedicalConsultationItem } from "@/features/consultas/consultas.schema";
+import type { PatientDocumentItem } from "@/features/documentos/documentos.schema";
 import {
   ULTRASOUND_TYPE_LABELS,
   ULTRASOUND_TYPE_SHORT_LABELS,
@@ -71,6 +79,7 @@ import type {
 } from "@/features/pacientes/pacientes.schema";
 import { cn, formatPeruDateDisplay } from "@/lib/utils";
 import {
+  generateCheckupWhatsAppUrl,
   generateColposcopyWhatsAppUrl,
   generateUltrasoundWhatsAppUrl,
 } from "@/lib/whatsapp-share";
@@ -82,9 +91,12 @@ interface TabChequeosProps {
   onUltrasoundsChange: (next: UltrasoundReportItem[]) => void;
   colposcopies: ColposcopyReportItem[];
   onColposcopiesChange: (next: ColposcopyReportItem[]) => void;
+  checkups: ClinicalCheckupItem[];
+  onCheckupsChange: (next: ClinicalCheckupItem[]) => void;
+  patientDocuments: PatientDocumentItem[];
+  onPatientDocumentsChange: (next: PatientDocumentItem[]) => void;
   initialClinicalTemplates: ClinicalTemplateItem[];
   consultations: MedicalConsultationItem[];
-  checkupsCount: number;
   canEdit: boolean;
   canDelete: boolean;
   onEmitBiopsyOrderFromColposcopy?: (colpo: ColposcopyReportItem) => void;
@@ -97,9 +109,12 @@ export function TabChequeos({
   onUltrasoundsChange,
   colposcopies,
   onColposcopiesChange,
+  checkups,
+  onCheckupsChange,
+  patientDocuments,
+  onPatientDocumentsChange,
   initialClinicalTemplates,
   consultations,
-  checkupsCount,
   canEdit,
   canDelete,
   onEmitBiopsyOrderFromColposcopy,
@@ -128,6 +143,17 @@ export function TabChequeos({
     templates: templateStore.colposcopyTemplates,
   });
 
+  const cheq = useChequeos({
+    patientId: patient.id,
+    checkups,
+    onCheckupsChange,
+    patientDocuments,
+    onPatientDocumentsChange,
+    ultrasounds,
+    colposcopies,
+    consultations,
+  });
+
   const lastUltrasound = ultrasounds[0] ?? null;
   const lastColposcopy = colposcopies[0] ?? null;
 
@@ -138,7 +164,7 @@ export function TabChequeos({
   return (
     <div className="space-y-4">
       {/* KPI Resumen Rápido */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="border border-border bg-card">
           <CardContent className="flex items-center justify-between pt-4 pb-4">
             <div>
@@ -178,6 +204,20 @@ export function TabChequeos({
               </p>
             </div>
             <Camera className="size-5 text-primary" />
+          </CardContent>
+        </Card>
+
+        <Card className="border border-border bg-card">
+          <CardContent className="flex items-center justify-between pt-4 pb-4">
+            <div>
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase">
+                Chequeos & PDFs Externos
+              </p>
+              <p className="mt-0.5 font-mono text-xl font-bold text-foreground">
+                {cheq.totalCount} / {patientDocuments.length}
+              </p>
+            </div>
+            <Layers className="size-5 text-primary" />
           </CardContent>
         </Card>
       </div>
@@ -253,7 +293,7 @@ export function TabChequeos({
                   : "bg-muted text-muted-foreground"
               )}
             >
-              {checkupsCount}
+              {cheq.totalCount}
             </span>
           </button>
         </div>
@@ -293,6 +333,13 @@ export function TabChequeos({
                 Nueva Colposcopía
               </Button>
             </>
+          ) : null}
+
+          {canEdit && subTab === "integral" ? (
+            <Button type="button" size="sm" onClick={cheq.openCreateModal}>
+              <Plus className="size-3.5" />
+              Nuevo Chequeo
+            </Button>
           ) : null}
         </div>
       </div>
@@ -775,37 +822,337 @@ export function TabChequeos({
         </Card>
       ) : null}
 
-      {/* SUB-TAB 3: CHEQUEO INTEGRAL & DOSSIER PDF (LISTO PARA ETAPA 4B) */}
+      {/* SUB-TAB 3: CHEQUEO INTEGRAL & DOSSIER PDF */}
       {subTab === "integral" ? (
-        <Card className="border border-border bg-card">
-          <CardHeader className="border-b border-border">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Layers className="size-4 text-primary" />
-                Chequeo Ginecológico Preventivo Integral & Dossier PDF Unificado
-              </CardTitle>
-              <Badge variant="outline" className="font-mono text-xs">
-                Etapa 4B en integración
-              </Badge>
-            </div>
-            <CardDescription>
-              Consolidará los{" "}
-              <strong className="font-mono">{eco.totalCount}</strong> informes
-              ecográficos y{" "}
-              <strong className="font-mono">{colpo.totalCount}</strong>{" "}
-              colposcopías registradas de {patient.fullName} junto a citología
-              PAP/VPH y anexos PDF externos mediante <code>pdf-lib</code>.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-4 text-sm text-muted-foreground">
-            Actualmente esta ficha cuenta con{" "}
-            <span className="font-mono font-semibold text-foreground">
-              {checkupsCount}
-            </span>{" "}
-            chequeo(s) integral(es) históricos en PostgreSQL. Se habilitará en
-            la Etapa 4B inmediata tras completar esta fase.
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          <Card className="border border-border bg-card">
+            <CardHeader className="border-b border-border pb-4">
+              <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Layers className="size-4 text-primary" />
+                    Chequeo Ginecológico Preventivo Integral & Dossier PDF
+                    Unificado
+                  </CardTitle>
+                  <CardDescription>
+                    Consolida{" "}
+                    <strong className="font-mono">{eco.totalCount}</strong>{" "}
+                    ecografías,{" "}
+                    <strong className="font-mono">{colpo.totalCount}</strong>{" "}
+                    colposcopías y{" "}
+                    <strong className="font-mono">
+                      {patientDocuments.length}
+                    </strong>{" "}
+                    PDFs externos de {patient.fullName} en un expediente PDF con
+                    carátula oficial.
+                  </CardDescription>
+                </div>
+
+                <div className="relative w-full sm:w-64">
+                  <Search className="pointer-events-none absolute top-2.5 left-2.5 size-3.5 text-muted-foreground" />
+                  <Input
+                    value={cheq.search}
+                    onChange={(e) => cheq.setSearch(e.target.value)}
+                    placeholder="Buscar diagnóstico, BI-RADS..."
+                    className="h-8 pl-8 text-xs"
+                  />
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="pt-4">
+              {cheq.filteredCount === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-10 text-center">
+                  <Layers className="mb-2 size-8 text-muted-foreground/50" />
+                  <p className="text-sm font-medium text-foreground">
+                    {cheq.totalCount === 0
+                      ? "Aún no hay chequeos integrales registrados."
+                      : "Sin coincidencias para el filtro aplicado."}
+                  </p>
+                  <p className="mt-1 max-w-md text-xs text-muted-foreground">
+                    Desde un Chequeo Integral el médico une las ecografías,
+                    colposcopías y PDFs externos (BIOLAQ PAP/VPH y placas VINNO
+                    E35) en un solo Dossier PDF.
+                  </p>
+                  {canEdit && cheq.totalCount === 0 ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="mt-3"
+                      onClick={cheq.openCreateModal}
+                    >
+                      <Plus className="size-3.5" />
+                      Crear Primer Chequeo Integral
+                    </Button>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="overflow-x-auto rounded-lg border border-border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/40">
+                          <TableHead className="text-xs">
+                            Fecha / Estado
+                          </TableHead>
+                          <TableHead className="text-xs">
+                            Piezas del Dossier PDF
+                          </TableHead>
+                          <TableHead className="text-xs">
+                            BI-RADS / PAP / VPH
+                          </TableHead>
+                          <TableHead className="text-xs">
+                            Conclusión / CIE-10
+                          </TableHead>
+                          <TableHead className="text-right text-xs">
+                            Acciones
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {cheq.items.map((item) => {
+                          const ecoCount = item.dossierConfig.items.filter(
+                            (x) => x.kind === "ULTRASOUND"
+                          ).length;
+                          const colpoCount = item.dossierConfig.items.filter(
+                            (x) => x.kind === "COLPOSCOPY"
+                          ).length;
+                          const docCount = item.dossierConfig.items.filter(
+                            (x) => x.kind === "DOCUMENT"
+                          ).length;
+                          const isComplete = item.status === "COMPLETO";
+                          const waUrl = generateCheckupWhatsAppUrl({
+                            patientName: patient.fullName,
+                            patientPhone: patient.phone,
+                            checkupDate: item.checkupDate,
+                            doctorName: item.doctorName,
+                            doctorCmp: item.doctorCmp,
+                            reasonForConsultation: item.reasonForConsultation,
+                            breastBirads: item.breastUltrasoundBirads,
+                            colposcopyResult: item.colposcopyResult,
+                            papResult: item.papResult,
+                            vphResult: item.vphResult,
+                            conclusions: item.conclusions,
+                            cie10Code: item.cie10Code,
+                            medicalPrescription: item.medicalPrescription,
+                            dossierItemsCount: item.dossierConfig.items.length,
+                          });
+
+                          return (
+                            <TableRow key={item.id}>
+                              <TableCell className="align-top text-xs">
+                                <div className="font-mono font-semibold text-foreground">
+                                  {formatPeruDateDisplay(item.checkupDate)}
+                                </div>
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    "mt-1 text-[10px]",
+                                    isComplete
+                                      ? "border-success/40 bg-success/10 text-success"
+                                      : "border-warning/40 bg-warning/10 text-warning"
+                                  )}
+                                >
+                                  {isComplete ? "COMPLETO" : "EN PROCESO"}
+                                </Badge>
+                                <p className="mt-1 text-[11px] text-muted-foreground">
+                                  {item.doctorName}
+                                </p>
+                              </TableCell>
+
+                              <TableCell className="align-top text-xs">
+                                <div className="flex flex-wrap gap-1">
+                                  <Badge
+                                    variant="outline"
+                                    className="border-primary/30 bg-primary/10 font-mono text-[10px] text-primary"
+                                  >
+                                    Eco: {ecoCount}
+                                  </Badge>
+                                  <Badge
+                                    variant="outline"
+                                    className="border-success/30 bg-success/10 font-mono text-[10px] text-success"
+                                  >
+                                    Colpo: {colpoCount}
+                                  </Badge>
+                                  <Badge
+                                    variant="outline"
+                                    className="border-warning/30 bg-warning/10 font-mono text-[10px] text-warning"
+                                  >
+                                    PDFs: {docCount}
+                                  </Badge>
+                                </div>
+                                <p className="mt-1 line-clamp-1 text-[11px] text-muted-foreground">
+                                  {item.dossierConfig.items.length > 0
+                                    ? `${item.dossierConfig.items.length} pieza(s) enlazada(s)`
+                                    : "Solo hoja clínica (sin anexos)"}
+                                </p>
+                              </TableCell>
+
+                              <TableCell className="align-top text-xs">
+                                <p className="font-medium text-foreground">
+                                  {item.breastUltrasoundBirads || "—"}
+                                </p>
+                                <p className="line-clamp-1 text-[11px] text-muted-foreground">
+                                  PAP: {item.papResult || "Pendiente"}
+                                </p>
+                                <p className="line-clamp-1 text-[11px] text-muted-foreground">
+                                  VPH: {item.vphResult || "Pendiente"}
+                                </p>
+                              </TableCell>
+
+                              <TableCell className="max-w-xs align-top text-xs">
+                                <p className="line-clamp-2 font-medium text-foreground">
+                                  {item.conclusions}
+                                </p>
+                                {item.cie10Code ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="mt-1 font-mono text-[10px]"
+                                  >
+                                    CIE-10: {item.cie10Code}
+                                  </Badge>
+                                ) : null}
+                              </TableCell>
+
+                              <TableCell className="text-right align-top">
+                                <div className="inline-flex items-center justify-end gap-1">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="xs"
+                                    title="Descargar Dossier PDF Unificado"
+                                    onClick={() =>
+                                      cheq.triggerDownloadDossier(item.id, {
+                                        sig: item.dossierConfig
+                                          .showDigitalSignature,
+                                        cover:
+                                          item.dossierConfig.includeCoverPage,
+                                        summary:
+                                          item.dossierConfig
+                                            .includeSummarySheet,
+                                      })
+                                    }
+                                  >
+                                    <FileDown className="size-3.5 text-primary" />
+                                    <span className="hidden xl:inline">
+                                      Dossier PDF
+                                    </span>
+                                  </Button>
+
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon-xs"
+                                    title="Vista Previa Ejecutiva / Imprimir"
+                                    onClick={() => cheq.setPrintingItem(item)}
+                                  >
+                                    <Printer className="size-3.5" />
+                                  </Button>
+
+                                  {waUrl ? (
+                                    <a
+                                      href={waUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      title="Enviar resumen por WhatsApp"
+                                    >
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon-xs"
+                                        className="text-success hover:text-success"
+                                      >
+                                        <MessageCircle className="size-3.5" />
+                                      </Button>
+                                    </a>
+                                  ) : null}
+
+                                  {canEdit ? (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon-xs"
+                                      title="Editar Chequeo y Dossier"
+                                      onClick={() => cheq.openEditModal(item)}
+                                    >
+                                      <Pencil className="size-3.5" />
+                                    </Button>
+                                  ) : null}
+
+                                  {canDelete ? (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon-xs"
+                                      title="Archivar Chequeo"
+                                      onClick={() =>
+                                        cheq.setDeleteTarget(item)
+                                      }
+                                      className="text-destructive hover:text-destructive"
+                                    >
+                                      <Trash2 className="size-3.5" />
+                                    </Button>
+                                  ) : null}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  <TablePagination
+                    currentPage={cheq.pagination.currentPage}
+                    totalItems={cheq.filteredCount}
+                    pageSize={cheq.pagination.pageSize}
+                    onPageChange={cheq.pagination.setCurrentPage}
+                    onPageSizeChange={cheq.pagination.setPageSize}
+                    itemLabel="chequeos integrales"
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Repositorio de PDFs Externos accesible también por Asistente */}
+          <Card className="border border-border bg-card">
+            <CardHeader className="border-b border-border pb-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                    <FileText className="size-4 text-warning" />
+                    Placas Ecográficas (VINNO E35) & Resultados Lab Externos
+                    (BIOLAQ PAP / VPH)
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Tanto el equipo médico como la asistente pueden cargar PDFs
+                    externos al Storage privado de la paciente para luego
+                    unirlos dentro de cualquier Chequeo Integral.
+                  </CardDescription>
+                </div>
+                <Badge variant="outline" className="font-mono text-xs">
+                  {patientDocuments.length} PDF(s)
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <PatientPdfDropzoneCard
+                documents={patientDocuments}
+                isUploading={cheq.isUploadingDocument}
+                deletingDocId={cheq.deletingDocId}
+                canDelete={canEdit}
+                onUploadPdf={(params) =>
+                  cheq.uploadExternalPdf({
+                    ...params,
+                    attachToDraftDossier: false,
+                  })
+                }
+                onDeletePdf={cheq.deleteExternalPdf}
+              />
+            </CardContent>
+          </Card>
+        </div>
       ) : null}
 
       {/* MODALES ECOGRAFÍA */}
@@ -961,6 +1308,7 @@ export function TabChequeos({
       <ColposcopyPrintModal
         report={colpo.printingItem}
         patient={patient}
+        background={background}
         showCoverPage={colpo.showCoverPage}
         onShowCoverPageChange={colpo.setShowCoverPage}
         canEdit={canEdit}
@@ -1010,6 +1358,101 @@ export function TabChequeos({
                 <Trash2 className="size-4" />
               )}
               Sí, Archivar Colposcopía
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <CheckupModal
+        open={cheq.dialogOpen}
+        onOpenChange={cheq.setDialogOpen}
+        editingItem={cheq.editingItem}
+        patient={patient}
+        background={background}
+        ultrasounds={ultrasounds}
+        colposcopies={colposcopies}
+        patientDocuments={patientDocuments}
+        consultations={consultations}
+        form={cheq.form}
+        watchedDossier={cheq.watchedDossier}
+        watchedDiagnosis={cheq.watchedDiagnosis}
+        watchedCie10={cheq.watchedCie10}
+        isSubmitting={cheq.isSubmitting}
+        isUploadingDocument={cheq.isUploadingDocument}
+        deletingDocId={cheq.deletingDocId}
+        canDeleteDocuments={canEdit}
+        onSyncStudies={() => cheq.syncFromStudiesAndDocuments()}
+        onToggleDossierItem={cheq.toggleDossierItem}
+        onMoveDossierItem={cheq.moveDossierItem}
+        onAutoOrderDossier={cheq.handleAutoOrderDossier}
+        onUploadPdf={cheq.uploadExternalPdf}
+        onDeletePdf={cheq.deleteExternalPdf}
+        onQuickCreateUltrasound={() => {
+          cheq.setDialogOpen(false);
+          setSubTab("ecografias");
+          eco.openCreateModal();
+        }}
+        onQuickCreateColposcopy={() => {
+          cheq.setDialogOpen(false);
+          setSubTab("colposcopia");
+          colpo.openCreateModal();
+        }}
+        onSetDownloadIntent={cheq.setDownloadAfterSaveIntent}
+        onSubmit={cheq.onSubmit}
+      />
+
+      <CheckupPrintModal
+        checkup={cheq.printingItem}
+        patient={patient}
+        showCoverPage={cheq.showCoverPage}
+        onShowCoverPageChange={cheq.setShowCoverPage}
+        canEdit={canEdit}
+        onEdit={cheq.openEditModal}
+        onDownloadDossier={cheq.triggerDownloadDossier}
+        onClose={() => cheq.setPrintingItem(null)}
+      />
+
+      <Dialog
+        open={Boolean(cheq.deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) cheq.setDeleteTarget(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>¿Archivar Chequeo Ginecológico Integral?</DialogTitle>
+            <DialogDescription>
+              Se archivará el chequeo del{" "}
+              <strong>
+                {cheq.deleteTarget
+                  ? formatPeruDateDisplay(cheq.deleteTarget.checkupDate)
+                  : ""}
+              </strong>
+              . Las ecografías, colposcopías y documentos PDF externos
+              enlazados se mantienen intactos en la historia clínica.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => cheq.setDeleteTarget(null)}
+              disabled={Boolean(cheq.deletingId)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => void cheq.confirmDelete()}
+              disabled={Boolean(cheq.deletingId)}
+            >
+              {cheq.deletingId ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Trash2 className="size-4" />
+              )}
+              Sí, Archivar Chequeo
             </Button>
           </DialogFooter>
         </DialogContent>

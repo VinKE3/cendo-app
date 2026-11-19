@@ -11,13 +11,17 @@ import {
   classifyColposcopyFindings,
   type ColposcopyReportItem,
 } from "@/features/colposcopia/colposcopia.schema";
-import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
+import type {
+  PatientBackgroundItem,
+  PatientDirectoryItem,
+} from "@/features/pacientes/pacientes.schema";
 import { buildClinicalImageViewUrl } from "@/lib/clinical-images";
 import { cn, formatPeruDateDisplay } from "@/lib/utils";
 
 interface ColposcopyPrintViewProps {
   report: ColposcopyReportItem;
   patient: PatientDirectoryItem;
+  background?: PatientBackgroundItem | null;
   clinicAddress?: string;
   clinicEmail?: string;
   clinicPhone?: string;
@@ -106,6 +110,7 @@ function chunkColpoImages(
 export function ColposcopyPrintView({
   report,
   patient,
+  background,
   clinicAddress = "Av. Alfredo Benavides N° 2975, Of. 405, Miraflores - Lima",
   clinicEmail = "cendoperu@gmail.com",
   clinicPhone = "985 945 697",
@@ -266,6 +271,53 @@ export function ColposcopyPrintView({
               </div>
             </div>
           </div>
+
+          {background ? (
+            <div className="grid grid-cols-12 gap-2 rounded-lg border border-warning/35 bg-warning/10 px-2.5 py-1.5 text-[9.5px]">
+              <div className="col-span-12 font-bold tracking-wider text-primary uppercase">
+                Antecedentes Complementarios
+              </div>
+              <div className="col-span-3">
+                <strong className="text-muted-foreground">F. Obstétrica: </strong>
+                <span className="font-mono font-semibold text-foreground">
+                  {background.obstetricFormula || "G0 P0000"}
+                </span>
+              </div>
+              <div className="col-span-2">
+                <strong className="text-muted-foreground">FUR: </strong>
+                <span className="font-mono font-semibold text-foreground">
+                  {background.lastMenstrualPeriod
+                    ? formatPeruDateDisplay(background.lastMenstrualPeriod)
+                    : "NA"}
+                </span>
+              </div>
+              <div className="col-span-3">
+                <strong className="text-muted-foreground">MAC: </strong>
+                <span className="font-medium text-foreground">
+                  {background.contraceptiveMethod || "Ninguno"}
+                </span>
+              </div>
+              <div className="col-span-4">
+                <strong className="text-muted-foreground">IRS / NPS: </strong>
+                <span className="font-mono font-medium text-foreground">
+                  {background.sexualDebutAge ?? "NA"} /{" "}
+                  {background.sexualPartnersCount ?? "NA"}
+                </span>
+              </div>
+              <div className="col-span-6">
+                <strong className="text-muted-foreground">PAP previo: </strong>
+                <span className="font-medium text-foreground">
+                  {background.papHistory || "No refiere"}
+                </span>
+              </div>
+              <div className="col-span-6">
+                <strong className="text-muted-foreground">Test VPH: </strong>
+                <span className="font-medium text-foreground">
+                  {background.vphTestHistory || "No realizado"}
+                </span>
+              </div>
+            </div>
+          ) : null}
 
           {/* 3. Matriz IFCPC 2011 Desglosada (Solo marcados los positivos) */}
           <div className="grid grid-cols-2 gap-3">

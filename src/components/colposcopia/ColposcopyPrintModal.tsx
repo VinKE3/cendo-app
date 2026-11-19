@@ -19,13 +19,17 @@ import {
   classifyColposcopyFindings,
   type ColposcopyReportItem,
 } from "@/features/colposcopia/colposcopia.schema";
-import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
+import type {
+  PatientBackgroundItem,
+  PatientDirectoryItem,
+} from "@/features/pacientes/pacientes.schema";
 import { printHtmlElement } from "@/lib/pdfGenerator";
 import { generateColposcopyWhatsAppUrl } from "@/lib/whatsapp-share";
 
 interface ColposcopyPrintModalProps {
   report: ColposcopyReportItem | null;
   patient: PatientDirectoryItem;
+  background?: PatientBackgroundItem | null;
   showCoverPage: boolean;
   onShowCoverPageChange: (value: boolean) => void;
   canEdit?: boolean;
@@ -37,6 +41,7 @@ interface ColposcopyPrintModalProps {
 export function ColposcopyPrintModal({
   report,
   patient,
+  background,
   showCoverPage,
   onShowCoverPageChange,
   canEdit = false,
@@ -192,6 +197,7 @@ export function ColposcopyPrintModal({
             <ColposcopyPrintView
               report={report}
               patient={patient}
+              background={background}
               showCoverPage={showCoverPage}
               signatureSrc={sigInfo.signatureSrc}
               showDigitalSignature={effectiveShowSignature}
