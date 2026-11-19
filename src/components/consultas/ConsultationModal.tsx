@@ -34,6 +34,7 @@ import type {
   MedicalConsultationItem,
 } from "@/features/consultas/consultas.schema";
 import type { ConsultationModalFormValues } from "@/features/consultas/hooks/use-consultas";
+import type { LabOrderItem } from "@/features/laboratorio/laboratorio.schema";
 import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
 import type { MedicalPrescriptionItem } from "@/features/recetas/recetas.schema";
 import { cn, formatPeruDateDisplay } from "@/lib/utils";
@@ -63,6 +64,10 @@ interface ConsultationModalProps {
   onFillNormalPhysicalExam: () => void;
   onAppendLabTemplate: (templateId: string) => void;
   onAppendMedication: (medId: string) => void;
+  linkedLabOrders?: LabOrderItem[];
+  onViewLinkedLabOrder?: (ord: LabOrderItem) => void;
+  onEditLinkedLabOrder?: (ord: LabOrderItem) => void;
+  onEmitLabOrderFromConsultation?: (cons: MedicalConsultationItem) => void;
   linkedPrescriptions?: MedicalPrescriptionItem[];
   onViewLinkedPrescription?: (rx: MedicalPrescriptionItem) => void;
   onEditLinkedPrescription?: (rx: MedicalPrescriptionItem) => void;
@@ -110,6 +115,10 @@ export function ConsultationModal({
   onFillNormalPhysicalExam,
   onAppendLabTemplate,
   onAppendMedication,
+  linkedLabOrders = [],
+  onViewLinkedLabOrder,
+  onEditLinkedLabOrder,
+  onEmitLabOrderFromConsultation,
   linkedPrescriptions = [],
   onViewLinkedPrescription,
   onEditLinkedPrescription,
@@ -586,55 +595,220 @@ export function ConsultationModal({
               ) : null}
             </div>
 
-            {/* Exámenes Auxiliares + Plantillas Lab */}
-            <div className="space-y-2 rounded-lg border border-border bg-card p-3">
+            {/* Exámenes Auxiliares + Plantillas Lab o Vista de Órdenes Vinculadas */}
+            <div className="space-y-2.5 rounded-lg border border-border bg-card p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <label
                   htmlFor="cons-aux"
                   className="flex items-center gap-1.5 text-xs font-semibold text-foreground"
                 >
                   <FlaskConical className="size-3.5 text-primary" />
-                  Exámenes Auxiliares
+                  Exámenes Auxiliares / Laboratorio
                 </label>
 
-                <select
-                  aria-label="Añadir plantilla de laboratorio"
-                  value=""
-                  onChange={(e) => {
-                    if (e.target.value) onAppendLabTemplate(e.target.value);
-                  }}
-                  className="h-7 max-w-xs rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none"
-                >
-                  <option value="" disabled>
-                    + Añadir plantilla de laboratorio...
-                  </option>
-                  {labTemplates.map((tmpl) => (
-                    <option key={tmpl.id} value={tmpl.id}>
-                      {tmpl.title}
+                {editingItem && linkedLabOrders.length > 0 ? (
+                  <Badge variant="secondary" className="gap-1 font-mono text-[11px]">
+                    Orden oficial emitida ({linkedLabOrders.length})
+                  </Badge>
+                ) : (
+                  <select
+                    aria-label="Añadir plantilla de laboratorio"
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value) onAppendLabTemplate(e.target.value);
+                    }}
+                    className="h-7 max-w-xs rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none"
+                  >
+                    <option value="" disabled>
+                      + Añadir plantilla de laboratorio...
                     </option>
-                  ))}
-                </select>
+                    {labTemplates.map((tmpl) => (
+                      <option key={tmpl.id} value={tmpl.id}>
+                        {tmpl.title}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
-              <Textarea
-                id="cons-aux"
-                rows={2}
-                placeholder="Dejar en blanco si no solicita exámenes auxiliares..."
-                {...register("auxiliaryExams")}
-              />
+              {editingItem && linkedLabOrders.length > 0 ? (
+                <div className="space-y-2.5">
+                  {linkedLabOrders.map((ord) => (
+                    <div
+                      key={ord.id}
+                      className="space-y-2 rounded-lg border border-border bg-muted/20 p-3 text-xs"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline" className="font-mono text-[10px]">
+                            LAB-{ord.id.slice(0, 8).toUpperCase()}
+                          </Badge>
+                          <Badge
+                            variant={
+                              ord.urgency === "Urgente"
+                                ? "destructive"
+                                : "secondary"
+                            }
+                            className="font-mono text-[10px]"
+                          >
+                            {ord.urgency}
+                          </Badge>
+                          <span className="font-mono text-[11px] text-muted-foreground">
+                            {formatPeruDateDisplay(ord.orderDate)}
+                          </span>
+                        </div>
 
-              {!editingItem && watchedAuxExams.trim() ? (
-                <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-primary">
-                  <input
-                    type="checkbox"
-                    className="size-3.5 accent-primary"
-                    {...register("generateLabOrder")}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {onViewLinkedLabOrder ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="xs"
+                              onClick={() => {
+                                onOpenChange(false);
+                                onViewLinkedLabOrder(ord);
+                              }}
+                            >
+                              <Printer className="size-3" />
+                              Imprimir
+                            </Button>
+                          ) : null}
+
+                          {onEditLinkedLabOrder ? (
+                            <Button
+                              type="button"
+                              variant="default"
+                              size="xs"
+                              onClick={() => {
+                                onOpenChange(false);
+                                onEditLinkedLabOrder(ord);
+                              }}
+                            >
+                              <Pencil className="size-3" />
+                              Editar Orden
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1">
+                        {ord.items.map((it) => (
+                          <Badge
+                            key={it.id}
+                            variant="outline"
+                            className="bg-card text-[10.5px] font-normal"
+                          >
+                            {it.testName}
+                          </Badge>
+                        ))}
+                        {ord.customTests ? (
+                          <Badge
+                            variant="secondary"
+                            className="text-[10.5px] italic"
+                          >
+                            + {ord.customTests}
+                          </Badge>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+
+                  {onEmitLabOrderFromConsultation ? (
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5 text-[11px] text-muted-foreground">
+                      <span>
+                        ¿Requiere otra orden separada (ej. biopsia / patología aparte)?
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="xs"
+                        onClick={() => {
+                          const currentValues = form.getValues();
+                          onOpenChange(false);
+                          onEmitLabOrderFromConsultation({
+                            ...editingItem,
+                            diagnosis:
+                              currentValues.diagnosis.trim() || editingItem.diagnosis,
+                            cie10Code:
+                              currentValues.cie10Code.trim() || editingItem.cie10Code,
+                            auxiliaryExams: "",
+                            nextAppointmentDate: currentValues.nextAppointmentDate,
+                          });
+                        }}
+                      >
+                        <FlaskConical className="size-3" />
+                        + Orden adicional
+                      </Button>
+                    </div>
+                  ) : null}
+
+                  {watchedAuxExams.trim() ? (
+                    <details className="rounded-md border border-border bg-muted/10 p-2 text-xs">
+                      <summary className="cursor-pointer font-medium text-muted-foreground select-none hover:text-foreground">
+                        Notas previas registradas en consulta
+                      </summary>
+                      <div className="pt-2">
+                        <Textarea
+                          id="cons-aux"
+                          rows={2}
+                          {...register("auxiliaryExams")}
+                        />
+                      </div>
+                    </details>
+                  ) : null}
+                </div>
+              ) : (
+                <>
+                  <Textarea
+                    id="cons-aux"
+                    rows={2}
+                    placeholder="Dejar en blanco si no solicita exámenes auxiliares..."
+                    {...register("auxiliaryExams")}
                   />
-                  <span>
-                    Generar Orden de Laboratorio vinculada automáticamente al guardar
-                  </span>
-                </label>
-              ) : null}
+
+                  {!editingItem && watchedAuxExams.trim() ? (
+                    <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-primary">
+                      <input
+                        type="checkbox"
+                        className="size-3.5 accent-primary"
+                        {...register("generateLabOrder")}
+                      />
+                      <span>
+                        Generar Orden de Laboratorio vinculada automáticamente al guardar
+                      </span>
+                    </label>
+                  ) : null}
+
+                  {editingItem && onEmitLabOrderFromConsultation ? (
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2">
+                      <span className="text-[11px] text-muted-foreground">
+                        Sin orden de laboratorio estructurada emitida para esta consulta.
+                      </span>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="xs"
+                        onClick={() => {
+                          const currentValues = form.getValues();
+                          onOpenChange(false);
+                          onEmitLabOrderFromConsultation({
+                            ...editingItem,
+                            diagnosis:
+                              currentValues.diagnosis.trim() || editingItem.diagnosis,
+                            cie10Code:
+                              currentValues.cie10Code.trim() || editingItem.cie10Code,
+                            auxiliaryExams: currentValues.auxiliaryExams,
+                            nextAppointmentDate: currentValues.nextAppointmentDate,
+                          });
+                        }}
+                      >
+                        <FlaskConical className="size-3" />
+                        Emitir Orden de Laboratorio
+                      </Button>
+                    </div>
+                  ) : null}
+                </>
+              )}
             </div>
 
             {/* Medicación / Rp + Vademécum o Vista de Receta Vinculada */}

@@ -10,13 +10,15 @@ import {
   patients,
   profiles,
 } from "@/db/schema";
-import type {
-  ConsultationVitalSignsRecord,
-  LabOrderItemRecord,
-} from "@/db/schema/clinical";
+import type { ConsultationVitalSignsRecord } from "@/db/schema/clinical";
 import { recordAuditLog } from "@/lib/audit/audit-log";
 import { DomainError, type SessionPayload } from "@/lib/security/action-guard";
 import { getPeruDateString } from "@/lib/utils";
+import {
+  parseConsultationAuxExamsToLabItems,
+  type LabOrderItem,
+} from "@/features/laboratorio/laboratorio.schema";
+import { mapLabOrderRow } from "@/features/laboratorio/services/laboratorio.service";
 import {
   parseConsultationRxNotesToDraftItems,
   type MedicalPrescriptionItem,
@@ -182,13 +184,6 @@ export async function getConsultationFormContext(
   };
 }
 
-function parseBulletLines(raw: string): string[] {
-  return raw
-    .split(/\r?\n/)
-    .map((line) => line.replace(/^[•\-*]\s*/, "").trim())
-    .filter(Boolean);
-}
-
 export async function createConsultation(
   ctx: SessionPayload,
   actorName: string,
@@ -198,6 +193,7 @@ export async function createConsultation(
   createdPrescriptionId: string | null;
   createdPrescription: MedicalPrescriptionItem | null;
   createdLabOrderId: string | null;
+  createdLabOrder: LabOrderItem | null;
   attendedAppointmentId: string | null;
 }> {
   if (!ctx.tenantId) throw new DomainError("Sesión sin sede asociada.");
@@ -354,41 +350,43 @@ export async function createConsultation(
     }
 
     let createdLabOrderId: string | null = null;
-    const labLines = parseBulletLines(input.auxiliaryExams);
-    if (input.generateLabOrder && labLines.length > 0) {
-      const labItems: LabOrderItemRecord[] = labLines.map((testName, idx) => ({
-        id: `lab-${Date.now()}-${idx}`,
-        category: "Ginecología & Exámenes Auxiliares",
-        testName,
-        sampleType: "Según protocolo",
-        notes: input.diagnosis ? `Dx: ${input.diagnosis}` : undefined,
+    let createdLabOrder: LabOrderItem | null = null;
+    if (input.generateLabOrder && input.auxiliaryExams.trim()) {
+      const labItems = parseConsultationAuxExamsToLabItems(
+        input.auxiliaryExams
+      ).map((item) => ({
+        ...item,
+        notes: item.notes ?? (input.diagnosis ? `Dx: ${input.diagnosis}` : undefined),
       }));
 
-      const [lab] = await tx
-        .insert(labOrders)
-        .values({
-          tenantId,
-          patientId: input.patientId,
-          consultationId: inserted.id,
-          doctorId: doctor.id,
-          doctorName: doctorDisplayName,
-          doctorCmp,
-          doctorRne,
-          orderDate: input.consultationDate,
-          diagnosis: input.diagnosis,
-          cie10Code: input.cie10Code || null,
-          urgency: "Rutina",
-          items: labItems,
-          patientInstructions:
-            "Acudir en ayunas o seguir las indicaciones específicas del laboratorio.",
-          templateType: "GENERAL",
-          templateTitle: "Orden generada desde Consulta Médica",
-          createdBy: ctx.userId,
-          updatedBy: ctx.userId,
-        })
-        .returning({ id: labOrders.id });
+      if (labItems.length > 0) {
+        const [lab] = await tx
+          .insert(labOrders)
+          .values({
+            tenantId,
+            patientId: input.patientId,
+            consultationId: inserted.id,
+            doctorId: doctor.id,
+            doctorName: doctorDisplayName,
+            doctorCmp,
+            doctorRne,
+            orderDate: input.consultationDate,
+            diagnosis: input.diagnosis,
+            cie10Code: input.cie10Code || null,
+            urgency: "Rutina",
+            items: labItems,
+            patientInstructions:
+              "Acudir en ayunas o seguir las indicaciones específicas del laboratorio.",
+            templateType: "GENERAL",
+            templateTitle: "Orden generada desde Consulta Médica",
+            createdBy: ctx.userId,
+            updatedBy: ctx.userId,
+          })
+          .returning();
 
-      createdLabOrderId = lab.id;
+        createdLabOrderId = lab.id;
+        createdLabOrder = mapLabOrderRow(lab);
+      }
     }
 
     return {
@@ -396,6 +394,7 @@ export async function createConsultation(
       createdPrescriptionId,
       createdPrescription,
       createdLabOrderId,
+      createdLabOrder,
       attendedAppointmentId,
     };
   });

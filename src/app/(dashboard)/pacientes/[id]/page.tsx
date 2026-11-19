@@ -7,8 +7,14 @@ import {
   getConsultationFormContext,
   listConsultationsByPatient,
 } from "@/features/consultas/services/consultas.service";
+import { listQuotesByPatient } from "@/features/cotizaciones/services/cotizaciones.service";
+import {
+  listLabOrdersByPatient,
+  listLabTemplates,
+} from "@/features/laboratorio/services/laboratorio.service";
 import { getPatientDetail } from "@/features/pacientes/services/pacientes.service";
 import { listPrescriptionsByPatient } from "@/features/recetas/services/recetas.service";
+import { listTariffs } from "@/features/tarifario/services/tarifario.service";
 import { requireSessionDoctor } from "@/lib/security/server-session";
 
 const uuidSchema = z
@@ -38,10 +44,16 @@ export default async function PacienteDetailPage({
     listCategories(doctor.tenantId, "consultation_reason"),
     listPrescriptionsByPatient(doctor.tenantId, parsedId.data),
   ]);
+  const [labOrders, labTemplates, quotes] = await Promise.all([
+    listLabOrdersByPatient(doctor.tenantId, parsedId.data),
+    listLabTemplates(doctor.tenantId),
+    listQuotesByPatient(doctor.tenantId, parsedId.data),
+  ]);
   const consultationFormContext = await getConsultationFormContext(
     doctor.tenantId,
     parsedId.data
   );
+  const tariffs = await listTariffs(doctor.tenantId);
 
   const canEdit = doctor.role === "admin" || doctor.role === "moderator";
   const canDelete = doctor.role === "admin";
@@ -59,6 +71,10 @@ export default async function PacienteDetailPage({
         initialConsultations={consultations}
         initialConsultationReasons={consultationReasons}
         initialPrescriptions={prescriptions}
+        initialLabOrders={labOrders}
+        initialLabTemplates={labTemplates}
+        initialQuotes={quotes}
+        initialTariffs={tariffs}
         consultationFormContext={consultationFormContext}
         canEdit={canEdit}
         canDelete={canDelete}

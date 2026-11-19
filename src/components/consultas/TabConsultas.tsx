@@ -4,11 +4,13 @@ import Link from "next/link";
 import {
   AlertTriangle,
   CalendarPlus,
+  FlaskConical,
   MessageCircle,
   Pencil,
   Pill,
   Plus,
   Printer,
+  Receipt,
   Search,
   Stethoscope,
   Tags,
@@ -52,6 +54,7 @@ import {
   useConsultas,
   type ConsultationCountsDelta,
 } from "@/features/consultas/hooks/use-consultas";
+import type { LabOrderItem } from "@/features/laboratorio/laboratorio.schema";
 import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
 import type { MedicalPrescriptionItem } from "@/features/recetas/recetas.schema";
 import { formatPeruDateDisplay } from "@/lib/utils";
@@ -65,14 +68,20 @@ interface TabConsultasProps {
   initialReasons: CatalogCategoryItem[];
   formContext: ConsultationFormContext;
   prescriptions: MedicalPrescriptionItem[];
+  labOrders: LabOrderItem[];
   canEdit: boolean;
   canDelete: boolean;
   onCountsChange?: (delta: ConsultationCountsDelta) => void;
   onConsultationsChange?: (items: MedicalConsultationItem[]) => void;
   onPrescriptionCreated?: (prescription: MedicalPrescriptionItem) => void;
+  onLabOrderCreated?: (labOrder: LabOrderItem) => void;
   onEmitPrescriptionFromConsultation?: (cons: MedicalConsultationItem) => void;
   onOpenLinkedPrescription?: (prescription: MedicalPrescriptionItem) => void;
   onEditLinkedPrescription?: (prescription: MedicalPrescriptionItem) => void;
+  onEmitLabOrderFromConsultation?: (cons: MedicalConsultationItem) => void;
+  onOpenLinkedLabOrder?: (labOrder: LabOrderItem) => void;
+  onEditLinkedLabOrder?: (labOrder: LabOrderItem) => void;
+  onEmitQuoteFromConsultation?: (cons: MedicalConsultationItem) => void;
 }
 
 export function TabConsultas({
@@ -81,14 +90,20 @@ export function TabConsultas({
   initialReasons,
   formContext,
   prescriptions,
+  labOrders,
   canEdit,
   canDelete,
   onCountsChange,
   onConsultationsChange,
   onPrescriptionCreated,
+  onLabOrderCreated,
   onEmitPrescriptionFromConsultation,
   onOpenLinkedPrescription,
   onEditLinkedPrescription,
+  onEmitLabOrderFromConsultation,
+  onOpenLinkedLabOrder,
+  onEditLinkedLabOrder,
+  onEmitQuoteFromConsultation,
 }: TabConsultasProps) {
   const {
     items,
@@ -141,6 +156,7 @@ export function TabConsultas({
     onCountsChange,
     onConsultationsChange,
     onPrescriptionCreated,
+    onLabOrderCreated,
   });
 
   return (
@@ -209,6 +225,9 @@ export function TabConsultas({
                     const linkedRx = prescriptions.filter(
                       (rx) => rx.consultationId === cons.id
                     );
+                    const linkedLabs = labOrders.filter(
+                      (ord) => ord.consultationId === cons.id
+                    );
 
                     return (
                       <TableRow key={cons.id}>
@@ -272,6 +291,19 @@ export function TabConsultas({
                                 >
                                   <Pill className="size-2.5" />
                                   Receta ({linkedRx.length})
+                                </button>
+                              ) : null}
+
+                              {linkedLabs.length > 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    onOpenLinkedLabOrder?.(linkedLabs[0])
+                                  }
+                                  className="inline-flex cursor-pointer items-center gap-1 rounded border border-border bg-secondary px-1.5 py-0.5 font-mono text-[10px] font-semibold text-secondary-foreground transition-colors hover:bg-secondary/80"
+                                >
+                                  <FlaskConical className="size-2.5" />
+                                  Lab ({linkedLabs.length})
                                 </button>
                               ) : null}
                             </div>
@@ -343,6 +375,18 @@ export function TabConsultas({
                                         )
                                         .join("\n")
                                     : cons.prescriptionNotes;
+                                const structuredLabSummary =
+                                  !cons.auxiliaryExams.trim() &&
+                                  linkedLabs.length > 0
+                                    ? linkedLabs
+                                        .flatMap((ord) => [
+                                          ...ord.items.map((it) => `• ${it.testName}`),
+                                          ...(ord.customTests
+                                            ? [`• ${ord.customTests}`]
+                                            : []),
+                                        ])
+                                        .join("\n")
+                                    : cons.auxiliaryExams;
                                 const url = generateConsultationWhatsAppUrl({
                                   patientName: patient.fullName,
                                   patientPhone: patient.phone,
@@ -352,7 +396,7 @@ export function TabConsultas({
                                   diagnosis: cons.diagnosis,
                                   cie10Code: cons.cie10Code,
                                   treatmentPlan: cons.treatmentPlan,
-                                  auxiliaryExams: cons.auxiliaryExams,
+                                  auxiliaryExams: structuredLabSummary,
                                   prescriptionNotes: structuredRxSummary,
                                   nextAppointmentDate: cons.nextAppointmentDate,
                                 });
@@ -386,6 +430,34 @@ export function TabConsultas({
                                 title="Emitir receta oficial desde esta consulta"
                               >
                                 <Pill className="size-3.5 text-primary" />
+                              </Button>
+                            ) : null}
+
+                            {canEdit && onEmitLabOrderFromConsultation ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon-xs"
+                                onClick={() =>
+                                  onEmitLabOrderFromConsultation(cons)
+                                }
+                                aria-label="Emitir orden de laboratorio desde consulta"
+                                title="Emitir orden de laboratorio desde esta consulta"
+                              >
+                                <FlaskConical className="size-3.5 text-primary" />
+                              </Button>
+                            ) : null}
+
+                            {canEdit && onEmitQuoteFromConsultation ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon-xs"
+                                onClick={() => onEmitQuoteFromConsultation(cons)}
+                                aria-label="Cotizar procedimiento desde consulta"
+                                title="Emitir cotización / presupuesto desde esta consulta"
+                              >
+                                <Receipt className="size-3.5 text-primary" />
                               </Button>
                             ) : null}
 
@@ -473,9 +545,20 @@ export function TabConsultas({
         onFillNormalPhysicalExam={fillNormalPhysicalExam}
         onAppendLabTemplate={appendLabTemplate}
         onAppendMedication={appendVademecumMedication}
+        linkedLabOrders={
+          editingItem
+            ? labOrders.filter((ord) => ord.consultationId === editingItem.id)
+            : []
+        }
+        onViewLinkedLabOrder={onOpenLinkedLabOrder}
+        onEditLinkedLabOrder={canEdit ? onEditLinkedLabOrder : undefined}
+        onEmitLabOrderFromConsultation={
+          canEdit ? onEmitLabOrderFromConsultation : undefined
+        }
         linkedPrescriptions={
           editingItem
             ? prescriptions.filter((rx) => rx.consultationId === editingItem.id)
+                .filter(Boolean)
             : []
         }
         onViewLinkedPrescription={onOpenLinkedPrescription}
@@ -495,6 +578,11 @@ export function TabConsultas({
         linkedPrescriptions={
           printingItem
             ? prescriptions.filter((rx) => rx.consultationId === printingItem.id)
+            : []
+        }
+        linkedLabOrders={
+          printingItem
+            ? labOrders.filter((ord) => ord.consultationId === printingItem.id)
             : []
         }
         showCoverPage={showCoverPage}

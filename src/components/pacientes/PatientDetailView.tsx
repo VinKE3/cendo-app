@@ -39,11 +39,20 @@ import type {
   ConsultationFormContext,
   MedicalConsultationItem,
 } from "@/features/consultas/consultas.schema";
-import type { ConsultationCountsDelta } from "@/features/consultas/hooks/use-consultas";
+import type { ProcedureQuoteItem } from "@/features/cotizaciones/cotizaciones.schema";
+import type {
+  LabOrderItem,
+  LabOrderTemplateItem,
+} from "@/features/laboratorio/laboratorio.schema";
 import type { PatientDetailData } from "@/features/pacientes/pacientes.schema";
 import type { MedicalPrescriptionItem } from "@/features/recetas/recetas.schema";
+import type { ProcedureTariffItem } from "@/features/tarifario/tarifario.schema";
 import { cn, formatPeruDateDisplay } from "@/lib/utils";
 import { TabConsultas } from "../consultas/TabConsultas";
+import {
+  TabLaboratorioCotizaciones,
+  type TabLabCotizHandle,
+} from "../laboratorio/TabLaboratorioCotizaciones";
 import { TabRecetas, type TabRecetasHandle } from "../recetas/TabRecetas";
 import { PatientBackgroundModal } from "./PatientBackgroundModal";
 import { PatientModal } from "./PatientModal";
@@ -53,6 +62,10 @@ interface PatientDetailViewProps {
   initialConsultations: MedicalConsultationItem[];
   initialConsultationReasons: CatalogCategoryItem[];
   initialPrescriptions: MedicalPrescriptionItem[];
+  initialLabOrders: LabOrderItem[];
+  initialLabTemplates: LabOrderTemplateItem[];
+  initialQuotes: ProcedureQuoteItem[];
+  initialTariffs: ProcedureTariffItem[];
   consultationFormContext: ConsultationFormContext;
   canEdit: boolean;
   canDelete?: boolean;
@@ -82,22 +95,26 @@ export function PatientDetailView({
   initialConsultations,
   initialConsultationReasons,
   initialPrescriptions,
+  initialLabOrders,
+  initialLabTemplates,
+  initialQuotes,
+  initialTariffs,
   consultationFormContext,
   canEdit,
   canDelete = false,
 }: PatientDetailViewProps) {
   const recetasRef = useRef<TabRecetasHandle>(null);
+  const labCotizRef = useRef<TabLabCotizHandle>(null);
   const [consultationsList, setConsultationsList] =
     useState<MedicalConsultationItem[]>(initialConsultations);
   const [prescriptionsList, setPrescriptionsList] =
     useState<MedicalPrescriptionItem[]>(initialPrescriptions);
-  const [labOrdersDelta, setLabOrdersDelta] = useState(0);
-
-  const handleConsultationCountsChange = (delta: ConsultationCountsDelta) => {
-    if (delta.labOrdersDelta) {
-      setLabOrdersDelta((prev) => prev + (delta.labOrdersDelta ?? 0));
-    }
-  };
+  const [labOrdersList, setLabOrdersList] =
+    useState<LabOrderItem[]>(initialLabOrders);
+  const [labTemplatesList, setLabTemplatesList] =
+    useState<LabOrderTemplateItem[]>(initialLabTemplates);
+  const [quotesList, setQuotesList] =
+    useState<ProcedureQuoteItem[]>(initialQuotes);
 
   const {
     patient,
@@ -155,11 +172,38 @@ export function PatientDetailView({
     setPrescriptionsList((prev) => [rx, ...prev]);
   };
 
+  const handleLabOrderCreatedFromConsultation = (ord: LabOrderItem) => {
+    setLabOrdersList((prev) => [ord, ...prev]);
+  };
+
+  const handleEmitLabOrderFromConsultation = (
+    cons: MedicalConsultationItem
+  ) => {
+    setActiveTab("laboratorio");
+    labCotizRef.current?.openLabFromConsultation(cons);
+  };
+
+  const handleOpenLinkedLabOrder = (ord: LabOrderItem) => {
+    setActiveTab("laboratorio");
+    labCotizRef.current?.openLabPrintPreview(ord);
+  };
+
+  const handleEditLinkedLabOrder = (ord: LabOrderItem) => {
+    setActiveTab("laboratorio");
+    labCotizRef.current?.openLabEdit(ord);
+  };
+
+  const handleEmitQuoteFromConsultation = (cons: MedicalConsultationItem) => {
+    setActiveTab("laboratorio");
+    labCotizRef.current?.openQuoteFromConsultation(cons);
+  };
+
   const liveCounts = {
     ...counts,
     consultations: consultationsList.length,
     prescriptions: prescriptionsList.length,
-    labOrders: Math.max(0, counts.labOrders + labOrdersDelta),
+    labOrders: labOrdersList.length,
+    quotes: quotesList.length,
   };
 
   const tabs: Array<{
@@ -733,16 +777,21 @@ export function PatientDetailView({
           initialReasons={initialConsultationReasons}
           formContext={consultationFormContext}
           prescriptions={prescriptionsList}
+          labOrders={labOrdersList}
           canEdit={canEdit}
           canDelete={canDelete}
-          onCountsChange={handleConsultationCountsChange}
           onConsultationsChange={setConsultationsList}
           onPrescriptionCreated={handlePrescriptionCreatedFromConsultation}
+          onLabOrderCreated={handleLabOrderCreatedFromConsultation}
           onEmitPrescriptionFromConsultation={
             handleEmitPrescriptionFromConsultation
           }
           onOpenLinkedPrescription={handleOpenLinkedPrescription}
           onEditLinkedPrescription={handleEditLinkedPrescription}
+          onEmitLabOrderFromConsultation={handleEmitLabOrderFromConsultation}
+          onOpenLinkedLabOrder={handleOpenLinkedLabOrder}
+          onEditLinkedLabOrder={handleEditLinkedLabOrder}
+          onEmitQuoteFromConsultation={handleEmitQuoteFromConsultation}
         />
       </div>
 
@@ -759,9 +808,28 @@ export function PatientDetailView({
         />
       </div>
 
+      <div className={activeTab === "laboratorio" ? "block" : "hidden"}>
+        <TabLaboratorioCotizaciones
+          ref={labCotizRef}
+          patient={patient}
+          background={background}
+          labOrders={labOrdersList}
+          onLabOrdersChange={setLabOrdersList}
+          labTemplates={labTemplatesList}
+          onLabTemplatesChange={setLabTemplatesList}
+          quotes={quotesList}
+          onQuotesChange={setQuotesList}
+          tariffs={initialTariffs}
+          consultations={consultationsList}
+          canEdit={canEdit}
+          canDelete={canDelete}
+        />
+      </div>
+
       {activeTab !== "resumen" &&
       activeTab !== "consultas" &&
-      activeTab !== "recetas" ? (
+      activeTab !== "recetas" &&
+      activeTab !== "laboratorio" ? (
         <Card className="border border-border bg-card">
           <CardHeader className="border-b border-border">
             <div className="flex items-center justify-between gap-2">

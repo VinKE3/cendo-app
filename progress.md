@@ -1,4 +1,4 @@
-# Estado del Proyecto: Fase 3 (Consultas & Recetas Médicas Completadas)
+# Estado del Proyecto: Fase 3 Completada (Agenda, Consultas, Recetas, Laboratorio & Cotizaciones)
 
 ## 1. Objetivo General
 Plataforma médica oficial de producción (**cendo-app**) para el Centro de Endometriosis y Ginecología Especializada **CENDO** (Sede Miraflores, Lima - Perú), liderado por el Director Médico **Dr. Patrick José Jacinto Gomero** (CMP 61693 | RNE 38657).
@@ -25,12 +25,12 @@ Plataforma médica oficial de producción (**cendo-app**) para el Centro de Endo
 - [x] Fase 3 (Parte 1): Agenda Médica (`/agenda`) en Tabla Densa con motor anti-cruces en PostgreSQL, Tipos de Atención dinámicos en `catalog_categories` (`ManageCategoriesModal`), registro rápido atómico de paciente, WhatsApp + Google/Apple Calendar (`.ics`), flujo `"Atender y registrar consulta"` hacia `/pacientes/[id]` y 3 citas activas verificadas end-to-end
 - [x] Fase 3 (Parte 2 - Consultas): Consultas Médicas Estructuradas (`consultas`, `/api/consultas`, `TabConsultas`, `ConsultationModal`, `ConsultationPrintView` A4 CENDO + WhatsApp), Motivos de Consulta dinámicos editables en cascada (`consultation_reason`), `Cie10Autocomplete` reutilizable, cálculo de IMC y validación fisiológica en servidor, y creación atómica opcional de cita `ATENDIDA` + receta + orden de laboratorio; 3 consultas de prueba verificadas end-to-end (`N80.3`, `Z34.0`, `N87.0`)
 - [x] Fase 3 (Parte 2 - Recetas): Módulo completo de Recetas Médicas (`recetas`, `/api/recetas`, `TabRecetas`, `PrescriptionModal`, `PrescriptionPrintView` A4/A5 CENDO + WhatsApp), alerta de Alergias/RAMs, presets ginecológicos en 1 clic conectados al Vademécum real (`medications_vademecum`), renovación/duplicación de recetas, puente bidireccional en vivo con `TabConsultas` (`Receta (N)` + botón "Emitir Receta desde Consulta" pre-llenado) y 3 recetas oficiales verificadas end-to-end (`N80.3`, `Z34.0`, `N87.0`)
-- [ ] Fase 3 (Parte 2 - Pendiente): Tabs dedicados de `laboratorio` (con gestor CRUD de plantillas `lab_order_templates` y formato Patología/Muestras) y `cotizaciones` (con Tarifario real y cálculo financiero Zero Trust en servidor) dentro de `/pacientes/[id]`
-- [ ] Fase 4: Alta Especialidad dentro de la ficha (`colposcopia`, `ecografias`, `procedimientos`, `prenatal` y unión de estudios en 1 PDF)
+- [x] Fase 3 (Parte 2 - Laboratorio & Cotizaciones): Sub-tabs completos a ancho completo dentro de `Laboratorio & Cotiz.` (`TabLaboratorioCotizaciones`): Órdenes de Laboratorio (`laboratorio`, `/api/laboratorio`, `LabOrderModal`, `LabOrderPrintView` A4 + cadena de custodia) con gestor CRUD de plantillas (`/api/lab-templates`, `LabTemplatesManagerModal`, protección de plantillas oficiales CENDO) y auto-hidratación de FUR/paridad/MAC en biopsias/citología; Cotizaciones (`cotizaciones`, `/api/cotizaciones`, `QuoteModal`, `QuotePrintView` A4 + WhatsApp) conectadas al Tarifario real (`procedures_tariff`) con cálculo financiero Zero Trust en servidor, vigencia automática y renovación de tarifas; fuente única de verdad en `TabConsultas` (`Lab (N)` + `Cotizar`) y 3 órdenes + 3 presupuestos verificados end-to-end
+- [ ] Fase 4: Alta Especialidad dentro de la ficha (`chequeos` [ecografías + colposcopía IFCPC integradas], `procedimientos`, `prenatal` y unión de estudios en 1 PDF)
 - [ ] Fase 5: Documentos externos, Impresión A4 oficial CENDO, WhatsApp y Excel clínico (59 cols)
 
 ## 4. Tarea Actual
-- Siguiente paso para cerrar **Fase 3**: implementar Bloque 2 (**Órdenes de Laboratorio** + **Cotizaciones / Presupuestos Médicos**) dentro de `/pacientes/[id]` (sub-tabs dentro de `Laboratorio & Cotiz.` + puente desde `Consultas`).
+- Iniciar **Fase 4**: módulos de Alta Especialidad dentro de `/pacientes/[id]` (`Chequeos` unificando `Ecografías` + `Colposcopía Digital IFCPC`, `Procedimientos Menores` y `Control Prenatal MINSA / CLAP`).
 
 ## 5. Bloqueos / Notas
 - Nota de despliegue: Si el proyecto escala en entorno Serverless multi-instancia (Vercel), migrar `rate-limit.ts` a `@upstash/ratelimit`.

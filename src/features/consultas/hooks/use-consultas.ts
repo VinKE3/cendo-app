@@ -8,6 +8,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import type { CatalogCategoryItem } from "@/features/catalog-categories/catalog-categories.schema";
 import { useCatalogCategories } from "@/features/catalog-categories/hooks/use-catalog-categories";
+import type { LabOrderItem } from "@/features/laboratorio/laboratorio.schema";
 import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
 import type { MedicalPrescriptionItem } from "@/features/recetas/recetas.schema";
 import { usePagination } from "@/hooks/use-pagination";
@@ -139,6 +140,7 @@ export interface UseConsultasParams {
   onCountsChange?: (delta: ConsultationCountsDelta) => void;
   onConsultationsChange?: (items: MedicalConsultationItem[]) => void;
   onPrescriptionCreated?: (prescription: MedicalPrescriptionItem) => void;
+  onLabOrderCreated?: (labOrder: LabOrderItem) => void;
 }
 
 export function useConsultas({
@@ -149,6 +151,7 @@ export function useConsultas({
   onCountsChange,
   onConsultationsChange,
   onPrescriptionCreated,
+  onLabOrderCreated,
 }: UseConsultasParams) {
   const searchParams = useSearchParams();
   const todayStr = useMemo(() => getPeruDateString(), []);
@@ -480,6 +483,7 @@ export function useConsultas({
       createdPrescriptionId,
       createdPrescription,
       createdLabOrderId,
+      createdLabOrder,
       attendedAppointmentId,
     } = res.data;
 
@@ -488,6 +492,9 @@ export function useConsultas({
     onConsultationsChange?.(nextItems);
     if (createdPrescription) {
       onPrescriptionCreated?.(createdPrescription);
+    }
+    if (createdLabOrder) {
+      onLabOrderCreated?.(createdLabOrder);
     }
     reasonManager.syncUsageCounts(nextItems.map((i) => i.reasonForVisit));
 

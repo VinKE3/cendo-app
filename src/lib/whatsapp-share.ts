@@ -1,9 +1,10 @@
+import { getDefaultInstructionsForTemplateType } from "@/features/laboratorio/laboratorio.schema";
 import {
   generateGoogleCalendarUrl,
   type CalendarClinicInfo,
   type CalendarExportAppointment,
 } from "@/lib/calendar-export";
-import { formatPeruDateDisplay } from "@/lib/utils";
+import { formatCurrency, formatPeruDateDisplay } from "@/lib/utils";
 
 const DEFAULT_CLINIC_ADDRESS =
   "Av. Alfredo Benavides N° 2975, Of. 405, Miraflores - Lima";
@@ -223,6 +224,144 @@ export function generatePrescriptionWhatsAppUrl(
     `📞 *Central de Citas:* ${phone}`,
     ``,
     `_Conserve esta receta para su dispensación y seguimiento médico._`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const encoded = encodeURIComponent(message);
+  return targetPhone
+    ? `https://wa.me/${targetPhone}?text=${encoded}`
+    : `https://wa.me/?text=${encoded}`;
+}
+
+export interface LabOrderWhatsAppPayload {
+  patientName: string;
+  patientPhone?: string | null;
+  orderDate: string;
+  doctorName: string;
+  doctorCmp?: string | null;
+  diagnosis: string;
+  cie10Code?: string | null;
+  urgency: string;
+  templateType: string;
+  items: Array<{ testName: string; sampleType?: string }>;
+  customTests?: string | null;
+  patientInstructions?: string | null;
+}
+
+export function generateLabOrderWhatsAppUrl(
+  order: LabOrderWhatsAppPayload,
+  clinicInfo?: CalendarClinicInfo | null
+): string {
+  const targetPhone = cleanPhoneForWhatsApp(order.patientPhone);
+  const address = clinicInfo?.clinicAddress?.trim() || DEFAULT_CLINIC_ADDRESS;
+  const phone = clinicInfo?.phone?.trim() || DEFAULT_CLINIC_PHONE;
+  const formattedDate = formatPeruDateDisplay(order.orderDate);
+  const instructions =
+    order.patientInstructions?.trim() ||
+    getDefaultInstructionsForTemplateType(order.templateType);
+
+  const testsText = [
+    ...order.items.map(
+      (it, idx) =>
+        `🔹 *${idx + 1}. ${it.testName}*${it.sampleType ? ` (${it.sampleType})` : ""}`
+    ),
+    order.customTests?.trim() ? `🔹 *Adicionales:* ${order.customTests.trim()}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const headerTitle =
+    order.templateType === "GENERAL"
+      ? "Orden de Laboratorio Clínico"
+      : "Remisión a Laboratorio / Patología";
+
+  const message = [
+    `🧪 *${headerTitle} • CENDO*`,
+    ``,
+    `Estimada *${order.patientName}*, le compartimos el detalle de su orden médica:`,
+    ``,
+    `🗓 *Fecha:* ${formattedDate}`,
+    `👩‍⚕️ *Médico:* ${order.doctorName}${order.doctorCmp ? ` (CMP ${order.doctorCmp})` : ""}`,
+    `⚡ *Prioridad:* ${order.urgency}`,
+    `🩺 *Indicación:* ${order.diagnosis}${order.cie10Code ? ` [CIE-10: ${order.cie10Code}]` : ""}`,
+    ``,
+    `*Estudios solicitados:*`,
+    testsText,
+    ``,
+    `📌 *Indicaciones:*`,
+    instructions,
+    ``,
+    `🏥 *Sede:* ${address}`,
+    `📞 *Central de Citas:* ${phone}`,
+  ].join("\n");
+
+  const encoded = encodeURIComponent(message);
+  return targetPhone
+    ? `https://wa.me/${targetPhone}?text=${encoded}`
+    : `https://wa.me/?text=${encoded}`;
+}
+
+export interface QuoteWhatsAppPayload {
+  patientName: string;
+  patientPhone?: string | null;
+  quoteDate: string;
+  validUntilDate: string;
+  validityDays: number;
+  doctorName: string;
+  items: Array<{
+    name: string;
+    regularPrice: number;
+    discountPercent?: number;
+    finalPrice: number;
+  }>;
+  subtotal: number;
+  discountTotal: number;
+  total: number;
+  paymentTerms?: string | null;
+}
+
+export function generateQuoteWhatsAppUrl(
+  quote: QuoteWhatsAppPayload,
+  clinicInfo?: CalendarClinicInfo | null
+): string {
+  const targetPhone = cleanPhoneForWhatsApp(quote.patientPhone);
+  const address = clinicInfo?.clinicAddress?.trim() || DEFAULT_CLINIC_ADDRESS;
+  const phone = clinicInfo?.phone?.trim() || DEFAULT_CLINIC_PHONE;
+  const formattedDate = formatPeruDateDisplay(quote.quoteDate);
+  const validUntilFormatted = formatPeruDateDisplay(quote.validUntilDate);
+
+  const itemsText = quote.items
+    .map(
+      (it, idx) =>
+        `• *${idx + 1}. ${it.name}*: *${formatCurrency(it.finalPrice)}*${
+          it.discountPercent && it.discountPercent > 0
+            ? ` (_Tarifa reg. ${formatCurrency(it.regularPrice)} • ${it.discountPercent}% desc._)`
+            : ""
+        }`
+    )
+    .join("\n");
+
+  const message = [
+    `💼 *Presupuesto Médico Oficial • CENDO*`,
+    ``,
+    `Estimada *${quote.patientName}*, le enviamos la cotización detallada para su atención:`,
+    ``,
+    `🗓 *Fecha de emisión:* ${formattedDate}`,
+    `⏳ *Válido hasta:* ${validUntilFormatted} (${quote.validityDays} días)`,
+    `👩‍⚕️ *Especialista:* ${quote.doctorName}`,
+    ``,
+    itemsText,
+    ``,
+    quote.discountTotal > 0
+      ? `Subtotal: ${formatCurrency(quote.subtotal)}\nDescuento CENDO: - ${formatCurrency(quote.discountTotal)}\n💰 *TOTAL A PAGAR: ${formatCurrency(quote.total)}*`
+      : `💰 *TOTAL A PAGAR: ${formatCurrency(quote.total)}*`,
+    quote.paymentTerms?.trim()
+      ? `\n💳 *Condiciones:* ${quote.paymentTerms.trim()}`
+      : "",
+    ``,
+    `🏥 *Sede:* ${address}`,
+    `📞 *Consultas y programación:* ${phone}`,
   ]
     .filter(Boolean)
     .join("\n");
