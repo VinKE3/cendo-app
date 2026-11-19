@@ -144,6 +144,11 @@ export function PatientDetailView({
     recetasRef.current?.openPrintPreview(rx);
   };
 
+  const handleEditLinkedPrescription = (rx: MedicalPrescriptionItem) => {
+    setActiveTab("recetas");
+    recetasRef.current?.openEdit(rx);
+  };
+
   const handlePrescriptionCreatedFromConsultation = (
     rx: MedicalPrescriptionItem
   ) => {
@@ -737,6 +742,7 @@ export function PatientDetailView({
             handleEmitPrescriptionFromConsultation
           }
           onOpenLinkedPrescription={handleOpenLinkedPrescription}
+          onEditLinkedPrescription={handleEditLinkedPrescription}
         />
       </div>
 

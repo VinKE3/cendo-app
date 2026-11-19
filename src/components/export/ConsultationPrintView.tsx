@@ -5,11 +5,13 @@ import { CendoFooterWave } from "@/components/export/CendoFooterWave";
 import { BrandLogo } from "@/components/layout/BrandLogo";
 import type { MedicalConsultationItem } from "@/features/consultas/consultas.schema";
 import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
+import type { MedicalPrescriptionItem } from "@/features/recetas/recetas.schema";
 import { formatPeruDateDisplay } from "@/lib/utils";
 
 interface ConsultationPrintViewProps {
   consultation: MedicalConsultationItem;
   patient: PatientDirectoryItem;
+  linkedPrescriptions?: MedicalPrescriptionItem[];
   clinicAddress?: string;
   clinicEmail?: string;
   clinicPhone?: string;
@@ -19,6 +21,7 @@ interface ConsultationPrintViewProps {
 export function ConsultationPrintView({
   consultation,
   patient,
+  linkedPrescriptions = [],
   clinicAddress = "Av. Alfredo Benavides N° 2975, Of. 405, Miraflores - Lima",
   clinicEmail = "cendoperu@gmail.com",
   clinicPhone = "985 945 697",
@@ -263,7 +266,28 @@ export function ConsultationPrintView({
               </div>
             ) : null}
 
-            {consultation.prescriptionNotes ? (
+            {linkedPrescriptions.length > 0 ? (
+              <div className="space-y-1.5 border-t border-border pt-1.5">
+                <span className="block text-[9.5px] font-semibold text-muted-foreground uppercase">
+                  Terapéutica / Medicación Oficial (Rp/)
+                </span>
+                {linkedPrescriptions.map((rx) => (
+                  <div key={rx.id} className="space-y-0.5 text-[11px]">
+                    <p className="font-mono text-[9.5px] font-bold text-primary">
+                      REC-{rx.id.slice(0, 8).toUpperCase()} ({formatPeruDateDisplay(rx.prescriptionDate)})
+                    </p>
+                    <ul className="space-y-0.5 pl-2">
+                      {rx.items.map((item, idx) => (
+                        <li key={item.id}>
+                          <strong>{idx + 1}. {item.medicationName}</strong> ({item.route}) —{" "}
+                          {item.dosage} • {item.frequency} • {item.duration}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            ) : consultation.prescriptionNotes ? (
               <div className="border-t border-border pt-1.5">
                 <span className="block text-[9.5px] font-semibold text-muted-foreground uppercase">
                   Terapéutica / Medicación (Rp/)

@@ -72,6 +72,7 @@ interface TabConsultasProps {
   onPrescriptionCreated?: (prescription: MedicalPrescriptionItem) => void;
   onEmitPrescriptionFromConsultation?: (cons: MedicalConsultationItem) => void;
   onOpenLinkedPrescription?: (prescription: MedicalPrescriptionItem) => void;
+  onEditLinkedPrescription?: (prescription: MedicalPrescriptionItem) => void;
 }
 
 export function TabConsultas({
@@ -87,6 +88,7 @@ export function TabConsultas({
   onPrescriptionCreated,
   onEmitPrescriptionFromConsultation,
   onOpenLinkedPrescription,
+  onEditLinkedPrescription,
 }: TabConsultasProps) {
   const {
     items,
@@ -329,6 +331,18 @@ export function TabConsultas({
                               variant="outline"
                               size="icon-xs"
                               onClick={() => {
+                                const structuredRxSummary =
+                                  !cons.prescriptionNotes.trim() &&
+                                  linkedRx.length > 0
+                                    ? linkedRx
+                                        .flatMap((rx) =>
+                                          rx.items.map(
+                                            (it) =>
+                                              `• ${it.medicationName} (${it.route}): ${it.dosage}, ${it.frequency}, ${it.duration}`
+                                          )
+                                        )
+                                        .join("\n")
+                                    : cons.prescriptionNotes;
                                 const url = generateConsultationWhatsAppUrl({
                                   patientName: patient.fullName,
                                   patientPhone: patient.phone,
@@ -339,7 +353,7 @@ export function TabConsultas({
                                   cie10Code: cons.cie10Code,
                                   treatmentPlan: cons.treatmentPlan,
                                   auxiliaryExams: cons.auxiliaryExams,
-                                  prescriptionNotes: cons.prescriptionNotes,
+                                  prescriptionNotes: structuredRxSummary,
                                   nextAppointmentDate: cons.nextAppointmentDate,
                                 });
                                 window.open(url, "_blank", "noopener,noreferrer");
@@ -459,21 +473,14 @@ export function TabConsultas({
         onFillNormalPhysicalExam={fillNormalPhysicalExam}
         onAppendLabTemplate={appendLabTemplate}
         onAppendMedication={appendVademecumMedication}
-        linkedPrescriptionsCount={
+        linkedPrescriptions={
           editingItem
             ? prescriptions.filter((rx) => rx.consultationId === editingItem.id)
-                .length
-            : 0
+            : []
         }
-        onOpenLinkedPrescriptions={
-          editingItem
-            ? () => {
-                const matched = prescriptions.find(
-                  (rx) => rx.consultationId === editingItem.id
-                );
-                if (matched) onOpenLinkedPrescription?.(matched);
-              }
-            : undefined
+        onViewLinkedPrescription={onOpenLinkedPrescription}
+        onEditLinkedPrescription={
+          canEdit ? onEditLinkedPrescription : undefined
         }
         onEmitPrescriptionFromConsultation={
           canEdit ? onEmitPrescriptionFromConsultation : undefined
@@ -485,6 +492,11 @@ export function TabConsultas({
       <ConsultationPrintModal
         consultation={printingItem}
         patient={patient}
+        linkedPrescriptions={
+          printingItem
+            ? prescriptions.filter((rx) => rx.consultationId === printingItem.id)
+            : []
+        }
         showCoverPage={showCoverPage}
         onShowCoverPageChange={setShowCoverPage}
         onClose={() => setPrintingItem(null)}

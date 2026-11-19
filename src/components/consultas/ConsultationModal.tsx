@@ -8,6 +8,7 @@ import {
   Calendar,
   FlaskConical,
   HeartPulse,
+  Pencil,
   Pill,
   Printer,
   Sparkles,
@@ -34,6 +35,7 @@ import type {
 } from "@/features/consultas/consultas.schema";
 import type { ConsultationModalFormValues } from "@/features/consultas/hooks/use-consultas";
 import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
+import type { MedicalPrescriptionItem } from "@/features/recetas/recetas.schema";
 import { cn, formatPeruDateDisplay } from "@/lib/utils";
 
 interface ConsultationModalProps {
@@ -61,8 +63,9 @@ interface ConsultationModalProps {
   onFillNormalPhysicalExam: () => void;
   onAppendLabTemplate: (templateId: string) => void;
   onAppendMedication: (medId: string) => void;
-  linkedPrescriptionsCount?: number;
-  onOpenLinkedPrescriptions?: () => void;
+  linkedPrescriptions?: MedicalPrescriptionItem[];
+  onViewLinkedPrescription?: (rx: MedicalPrescriptionItem) => void;
+  onEditLinkedPrescription?: (rx: MedicalPrescriptionItem) => void;
   onEmitPrescriptionFromConsultation?: (cons: MedicalConsultationItem) => void;
   onSaveAndPrintIntent: (printAfterSave: boolean) => void;
   onSubmit: (e?: BaseSyntheticEvent) => Promise<void>;
@@ -107,8 +110,9 @@ export function ConsultationModal({
   onFillNormalPhysicalExam,
   onAppendLabTemplate,
   onAppendMedication,
-  linkedPrescriptionsCount = 0,
-  onOpenLinkedPrescriptions,
+  linkedPrescriptions = [],
+  onViewLinkedPrescription,
+  onEditLinkedPrescription,
   onEmitPrescriptionFromConsultation,
   onSaveAndPrintIntent,
   onSubmit,
@@ -633,8 +637,8 @@ export function ConsultationModal({
               ) : null}
             </div>
 
-            {/* Medicación / Rp + Vademécum */}
-            <div className="space-y-2 rounded-lg border border-border bg-card p-3">
+            {/* Medicación / Rp + Vademécum o Vista de Receta Vinculada */}
+            <div className="space-y-2.5 rounded-lg border border-border bg-card p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <label
                   htmlFor="cons-rx"
@@ -644,77 +648,169 @@ export function ConsultationModal({
                   Receta / Indicaciones Farmacológicas (Rp/)
                 </label>
 
-                <select
-                  aria-label="Añadir fármaco del vademécum"
-                  value=""
-                  onChange={(e) => {
-                    if (e.target.value) onAppendMedication(e.target.value);
-                  }}
-                  className="h-7 max-w-xs rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none"
-                >
-                  <option value="" disabled>
-                    + Añadir fármaco del vademécum...
-                  </option>
-                  {vademecumOptions.map((med) => (
-                    <option key={med.id} value={med.id}>
-                      {med.genericName}
+                {editingItem && linkedPrescriptions.length > 0 ? (
+                  <Badge variant="secondary" className="gap-1 font-mono text-[11px]">
+                    Receta oficial emitida ({linkedPrescriptions.length})
+                  </Badge>
+                ) : (
+                  <select
+                    aria-label="Añadir fármaco del vademécum"
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value) onAppendMedication(e.target.value);
+                    }}
+                    className="h-7 max-w-xs rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none"
+                  >
+                    <option value="" disabled>
+                      + Añadir fármaco del vademécum...
                     </option>
-                  ))}
-                </select>
+                    {vademecumOptions.map((med) => (
+                      <option key={med.id} value={med.id}>
+                        {med.genericName}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
-              <Textarea
-                id="cons-rx"
-                rows={2}
-                placeholder="Dejar en blanco si no prescribe medicación..."
-                {...register("prescriptionNotes")}
-              />
+              {editingItem && linkedPrescriptions.length > 0 ? (
+                <div className="space-y-2.5">
+                  {linkedPrescriptions.map((rx) => (
+                    <div
+                      key={rx.id}
+                      className="space-y-2 rounded-lg border border-border bg-muted/20 p-3 text-xs"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline" className="font-mono text-[10px]">
+                            REC-{rx.id.slice(0, 8).toUpperCase()}
+                          </Badge>
+                          <span className="font-mono text-[11px] text-muted-foreground">
+                            {formatPeruDateDisplay(rx.prescriptionDate)}
+                          </span>
+                        </div>
 
-              {!editingItem && watchedRxNotes.trim() ? (
-                <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-primary">
-                  <input
-                    type="checkbox"
-                    className="size-3.5 accent-primary"
-                    {...register("generatePrescription")}
-                  />
-                  <span>
-                    Generar Receta Médica vinculada automáticamente al guardar
-                  </span>
-                </label>
-              ) : null}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {onViewLinkedPrescription ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="xs"
+                              onClick={() => {
+                                onOpenChange(false);
+                                onViewLinkedPrescription(rx);
+                              }}
+                            >
+                              <Printer className="size-3" />
+                              Imprimir
+                            </Button>
+                          ) : null}
 
-              {editingItem &&
-              (linkedPrescriptionsCount > 0 ||
-                onEmitPrescriptionFromConsultation) ? (
-                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2">
-                  {linkedPrescriptionsCount > 0 ? (
-                    <Badge variant="secondary" className="gap-1 font-mono text-[11px]">
-                      <Pill className="size-3 text-primary" />
-                      Receta vinculada ({linkedPrescriptionsCount})
-                    </Badge>
-                  ) : (
-                    <span className="text-[11px] text-muted-foreground">
-                      Sin receta estructurada emitida para esta consulta.
-                    </span>
-                  )}
+                          {onEditLinkedPrescription ? (
+                            <Button
+                              type="button"
+                              variant="default"
+                              size="xs"
+                              onClick={() => {
+                                onOpenChange(false);
+                                onEditLinkedPrescription(rx);
+                              }}
+                            >
+                              <Pencil className="size-3" />
+                              Editar Receta
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
 
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {linkedPrescriptionsCount > 0 && onOpenLinkedPrescriptions ? (
+                      <ul className="space-y-1 text-xs">
+                        {rx.items.map((item, idx) => (
+                          <li key={item.id} className="leading-snug text-foreground">
+                            <span className="font-mono font-bold text-primary">
+                              {idx + 1}.
+                            </span>{" "}
+                            <strong>{item.medicationName}</strong>{" "}
+                            <span className="text-muted-foreground">
+                              — {item.route} • {item.dosage} • {item.frequency} •{" "}
+                              {item.duration}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+
+                  {onEmitPrescriptionFromConsultation ? (
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5 text-[11px] text-muted-foreground">
+                      <span>
+                        ¿Requiere receta aparte (ej. pareja o fármaco retenido en farmacia)?
+                      </span>
                       <Button
                         type="button"
                         variant="outline"
                         size="xs"
                         onClick={() => {
+                          const currentValues = form.getValues();
                           onOpenChange(false);
-                          onOpenLinkedPrescriptions();
+                          onEmitPrescriptionFromConsultation({
+                            ...editingItem,
+                            diagnosis:
+                              currentValues.diagnosis.trim() || editingItem.diagnosis,
+                            cie10Code:
+                              currentValues.cie10Code.trim() || editingItem.cie10Code,
+                            prescriptionNotes: "",
+                            nextAppointmentDate: currentValues.nextAppointmentDate,
+                          });
                         }}
                       >
-                        <Printer className="size-3" />
-                        Ver / Imprimir Receta
+                        <Pill className="size-3" />
+                        + Receta adicional
                       </Button>
-                    ) : null}
+                    </div>
+                  ) : null}
 
-                    {onEmitPrescriptionFromConsultation ? (
+                  {watchedRxNotes.trim() ? (
+                    <details className="rounded-md border border-border bg-muted/10 p-2 text-xs">
+                      <summary className="cursor-pointer font-medium text-muted-foreground select-none hover:text-foreground">
+                        Notas previas registradas en consulta
+                      </summary>
+                      <div className="pt-2">
+                        <Textarea
+                          id="cons-rx"
+                          rows={2}
+                          {...register("prescriptionNotes")}
+                        />
+                      </div>
+                    </details>
+                  ) : null}
+                </div>
+              ) : (
+                <>
+                  <Textarea
+                    id="cons-rx"
+                    rows={2}
+                    placeholder="Dejar en blanco si no prescribe medicación..."
+                    {...register("prescriptionNotes")}
+                  />
+
+                  {!editingItem && watchedRxNotes.trim() ? (
+                    <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-primary">
+                      <input
+                        type="checkbox"
+                        className="size-3.5 accent-primary"
+                        {...register("generatePrescription")}
+                      />
+                      <span>
+                        Generar Receta Médica vinculada automáticamente al guardar
+                      </span>
+                    </label>
+                  ) : null}
+
+                  {editingItem && onEmitPrescriptionFromConsultation ? (
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2">
+                      <span className="text-[11px] text-muted-foreground">
+                        Sin receta estructurada emitida para esta consulta.
+                      </span>
                       <Button
                         type="button"
                         variant="secondary"
@@ -734,14 +830,12 @@ export function ConsultationModal({
                         }}
                       >
                         <Pill className="size-3" />
-                        {linkedPrescriptionsCount > 0
-                          ? "+ Emitir Nueva Receta"
-                          : "Emitir Receta Oficial"}
+                        Emitir Receta Oficial
                       </Button>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
+                    </div>
+                  ) : null}
+                </>
+              )}
             </div>
 
             <div className="space-y-1.5">

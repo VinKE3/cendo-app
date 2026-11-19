@@ -14,11 +14,13 @@ import {
 } from "@/components/ui/dialog";
 import type { MedicalConsultationItem } from "@/features/consultas/consultas.schema";
 import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
+import type { MedicalPrescriptionItem } from "@/features/recetas/recetas.schema";
 import { printHtmlElement } from "@/lib/pdfGenerator";
 
 interface ConsultationPrintModalProps {
   consultation: MedicalConsultationItem | null;
   patient: PatientDirectoryItem;
+  linkedPrescriptions?: MedicalPrescriptionItem[];
   showCoverPage: boolean;
   onShowCoverPageChange: (value: boolean) => void;
   onClose: () => void;
@@ -27,6 +29,7 @@ interface ConsultationPrintModalProps {
 export function ConsultationPrintModal({
   consultation,
   patient,
+  linkedPrescriptions = [],
   showCoverPage,
   onShowCoverPageChange,
   onClose,
@@ -73,6 +76,7 @@ export function ConsultationPrintModal({
             <ConsultationPrintView
               consultation={consultation}
               patient={patient}
+              linkedPrescriptions={linkedPrescriptions}
               showCoverPage={showCoverPage}
             />
           </div>

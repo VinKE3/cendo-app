@@ -13,12 +13,14 @@ import {
 import type {
   ConsultationVitalSignsRecord,
   LabOrderItemRecord,
-  PrescriptionItemRecord,
 } from "@/db/schema/clinical";
 import { recordAuditLog } from "@/lib/audit/audit-log";
 import { DomainError, type SessionPayload } from "@/lib/security/action-guard";
 import { getPeruDateString } from "@/lib/utils";
-import type { MedicalPrescriptionItem } from "@/features/recetas/recetas.schema";
+import {
+  parseConsultationRxNotesToDraftItems,
+  type MedicalPrescriptionItem,
+} from "@/features/recetas/recetas.schema";
 import { mapPrescriptionRow } from "@/features/recetas/services/recetas.service";
 import {
   calculateBmi,
@@ -318,43 +320,37 @@ export async function createConsultation(
 
     let createdPrescriptionId: string | null = null;
     let createdPrescription: MedicalPrescriptionItem | null = null;
-    const rxLines = parseBulletLines(input.prescriptionNotes);
-    if (input.generatePrescription && rxLines.length > 0) {
-      const rxItems: PrescriptionItemRecord[] = rxLines.map((line, idx) => ({
-        id: `rx-${Date.now()}-${idx}`,
-        medicationName: line,
-        presentation: "Presentación indicada",
-        route: "Vía Oral",
-        dosage: "Según pauta médica",
-        frequency: "Indicada en consulta",
-        duration: "Tratamiento completo",
-        instructions: line,
-      }));
+    if (input.generatePrescription && input.prescriptionNotes.trim()) {
+      const rxItems = parseConsultationRxNotesToDraftItems(
+        input.prescriptionNotes,
+        []
+      );
+      if (rxItems.length > 0) {
+        const [rx] = await tx
+          .insert(medicalPrescriptions)
+          .values({
+            tenantId,
+            patientId: input.patientId,
+            consultationId: inserted.id,
+            doctorId: doctor.id,
+            doctorName: doctorDisplayName,
+            doctorCmp,
+            doctorRne,
+            prescriptionDate: input.consultationDate,
+            diagnosis: input.diagnosis,
+            cie10Code: input.cie10Code || null,
+            items: rxItems,
+            generalIndications:
+              "Cumplir estrictamente la pauta médica indicada en consulta.",
+            nextAppointmentDate: input.nextAppointmentDate || null,
+            createdBy: ctx.userId,
+            updatedBy: ctx.userId,
+          })
+          .returning();
 
-      const [rx] = await tx
-        .insert(medicalPrescriptions)
-        .values({
-          tenantId,
-          patientId: input.patientId,
-          consultationId: inserted.id,
-          doctorId: doctor.id,
-          doctorName: doctorDisplayName,
-          doctorCmp,
-          doctorRne,
-          prescriptionDate: input.consultationDate,
-          diagnosis: input.diagnosis,
-          cie10Code: input.cie10Code || null,
-          items: rxItems,
-          generalIndications:
-            "Cumplir estrictamente la pauta médica indicada en consulta.",
-          nextAppointmentDate: input.nextAppointmentDate || null,
-          createdBy: ctx.userId,
-          updatedBy: ctx.userId,
-        })
-        .returning();
-
-      createdPrescriptionId = rx.id;
-      createdPrescription = mapPrescriptionRow(rx);
+        createdPrescriptionId = rx.id;
+        createdPrescription = mapPrescriptionRow(rx);
+      }
     }
 
     let createdLabOrderId: string | null = null;
