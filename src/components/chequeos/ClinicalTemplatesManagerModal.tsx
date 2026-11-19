@@ -31,14 +31,26 @@ import { Textarea } from "@/components/ui/textarea";
 import type { UltrasoundFindingsRecord } from "@/db/schema/specialty";
 import {
   colposcopyTemplatePayloadSchema,
+  procedureTemplatePayloadSchema,
   ultrasoundTemplatePayloadSchema,
   type ClinicalTemplateItem,
   type ClinicalTemplateScope,
   type ColposcopyTemplatePayload,
   type CreateClinicalTemplateInput,
+  type ProcedureTemplatePayload,
   type UltrasoundClinicalTemplateItem,
   type UpdateClinicalTemplateInput,
 } from "@/features/clinical-templates/clinical-templates.schema";
+import {
+  ANESTHESIA_OPTIONS,
+  BLEEDING_OPTIONS,
+  HEMOSTASIS_OPTIONS,
+  PROCEDURE_PRESETS,
+  PROCEDURE_TYPE_LABELS,
+  PROCEDURE_TYPE_SHORT_LABELS,
+  PROCEDURE_TYPES,
+  type ProcedureType,
+} from "@/features/procedimientos/procedimientos.schema";
 import {
   SCHILLER_TEST_OPTIONS,
   SCJ_VISIBILITY_OPTIONS,
@@ -237,6 +249,20 @@ function buildDefaultColpoPayload(): ColposcopyTemplatePayload {
   };
 }
 
+function buildDefaultProcPayload(): ProcedureTemplatePayload {
+  const base = PROCEDURE_PRESETS[0];
+  return {
+    procedureType: base.procedureType,
+    preOpDiagnosis: base.preOpDiagnosis,
+    postOpDiagnosis: base.postOpDiagnosis,
+    cie10Code: base.cie10Code,
+    anesthesiaType: base.anesthesiaType,
+    procedureDetails: { ...base.procedureDetails },
+    postOpIndications: base.postOpIndications,
+    medicationsPrescribed: base.medicationsPrescribed,
+  };
+}
+
 function optionalNum(raw: string): number | undefined {
   const clean = raw.trim();
   if (!clean) return undefined;
@@ -341,6 +367,9 @@ export function ClinicalTemplatesManagerModal({
   const [colpoDraft, setColpoDraft] = useState<ColposcopyTemplatePayload>(() =>
     buildDefaultColpoPayload()
   );
+  const [procDraft, setProcDraft] = useState<ProcedureTemplatePayload>(() =>
+    buildDefaultProcPayload()
+  );
 
   const [deleteTarget, setDeleteTarget] =
     useState<ClinicalTemplateItem | null>(null);
@@ -377,6 +406,7 @@ export function ClinicalTemplatesManagerModal({
     setDescription("");
     setEcoDraft(buildEmptyEcoDraft("TRANSVAGINAL"));
     setColpoDraft(buildDefaultColpoPayload());
+    setProcDraft(buildDefaultProcPayload());
     setFormMode(true);
   };
 
@@ -386,6 +416,8 @@ export function ClinicalTemplatesManagerModal({
     setDescription(item.description);
     if (item.scope === "ULTRASOUND") {
       setEcoDraft(ecoPayloadToDraft(item.payload));
+    } else if (item.scope === "PROCEDURE") {
+      setProcDraft(structuredClone(item.payload));
     } else {
       setColpoDraft(structuredClone(item.payload));
     }
@@ -398,6 +430,8 @@ export function ClinicalTemplatesManagerModal({
     setDescription(item.description);
     if (item.scope === "ULTRASOUND") {
       setEcoDraft(ecoPayloadToDraft(item.payload));
+    } else if (item.scope === "PROCEDURE") {
+      setProcDraft(structuredClone(item.payload));
     } else {
       setColpoDraft(structuredClone(item.payload));
     }
@@ -535,6 +569,45 @@ export function ClinicalTemplatesManagerModal({
       return;
     }
 
+    if (scope === "PROCEDURE") {
+      const parsedProc = procedureTemplatePayloadSchema.safeParse(procDraft);
+      if (!parsedProc.success) {
+        toast.error(
+          parsedProc.error.issues[0]?.message ||
+            "Complete diagnósticos, técnica e indicaciones del procedimiento."
+        );
+        return;
+      }
+
+      if (editingId) {
+        const ok = await onUpdateTemplate({
+          id: editingId,
+          scope: "PROCEDURE",
+          subType: parsedProc.data.procedureType,
+          name: trimmedName,
+          description: description.trim() || null,
+          payload: parsedProc.data,
+        });
+        if (ok) {
+          setFormMode(false);
+          setEditingId(null);
+        }
+      } else {
+        const res = await onCreateTemplate({
+          scope: "PROCEDURE",
+          subType: parsedProc.data.procedureType,
+          name: trimmedName,
+          description: description.trim() || null,
+          payload: parsedProc.data,
+        });
+        if (res.success) {
+          setFormMode(false);
+          setEditingId(null);
+        }
+      }
+      return;
+    }
+
     const parsedColpo = colposcopyTemplatePayloadSchema.safeParse({
       ...colpoDraft,
       biopsyClockHours: colpoDraft.cervicalBiopsyTaken
@@ -614,8 +687,20 @@ export function ClinicalTemplatesManagerModal({
               {formMode
                 ? editingId
                   ? "Editar Plantilla Clínica"
-                  : `Nueva Plantilla de ${scope === "ULTRASOUND" ? "Ecografía" : "Colposcopía"}`
-                : `Gestor de Plantillas — ${scope === "ULTRASOUND" ? "Ecografías CENDO" : "Colposcopía IFCPC"}`}
+                  : `Nueva Plantilla de ${
+                      scope === "ULTRASOUND"
+                        ? "Ecografía"
+                        : scope === "PROCEDURE"
+                          ? "Procedimiento Menor"
+                          : "Colposcopía"
+                    }`
+                : `Gestor de Plantillas — ${
+                    scope === "ULTRASOUND"
+                      ? "Ecografías CENDO"
+                      : scope === "PROCEDURE"
+                        ? "Procedimientos Menores & Biopsias"
+                        : "Colposcopía IFCPC"
+                  }`}
             </DialogTitle>
             <DialogDescription>
               Cree, personalice, duplique o elimine sus plantillas de informes.
@@ -730,6 +815,15 @@ export function ClinicalTemplatesManagerModal({
                                   item.payload.ultrasoundType
                                 ] || item.payload.ultrasoundType}
                               </Badge>
+                            ) : item.scope === "PROCEDURE" ? (
+                              <Badge
+                                variant="outline"
+                                className="font-mono text-[10px]"
+                              >
+                                {PROCEDURE_TYPE_SHORT_LABELS[
+                                  item.payload.procedureType
+                                ] || item.payload.procedureType}
+                              </Badge>
                             ) : (
                               <Badge
                                 variant="outline"
@@ -747,7 +841,9 @@ export function ClinicalTemplatesManagerModal({
                           <p className="line-clamp-1 text-[11px] text-muted-foreground">
                             {item.scope === "ULTRASOUND"
                               ? item.payload.conclusion
-                              : item.payload.diagnosis}
+                              : item.scope === "PROCEDURE"
+                                ? item.payload.postOpDiagnosis
+                                : item.payload.diagnosis}
                           </p>
                         </div>
 
@@ -1272,7 +1368,7 @@ export function ClinicalTemplatesManagerModal({
                     </div>
                   </div>
                 </div>
-              ) : (
+              ) : scope === "COLPOSCOPY" ? (
                 <div className="space-y-3 rounded-xl border border-border bg-card p-3.5">
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                     <div className="flex items-end pb-1">
@@ -1492,6 +1588,184 @@ export function ClinicalTemplatesManagerModal({
                     </div>
                   </div>
                 </div>
+              ) : (
+                <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-3.5">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-foreground">
+                        Tipo de Procedimiento *
+                      </label>
+                      <select
+                        className={selectClassName}
+                        value={procDraft.procedureType}
+                        onChange={(e) =>
+                          setProcDraft((prev) => ({
+                            ...prev,
+                            procedureType: e.target.value as ProcedureType,
+                          }))
+                        }
+                      >
+                        {PROCEDURE_TYPES.map((t) => (
+                          <option key={t} value={t}>
+                            {PROCEDURE_TYPE_LABELS[t]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-foreground">
+                        Anestesia *
+                      </label>
+                      <select
+                        className={selectClassName}
+                        value={procDraft.anesthesiaType}
+                        onChange={(e) =>
+                          setProcDraft((prev) => ({
+                            ...prev,
+                            anesthesiaType: e.target.value,
+                          }))
+                        }
+                      >
+                        {ANESTHESIA_OPTIONS.map((a) => (
+                          <option key={a} value={a}>
+                            {a}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-foreground">
+                        Diagnóstico Preoperatorio *
+                      </label>
+                      <Input
+                        value={procDraft.preOpDiagnosis}
+                        onChange={(e) =>
+                          setProcDraft((prev) => ({
+                            ...prev,
+                            preOpDiagnosis: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-foreground">
+                        Diagnóstico Postoperatorio *
+                      </label>
+                      <Input
+                        value={procDraft.postOpDiagnosis}
+                        onChange={(e) =>
+                          setProcDraft((prev) => ({
+                            ...prev,
+                            postOpDiagnosis: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-foreground">
+                        Código CIE-10
+                      </label>
+                      <Input
+                        value={procDraft.cie10Code ?? ""}
+                        onChange={(e) =>
+                          setProcDraft((prev) => ({
+                            ...prev,
+                            cie10Code: e.target.value.toUpperCase(),
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-foreground">
+                        Sangrado
+                      </label>
+                      <select
+                        className={selectClassName}
+                        value={procDraft.procedureDetails.bleedingAmount}
+                        onChange={(e) =>
+                          setProcDraft((prev) => ({
+                            ...prev,
+                            procedureDetails: {
+                              ...prev.procedureDetails,
+                              bleedingAmount: e.target.value,
+                            },
+                          }))
+                        }
+                      >
+                        {BLEEDING_OPTIONS.map((b) => (
+                          <option key={b} value={b}>
+                            {b}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-foreground">
+                        Hemostasia
+                      </label>
+                      <select
+                        className={selectClassName}
+                        value={procDraft.procedureDetails.hemostasisMethod}
+                        onChange={(e) =>
+                          setProcDraft((prev) => ({
+                            ...prev,
+                            procedureDetails: {
+                              ...prev.procedureDetails,
+                              hemostasisMethod: e.target.value,
+                            },
+                          }))
+                        }
+                      >
+                        {HEMOSTASIS_OPTIONS.map((h) => (
+                          <option key={h} value={h}>
+                            {h}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-semibold text-foreground">
+                      Técnica de Asepsia & Procedimiento *
+                    </label>
+                    <Textarea
+                      rows={2}
+                      value={procDraft.procedureDetails.asepsisTechnique}
+                      onChange={(e) =>
+                        setProcDraft((prev) => ({
+                          ...prev,
+                          procedureDetails: {
+                            ...prev.procedureDetails,
+                            asepsisTechnique: e.target.value,
+                          },
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-semibold text-foreground">
+                      Indicaciones Postoperatorias *
+                    </label>
+                    <Textarea
+                      rows={3}
+                      value={procDraft.postOpIndications}
+                      onChange={(e) =>
+                        setProcDraft((prev) => ({
+                          ...prev,
+                          postOpIndications: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
               )}
 
               <DialogFooter>
@@ -1529,7 +1803,11 @@ export function ClinicalTemplatesManagerModal({
               Se volverán a activar y restablecer las plantillas base oficiales
               de{" "}
               <strong className="text-foreground">
-                {scope === "ULTRASOUND" ? "Ecografía" : "Colposcopía"}
+                {scope === "ULTRASOUND"
+                  ? "Ecografía"
+                  : scope === "PROCEDURE"
+                    ? "Procedimientos Menores"
+                    : "Colposcopía"}
               </strong>{" "}
               con su redacción original CENDO. Sus plantillas personalizadas no
               serán modificadas ni eliminadas.

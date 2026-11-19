@@ -12,6 +12,8 @@ import {
   type ColposcopyClinicalTemplateItem,
   type ColposcopyTemplatePayload,
   type CreateClinicalTemplateInput,
+  type ProcedureClinicalTemplateItem,
+  type ProcedureTemplatePayload,
   type UltrasoundClinicalTemplateItem,
   type UltrasoundTemplatePayload,
   type UpdateClinicalTemplateInput,
@@ -58,6 +60,22 @@ function mapTemplateRow(
       name: row.name,
       description: row.description ?? "",
       payload: row.payload as UltrasoundClinicalTemplateItem["payload"],
+      isOfficial: row.isOfficial,
+      sortOrder: row.sortOrder,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+
+  if (row.scope === "PROCEDURE") {
+    return {
+      id: row.id,
+      scope: "PROCEDURE",
+      subType: row.subType,
+      code: row.code,
+      name: row.name,
+      description: row.description ?? "",
+      payload: row.payload as ProcedureClinicalTemplateItem["payload"],
       isOfficial: row.isOfficial,
       sortOrder: row.sortOrder,
       createdAt: row.createdAt.toISOString(),
@@ -158,12 +176,19 @@ export async function createClinicalTemplate(
   const normalizedPayload =
     input.scope === "COLPOSCOPY"
       ? normalizeColposcopyPayload(input.payload)
-      : (input.payload as UltrasoundTemplatePayload);
+      : input.scope === "PROCEDURE"
+        ? ({
+            ...input.payload,
+            cie10Code: (input.payload.cie10Code ?? "").trim().toUpperCase(),
+          } satisfies ProcedureTemplatePayload)
+        : (input.payload as UltrasoundTemplatePayload);
 
   const subType =
     input.scope === "ULTRASOUND"
       ? input.payload.ultrasoundType
-      : input.subType?.trim() || "CUSTOM";
+      : input.scope === "PROCEDURE"
+        ? input.payload.procedureType
+        : input.subType?.trim() || "CUSTOM";
 
   const [maxOrderRow] = await db
     .select({
@@ -250,12 +275,19 @@ export async function updateClinicalTemplate(
   const normalizedPayload =
     input.scope === "COLPOSCOPY"
       ? normalizeColposcopyPayload(input.payload)
-      : (input.payload as UltrasoundTemplatePayload);
+      : input.scope === "PROCEDURE"
+        ? ({
+            ...input.payload,
+            cie10Code: (input.payload.cie10Code ?? "").trim().toUpperCase(),
+          } satisfies ProcedureTemplatePayload)
+        : (input.payload as UltrasoundTemplatePayload);
 
   const subType =
     input.scope === "ULTRASOUND"
       ? input.payload.ultrasoundType
-      : input.subType?.trim() || existing.subType || "CUSTOM";
+      : input.scope === "PROCEDURE"
+        ? input.payload.procedureType
+        : input.subType?.trim() || existing.subType || "CUSTOM";
 
   const [updated] = await db
     .update(clinicalTemplates)

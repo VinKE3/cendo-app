@@ -17,8 +17,17 @@ import {
   ultrasoundFindingsSchema,
   type UltrasoundType,
 } from "@/features/ecografias/ecografias.schema";
+import {
+  PROCEDURE_PRESETS,
+  PROCEDURE_TYPES,
+  procedureDetailsSchema,
+} from "@/features/procedimientos/procedimientos.schema";
 
-export const CLINICAL_TEMPLATE_SCOPES = ["ULTRASOUND", "COLPOSCOPY"] as const;
+export const CLINICAL_TEMPLATE_SCOPES = [
+  "ULTRASOUND",
+  "COLPOSCOPY",
+  "PROCEDURE",
+] as const;
 
 export type ClinicalTemplateScope = (typeof CLINICAL_TEMPLATE_SCOPES)[number];
 
@@ -81,11 +90,46 @@ export const colposcopyTemplatePayloadSchema = z
   })
   .strict();
 
+export const procedureTemplatePayloadSchema = z
+  .object({
+    procedureType: z.enum(PROCEDURE_TYPES, {
+      error: "Seleccione el tipo de procedimiento.",
+    }),
+    preOpDiagnosis: z
+      .string()
+      .trim()
+      .min(3, "El diagnóstico pre-operatorio es obligatorio.")
+      .max(500),
+    postOpDiagnosis: z
+      .string()
+      .trim()
+      .min(3, "El diagnóstico post-operatorio es obligatorio.")
+      .max(500),
+    cie10Code: z.string().trim().max(15).optional().or(z.literal("")),
+    anesthesiaType: z.string().trim().min(2).max(100),
+    procedureDetails: procedureDetailsSchema,
+    postOpIndications: z
+      .string()
+      .trim()
+      .min(3, "Las indicaciones post-operatorias son obligatorias.")
+      .max(2500),
+    medicationsPrescribed: z
+      .string()
+      .trim()
+      .max(1000)
+      .optional()
+      .or(z.literal("")),
+  })
+  .strict();
+
 export type UltrasoundTemplatePayload = z.infer<
   typeof ultrasoundTemplatePayloadSchema
 >;
 export type ColposcopyTemplatePayload = z.infer<
   typeof colposcopyTemplatePayloadSchema
+>;
+export type ProcedureTemplatePayload = z.infer<
+  typeof procedureTemplatePayloadSchema
 >;
 
 interface BaseClinicalTemplateItem {
@@ -116,9 +160,15 @@ export interface ColposcopyClinicalTemplateItem extends BaseClinicalTemplateItem
   payload: ColposcopyTemplatePayload;
 }
 
+export interface ProcedureClinicalTemplateItem extends BaseClinicalTemplateItem {
+  scope: "PROCEDURE";
+  payload: ProcedureTemplatePayload;
+}
+
 export type ClinicalTemplateItem =
   | UltrasoundClinicalTemplateItem
-  | ColposcopyClinicalTemplateItem;
+  | ColposcopyClinicalTemplateItem
+  | ProcedureClinicalTemplateItem;
 
 const templateMetaShape = {
   subType: z.string().trim().max(40).optional().nullable(),
@@ -146,6 +196,13 @@ export const createClinicalTemplateSchema = z.discriminatedUnion("scope", [
       payload: colposcopyTemplatePayloadSchema,
     })
     .strict(),
+  z
+    .object({
+      scope: z.literal("PROCEDURE"),
+      ...templateMetaShape,
+      payload: procedureTemplatePayloadSchema,
+    })
+    .strict(),
 ]);
 
 export const updateClinicalTemplateSchema = z.discriminatedUnion("scope", [
@@ -163,6 +220,14 @@ export const updateClinicalTemplateSchema = z.discriminatedUnion("scope", [
       scope: z.literal("COLPOSCOPY"),
       ...templateMetaShape,
       payload: colposcopyTemplatePayloadSchema,
+    })
+    .strict(),
+  z
+    .object({
+      id: pgUuidSchema("ID de plantilla inválido."),
+      scope: z.literal("PROCEDURE"),
+      ...templateMetaShape,
+      payload: procedureTemplatePayloadSchema,
     })
     .strict(),
 ]);
@@ -202,7 +267,10 @@ export interface OfficialClinicalTemplateSeed {
   name: string;
   description: string;
   sortOrder: number;
-  payload: UltrasoundTemplatePayload | ColposcopyTemplatePayload;
+  payload:
+    | UltrasoundTemplatePayload
+    | ColposcopyTemplatePayload
+    | ProcedureTemplatePayload;
 }
 
 const DEFAULT_EXTENDED_COLPOSCOPY: ColposcopyExtendedFindingsRecord = {
@@ -388,7 +456,28 @@ const OFFICIAL_COLPOSCOPY_TEMPLATES: OfficialClinicalTemplateSeed[] = [
   },
 ];
 
+const OFFICIAL_PROCEDURE_TEMPLATES: OfficialClinicalTemplateSeed[] =
+  PROCEDURE_PRESETS.map((preset, idx) => ({
+    scope: "PROCEDURE",
+    subType: preset.procedureType,
+    code: preset.id,
+    name: preset.label,
+    description: preset.postOpDiagnosis,
+    sortOrder: idx + 1,
+    payload: procedureTemplatePayloadSchema.parse({
+      procedureType: preset.procedureType,
+      preOpDiagnosis: preset.preOpDiagnosis,
+      postOpDiagnosis: preset.postOpDiagnosis,
+      cie10Code: preset.cie10Code,
+      anesthesiaType: preset.anesthesiaType,
+      procedureDetails: preset.procedureDetails,
+      postOpIndications: preset.postOpIndications,
+      medicationsPrescribed: preset.medicationsPrescribed,
+    }),
+  }));
+
 export const OFFICIAL_CLINICAL_TEMPLATES: OfficialClinicalTemplateSeed[] = [
   ...OFFICIAL_ULTRASOUND_TEMPLATES,
   ...OFFICIAL_COLPOSCOPY_TEMPLATES,
+  ...OFFICIAL_PROCEDURE_TEMPLATES,
 ];

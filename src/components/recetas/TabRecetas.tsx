@@ -47,6 +47,7 @@ import type {
   PatientBackgroundItem,
   PatientDirectoryItem,
 } from "@/features/pacientes/pacientes.schema";
+import type { MinorProcedureItem } from "@/features/procedimientos/procedimientos.schema";
 import { useRecetas } from "@/features/recetas/hooks/use-recetas";
 import type { MedicalPrescriptionItem } from "@/features/recetas/recetas.schema";
 import { formatPeruDateDisplay } from "@/lib/utils";
@@ -56,6 +57,7 @@ import { PrescriptionPrintModal } from "./PrescriptionPrintModal";
 
 export interface TabRecetasHandle {
   openFromConsultation: (consultation: MedicalConsultationItem) => void;
+  openFromProcedure: (procedure: MinorProcedureItem) => void;
   openPrintPreview: (prescription: MedicalPrescriptionItem) => void;
   openEdit: (prescription: MedicalPrescriptionItem) => void;
 }
@@ -111,6 +113,7 @@ export function TabRecetas({
     openEditModal,
     openDuplicateModal,
     openFromConsultation,
+    openFromProcedure,
     selectVademecumMedication,
     applyDosagePreset,
     saveBuilderItem,
@@ -143,10 +146,11 @@ export function TabRecetas({
     ref,
     () => ({
       openFromConsultation,
+      openFromProcedure,
       openPrintPreview: setPrintingItem,
       openEdit: openEditModal,
     }),
-    [openFromConsultation, openEditModal, setPrintingItem]
+    [openFromConsultation, openFromProcedure, openEditModal, setPrintingItem]
   );
 
   return (

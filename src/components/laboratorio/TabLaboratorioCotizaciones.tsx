@@ -56,6 +56,7 @@ import type {
   PatientBackgroundItem,
   PatientDirectoryItem,
 } from "@/features/pacientes/pacientes.schema";
+import type { MinorProcedureItem } from "@/features/procedimientos/procedimientos.schema";
 import type { ProcedureTariffItem } from "@/features/tarifario/tarifario.schema";
 import { cn, formatCurrency, formatPeruDateDisplay } from "@/lib/utils";
 import {
@@ -69,6 +70,7 @@ import { LabTemplatesManagerModal } from "./LabTemplatesManagerModal";
 export interface TabLabCotizHandle {
   openLabFromConsultation: (consultation: MedicalConsultationItem) => void;
   openBiopsyFromColposcopy: (colposcopy: ColposcopyReportItem) => void;
+  openPathologyFromProcedure: (procedure: MinorProcedureItem) => void;
   openLabPrintPreview: (labOrder: LabOrderItem) => void;
   openLabEdit: (labOrder: LabOrderItem) => void;
   openQuoteFromConsultation: (consultation: MedicalConsultationItem) => void;
@@ -139,6 +141,10 @@ export function TabLaboratorioCotizaciones({
       openBiopsyFromColposcopy: (colpo) => {
         setSubTab("laboratorio");
         lab.openBiopsyFromColposcopy(colpo);
+      },
+      openPathologyFromProcedure: (proc) => {
+        setSubTab("laboratorio");
+        lab.openPathologyFromProcedure(proc);
       },
       openLabPrintPreview: (ord) => {
         setSubTab("laboratorio");

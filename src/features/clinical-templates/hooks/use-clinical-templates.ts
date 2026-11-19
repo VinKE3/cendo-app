@@ -13,6 +13,7 @@ import type {
   ClinicalTemplateScope,
   ColposcopyClinicalTemplateItem,
   CreateClinicalTemplateInput,
+  ProcedureClinicalTemplateItem,
   UltrasoundClinicalTemplateItem,
   UpdateClinicalTemplateInput,
 } from "../clinical-templates.schema";
@@ -42,6 +43,14 @@ export function useClinicalTemplates(initialTemplates: ClinicalTemplateItem[]) {
     () =>
       templates.filter(
         (t): t is ColposcopyClinicalTemplateItem => t.scope === "COLPOSCOPY"
+      ),
+    [templates]
+  );
+
+  const procedureTemplates = useMemo(
+    () =>
+      templates.filter(
+        (t): t is ProcedureClinicalTemplateItem => t.scope === "PROCEDURE"
       ),
     [templates]
   );
@@ -136,7 +145,9 @@ export function useClinicalTemplates(initialTemplates: ClinicalTemplateItem[]) {
           ? "Plantillas oficiales CENDO de Ecografía restauradas."
           : scope === "COLPOSCOPY"
             ? "Plantillas oficiales CENDO de Colposcopía restauradas."
-            : "Plantillas oficiales CENDO restauradas."
+            : scope === "PROCEDURE"
+              ? "Plantillas oficiales CENDO de Procedimientos Menores restauradas."
+              : "Plantillas oficiales CENDO restauradas."
       );
       return true;
     } finally {
@@ -148,6 +159,7 @@ export function useClinicalTemplates(initialTemplates: ClinicalTemplateItem[]) {
     templates,
     ultrasoundTemplates,
     colposcopyTemplates,
+    procedureTemplates,
     isMutating,
     createTemplate,
     updateTemplate,

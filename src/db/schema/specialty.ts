@@ -74,6 +74,8 @@ export interface UltrasoundFindingsRecord {
   amnioticFluidIndex?: string;
 }
 
+export type ProcedurePathologyStatus = "NO_APLICA" | "PENDIENTE" | "RECIBIDO";
+
 export interface MinorProcedureDetailsRecord {
   asepsisTechnique: string;
   biopsySites?: string;
@@ -82,6 +84,10 @@ export interface MinorProcedureDetailsRecord {
   bleedingAmount: string;
   hemostasisMethod: string;
   complications: string;
+  informedConsentConfirmed?: boolean;
+  deviceInfo?: string;
+  pathologyStatus?: ProcedurePathologyStatus;
+  pathologyResultNotes?: string;
 }
 
 export type PrenatalBaselineRecord = Record<string, unknown>;

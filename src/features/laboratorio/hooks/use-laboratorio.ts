@@ -15,6 +15,10 @@ import type {
   PatientBackgroundItem,
   PatientDirectoryItem,
 } from "@/features/pacientes/pacientes.schema";
+import {
+  PROCEDURE_TYPE_LABELS,
+  type MinorProcedureItem,
+} from "@/features/procedimientos/procedimientos.schema";
 import { usePagination } from "@/hooks/use-pagination";
 import { formatPeruDateDisplay, getPeruDateString } from "@/lib/utils";
 import {
@@ -357,6 +361,72 @@ export function useLaboratorio({
       clinicalFindings: `Colposcopía del ${formatPeruDateDisplay(colpo.reportDate)}. ${colpo.diagnosis}`,
       sampleObtainedAt: colpo.reportDate || todayStr,
       procedureOrigin: "Unidad de Colposcopía Digital CENDO",
+    });
+
+    setDialogOpen(true);
+  };
+
+  const openPathologyFromProcedure = (proc: MinorProcedureItem) => {
+    setEditingItem(null);
+    setSourceLabel(
+      `Procedimiento: ${PROCEDURE_TYPE_LABELS[proc.procedureType] || proc.procedureType} (${formatPeruDateDisplay(proc.procedureDate)})`
+    );
+    setSaveAndPrintIntent(false);
+    setCatalogSearch("");
+    setCatalogCategory("Anatomía Patológica & Biopsias");
+    setManualTestName("");
+
+    const matchedBiopsyTmpl = labTemplates.find(
+      (t) => t.templateType === "BIOPSIA"
+    );
+    const procLabel =
+      PROCEDURE_TYPE_LABELS[proc.procedureType] || proc.procedureType;
+
+    setSelectedTests([
+      {
+        id: `lab-proc-biopsy-${Date.now()}`,
+        category: "Anatomía Patológica & Biopsias",
+        testName:
+          proc.procedureType === "BIOPSIA_ENDOMETRIAL"
+            ? "Estudio Histopatológico de Biopsia de Endometrio (Pipelle)"
+            : proc.procedureType === "CONO_LEEP"
+              ? "Estudio Anatomopatológico de Pieza de Cono Cervical LEEP"
+              : proc.procedureType === "POLIPECTOMIA"
+                ? "Estudio Histopatológico de Pólipo Cervical / Endocervical"
+                : matchedBiopsyTmpl?.defaultTests[0] ||
+                  "Estudio Anatomopatológico de Biopsia de Cérvix (Biopsia Dirigida)",
+        sampleType:
+          proc.procedureDetails.specimenDescription ||
+          "Muestra tisular en formol tamponado al 10%",
+        notes: `Remisión directa desde Procedimiento Menor CENDO (${procLabel})`,
+      },
+    ]);
+
+    form.reset({
+      consultationId: proc.consultationId ?? consultations[0]?.id ?? "",
+      orderDate: proc.procedureDate || todayStr,
+      diagnosis: proc.postOpDiagnosis,
+      cie10Code: proc.cie10Code || "N87.0",
+      urgency: "Prioritario",
+      customTests: "",
+      patientInstructions:
+        matchedBiopsyTmpl?.clinicalNotes ||
+        getDefaultInstructionsForTemplateType("BIOPSIA"),
+      templateType: "BIOPSIA",
+      templateTitle:
+        matchedBiopsyTmpl?.title ||
+        `Anatomía Patológica — ${procLabel.slice(0, 48)}`,
+      ...defaultSpecimenValues,
+      anatomicalSite:
+        proc.procedureDetails.biopsySites ||
+        "Cérvix / Cavidad Endometrial",
+      sampleMethod: procLabel,
+      fixative: matchedBiopsyTmpl?.fixativeTransport || "Formol tamponado al 10%",
+      containerCount: 1,
+      cervixAspect: proc.preOpDiagnosis,
+      clinicalFindings: `${proc.postOpDiagnosis}. ${proc.procedureDetails.specimenDescription || ""}`.trim(),
+      sampleObtainedAt: proc.procedureDate || todayStr,
+      procedureOrigin: "Sala de Procedimientos Menores CENDO",
     });
 
     setDialogOpen(true);
@@ -705,6 +775,7 @@ export function useLaboratorio({
     openEditModal,
     openFromConsultation,
     openBiopsyFromColposcopy,
+    openPathologyFromProcedure,
     applyTemplate,
     resetToGeneralOrder,
     applyPresetPack,

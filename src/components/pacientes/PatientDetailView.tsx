@@ -50,6 +50,7 @@ import type {
   LabOrderTemplateItem,
 } from "@/features/laboratorio/laboratorio.schema";
 import type { PatientDetailData } from "@/features/pacientes/pacientes.schema";
+import type { MinorProcedureItem } from "@/features/procedimientos/procedimientos.schema";
 import type { MedicalPrescriptionItem } from "@/features/recetas/recetas.schema";
 import type { ProcedureTariffItem } from "@/features/tarifario/tarifario.schema";
 import { cn, formatPeruDateDisplay } from "@/lib/utils";
@@ -59,6 +60,7 @@ import {
   TabLaboratorioCotizaciones,
   type TabLabCotizHandle,
 } from "../laboratorio/TabLaboratorioCotizaciones";
+import { TabProcedimientos } from "../procedimientos/TabProcedimientos";
 import { TabRecetas, type TabRecetasHandle } from "../recetas/TabRecetas";
 import { PatientBackgroundModal } from "./PatientBackgroundModal";
 import { PatientModal } from "./PatientModal";
@@ -75,6 +77,7 @@ interface PatientDetailViewProps {
   initialColposcopies: ColposcopyReportItem[];
   initialCheckups: ClinicalCheckupItem[];
   initialPatientDocuments: PatientDocumentItem[];
+  initialProcedures: MinorProcedureItem[];
   initialClinicalTemplates: ClinicalTemplateItem[];
   initialTariffs: ProcedureTariffItem[];
   consultationFormContext: ConsultationFormContext;
@@ -113,6 +116,7 @@ export function PatientDetailView({
   initialColposcopies,
   initialCheckups,
   initialPatientDocuments,
+  initialProcedures,
   initialClinicalTemplates,
   initialTariffs,
   consultationFormContext,
@@ -139,10 +143,13 @@ export function PatientDetailView({
     useState<ClinicalCheckupItem[]>(initialCheckups);
   const [documentsList, setDocumentsList] =
     useState<PatientDocumentItem[]>(initialPatientDocuments);
+  const [proceduresList, setProceduresList] =
+    useState<MinorProcedureItem[]>(initialProcedures);
 
   const {
     patient,
     background,
+    setBackground,
     counts,
     activeTab,
     setActiveTab,
@@ -227,12 +234,53 @@ export function PatientDetailView({
     labCotizRef.current?.openBiopsyFromColposcopy(colpo);
   };
 
+  const handleEmitPathologyOrderFromProcedure = (proc: MinorProcedureItem) => {
+    setActiveTab("laboratorio");
+    labCotizRef.current?.openPathologyFromProcedure(proc);
+  };
+
+  const handleEmitPrescriptionFromProcedure = (proc: MinorProcedureItem) => {
+    setActiveTab("recetas");
+    recetasRef.current?.openFromProcedure(proc);
+  };
+
+  const handleMacSyncedFromProcedure = (newMac: string) => {
+    setBackground((prev) =>
+      prev
+        ? { ...prev, contraceptiveMethod: newMac }
+        : {
+            id: "temp-bg",
+            patientId: patient.id,
+            obstetricFormula: "G0 P0000",
+            menarche: 12,
+            sexualDebutAge: 18,
+            sexualPartnersCount: 1,
+            catamenialRegimen: "28/4",
+            stiHistory: "Niega ITS",
+            contraceptiveMethod: newMac,
+            lastMenstrualPeriod: "",
+            papHistory: "No refiere",
+            vphTestHistory: "No realizado",
+            hasDiabetes: "Niega",
+            hasHypertension: "Niega",
+            hasAsthma: "Niega",
+            medicalAllergies: "Niega",
+            surgeriesHistory: "Niega",
+            familyHistory: "No refiere",
+            otherPathologies: "Niega",
+            notes: "",
+            updatedAt: new Date().toISOString(),
+          }
+    );
+  };
+
   const liveCounts = {
     ...counts,
     consultations: consultationsList.length,
     ultrasounds: ultrasoundsList.length,
     colposcopies: colposcopiesList.length,
     checkups: checkupsList.length,
+    procedures: proceduresList.length,
     documents: documentsList.length,
     prescriptions: prescriptionsList.length,
     labOrders: labOrdersList.length,
@@ -851,6 +899,26 @@ export function PatientDetailView({
         />
       </div>
 
+      <div className={activeTab === "procedimientos" ? "block" : "hidden"}>
+        <TabProcedimientos
+          patient={patient}
+          background={background}
+          procedures={proceduresList}
+          onProceduresChange={setProceduresList}
+          consultations={consultationsList}
+          ultrasounds={ultrasoundsList}
+          colposcopies={colposcopiesList}
+          initialClinicalTemplates={initialClinicalTemplates}
+          canEdit={canEdit}
+          canDelete={canDelete}
+          onEmitPathologyOrderFromProcedure={
+            handleEmitPathologyOrderFromProcedure
+          }
+          onEmitPrescriptionFromProcedure={handleEmitPrescriptionFromProcedure}
+          onMacSynced={handleMacSyncedFromProcedure}
+        />
+      </div>
+
       <div className={activeTab === "recetas" ? "block" : "hidden"}>
         <TabRecetas
           ref={recetasRef}
@@ -886,6 +954,7 @@ export function PatientDetailView({
       {activeTab !== "resumen" &&
       activeTab !== "consultas" &&
       activeTab !== "chequeos" &&
+      activeTab !== "procedimientos" &&
       activeTab !== "recetas" &&
       activeTab !== "laboratorio" ? (
         <Card className="border border-border bg-card">

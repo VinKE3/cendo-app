@@ -583,3 +583,71 @@ export function generateCheckupWhatsAppUrl(
     ? `https://wa.me/${targetPhone}?text=${encoded}`
     : `https://wa.me/?text=${encoded}`;
 }
+
+
+export interface MinorProcedureWhatsAppPayload {
+  patientName: string;
+  patientPhone?: string | null;
+  procedureDate: string;
+  doctorName: string;
+  doctorCmp?: string | null;
+  procedureTypeLabel: string;
+  postOpDiagnosis: string;
+  cie10Code?: string | null;
+  anesthesiaType: string;
+  specimenSentToPathology: boolean;
+  specimenDescription?: string | null;
+  deviceInfo?: string | null;
+  postOpIndications: string;
+  medicationsPrescribed?: string | null;
+  nextControlDate?: string | null;
+}
+
+export function generateMinorProcedureWhatsAppUrl(
+  procedure: MinorProcedureWhatsAppPayload,
+  clinicInfo?: CalendarClinicInfo | null
+): string {
+  const targetPhone = cleanPhoneForWhatsApp(procedure.patientPhone);
+  const address = clinicInfo?.clinicAddress?.trim() || DEFAULT_CLINIC_ADDRESS;
+  const phone = clinicInfo?.phone?.trim() || DEFAULT_CLINIC_PHONE;
+  const formattedDate = formatPeruDateDisplay(procedure.procedureDate);
+  const formattedControl = procedure.nextControlDate
+    ? formatPeruDateDisplay(procedure.nextControlDate)
+    : null;
+
+  const message = [
+    `🩺 *Protocolo e Indicaciones Post-Procedimiento • CENDO*`,
+    ``,
+    `Estimada *${procedure.patientName}*, compartimos el resumen y cuidados posteriores a su procedimiento:`,
+    ``,
+    `🗓 *Fecha:* ${formattedDate}`,
+    `👩‍⚕️ *Especialista:* ${procedure.doctorName}${procedure.doctorCmp ? ` (CMP ${procedure.doctorCmp})` : ""}`,
+    `✂️ *Procedimiento:* ${procedure.procedureTypeLabel}`,
+    `📋 *Diagnóstico Post-Op:* ${procedure.postOpDiagnosis}${procedure.cie10Code ? ` [CIE-10: ${procedure.cie10Code}]` : ""}`,
+    procedure.deviceInfo?.trim()
+      ? `📌 *Dispositivo:* ${procedure.deviceInfo.trim()}`
+      : "",
+    procedure.specimenSentToPathology
+      ? `🧪 *Anatomía Patológica:* Muestra remitida${procedure.specimenDescription?.trim() ? ` (${procedure.specimenDescription.trim()})` : ""}`
+      : "",
+    ``,
+    `*Cuidados e Indicaciones en Casa:*`,
+    procedure.postOpIndications.trim(),
+    procedure.medicationsPrescribed?.trim()
+      ? `\n💊 *Medicación Indicada:*\n${procedure.medicationsPrescribed.trim()}`
+      : "",
+    formattedControl
+      ? `\n📅 *Próximo control en consultorio:* ${formattedControl}`
+      : "",
+    ``,
+    `🏥 *Sede:* ${address}`,
+    `📞 *Central de Citas / Urgencias:* ${phone}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const encoded = encodeURIComponent(message);
+  return targetPhone
+    ? `https://wa.me/${targetPhone}?text=${encoded}`
+    : `https://wa.me/?text=${encoded}`;
+}

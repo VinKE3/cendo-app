@@ -11,6 +11,10 @@ import type {
   MedicalConsultationItem,
 } from "@/features/consultas/consultas.schema";
 import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
+import {
+  PROCEDURE_TYPE_LABELS,
+  type MinorProcedureItem,
+} from "@/features/procedimientos/procedimientos.schema";
 import { usePagination } from "@/hooks/use-pagination";
 import { getPeruDateString } from "@/lib/utils";
 import {
@@ -271,6 +275,33 @@ export function useRecetas({
     setDialogOpen(true);
   };
 
+  const openFromProcedure = (procedure: MinorProcedureItem) => {
+    const parsedDrafts = parseConsultationRxNotesToDraftItems(
+      procedure.medicationsPrescribed || "",
+      vademecumOptions
+    );
+    const procLabel =
+      PROCEDURE_TYPE_LABELS[procedure.procedureType] || procedure.procedureType;
+    setEditingItem(null);
+    setSourceConsultationLabel(
+      `Pre-llenado desde Procedimiento Menor: ${procLabel} (${procedure.procedureDate})`
+    );
+    setSaveAndPrintIntent(false);
+    resetBuilder();
+    setVademecumSearch("");
+    setDraftItems(parsedDrafts);
+    form.reset({
+      consultationId: procedure.consultationId ?? consultations[0]?.id ?? "",
+      prescriptionDate: procedure.procedureDate || todayStr,
+      diagnosis: procedure.postOpDiagnosis,
+      cie10Code: procedure.cie10Code || "N87.0",
+      generalIndications:
+        procedure.postOpIndications || DEFAULT_GENERAL_INDICATIONS,
+      nextAppointmentDate: procedure.nextControlDate || "",
+    });
+    setDialogOpen(true);
+  };
+
   const selectVademecumMedication = (
     med: ConsultationVademecumOption,
     brandIndex?: number
@@ -511,6 +542,7 @@ export function useRecetas({
     openEditModal,
     openDuplicateModal,
     openFromConsultation,
+    openFromProcedure,
     selectVademecumMedication,
     applyDosagePreset,
     saveBuilderItem,

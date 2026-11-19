@@ -18,6 +18,7 @@ import {
   listLabTemplates,
 } from "@/features/laboratorio/services/laboratorio.service";
 import { getPatientDetail } from "@/features/pacientes/services/pacientes.service";
+import { listMinorProceduresByPatient } from "@/features/procedimientos/services/procedimientos.service";
 import { listPrescriptionsByPatient } from "@/features/recetas/services/recetas.service";
 import { listTariffs } from "@/features/tarifario/services/tarifario.service";
 import { requireSessionDoctor } from "@/lib/security/server-session";
@@ -68,6 +69,10 @@ export default async function PacienteDetailPage({
     listPatientDocumentsByPatient(doctor.tenantId, parsedId.data),
     listTariffs(doctor.tenantId),
   ]);
+  const minorProcedures = await listMinorProceduresByPatient(
+    doctor.tenantId,
+    parsedId.data
+  );
 
   const canEdit = doctor.role === "admin" || doctor.role === "moderator";
   const canDelete = doctor.role === "admin";
@@ -92,6 +97,7 @@ export default async function PacienteDetailPage({
         initialColposcopies={colposcopies}
         initialCheckups={checkups}
         initialPatientDocuments={patientDocuments}
+        initialProcedures={minorProcedures}
         initialClinicalTemplates={clinicalTemplates}
         initialTariffs={tariffs}
         consultationFormContext={consultationFormContext}

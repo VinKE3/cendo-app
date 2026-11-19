@@ -244,6 +244,7 @@ export function usePatientDetail(initialDetail: PatientDetailData) {
   return {
     patient,
     background,
+    setBackground,
     counts,
     activeTab,
     setActiveTab,

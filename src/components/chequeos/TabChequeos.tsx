@@ -1483,14 +1483,14 @@ export function TabChequeos({
         onApplyTemplate={
           (templatesManagerScope === "ULTRASOUND" && eco.dialogOpen) ||
           (templatesManagerScope === "COLPOSCOPY" && colpo.dialogOpen)
-            ? (tmpl) => {
-                if (tmpl.scope === "ULTRASOUND") {
-                  eco.applyTemplate(tmpl);
-                } else {
-                  colpo.applyTemplate(tmpl);
+              ? (tmpl) => {
+                  if (tmpl.scope === "ULTRASOUND") {
+                    eco.applyTemplate(tmpl);
+                  } else if (tmpl.scope === "COLPOSCOPY") {
+                    colpo.applyTemplate(tmpl);
+                  }
                 }
-              }
-            : undefined
+              : undefined
         }
         onCreateTemplate={templateStore.createTemplate}
         onUpdateTemplate={templateStore.updateTemplate}
