@@ -8,6 +8,7 @@ import {
   listConsultationsByPatient,
 } from "@/features/consultas/services/consultas.service";
 import { getPatientDetail } from "@/features/pacientes/services/pacientes.service";
+import { listPrescriptionsByPatient } from "@/features/recetas/services/recetas.service";
 import { requireSessionDoctor } from "@/lib/security/server-session";
 
 const uuidSchema = z
@@ -32,9 +33,10 @@ export default async function PacienteDetailPage({
     notFound();
   }
 
-  const [consultations, consultationReasons] = await Promise.all([
+  const [consultations, consultationReasons, prescriptions] = await Promise.all([
     listConsultationsByPatient(doctor.tenantId, parsedId.data),
     listCategories(doctor.tenantId, "consultation_reason"),
+    listPrescriptionsByPatient(doctor.tenantId, parsedId.data),
   ]);
   const consultationFormContext = await getConsultationFormContext(
     doctor.tenantId,
@@ -56,6 +58,7 @@ export default async function PacienteDetailPage({
         initialDetail={detail}
         initialConsultations={consultations}
         initialConsultationReasons={consultationReasons}
+        initialPrescriptions={prescriptions}
         consultationFormContext={consultationFormContext}
         canEdit={canEdit}
         canDelete={canDelete}

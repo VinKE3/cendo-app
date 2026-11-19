@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import {
   Activity,
@@ -41,8 +41,10 @@ import type {
 } from "@/features/consultas/consultas.schema";
 import type { ConsultationCountsDelta } from "@/features/consultas/hooks/use-consultas";
 import type { PatientDetailData } from "@/features/pacientes/pacientes.schema";
+import type { MedicalPrescriptionItem } from "@/features/recetas/recetas.schema";
 import { cn, formatPeruDateDisplay } from "@/lib/utils";
 import { TabConsultas } from "../consultas/TabConsultas";
+import { TabRecetas, type TabRecetasHandle } from "../recetas/TabRecetas";
 import { PatientBackgroundModal } from "./PatientBackgroundModal";
 import { PatientModal } from "./PatientModal";
 
@@ -50,6 +52,7 @@ interface PatientDetailViewProps {
   initialDetail: PatientDetailData;
   initialConsultations: MedicalConsultationItem[];
   initialConsultationReasons: CatalogCategoryItem[];
+  initialPrescriptions: MedicalPrescriptionItem[];
   consultationFormContext: ConsultationFormContext;
   canEdit: boolean;
   canDelete?: boolean;
@@ -78,22 +81,22 @@ export function PatientDetailView({
   initialDetail,
   initialConsultations,
   initialConsultationReasons,
+  initialPrescriptions,
   consultationFormContext,
   canEdit,
   canDelete = false,
 }: PatientDetailViewProps) {
-  const [countsDelta, setCountsDelta] = useState({
-    consultations: 0,
-    prescriptions: 0,
-    labOrders: 0,
-  });
+  const recetasRef = useRef<TabRecetasHandle>(null);
+  const [consultationsList, setConsultationsList] =
+    useState<MedicalConsultationItem[]>(initialConsultations);
+  const [prescriptionsList, setPrescriptionsList] =
+    useState<MedicalPrescriptionItem[]>(initialPrescriptions);
+  const [labOrdersDelta, setLabOrdersDelta] = useState(0);
 
   const handleConsultationCountsChange = (delta: ConsultationCountsDelta) => {
-    setCountsDelta((prev) => ({
-      consultations: prev.consultations + (delta.consultationsDelta ?? 0),
-      prescriptions: prev.prescriptions + (delta.prescriptionsDelta ?? 0),
-      labOrders: prev.labOrders + (delta.labOrdersDelta ?? 0),
-    }));
+    if (delta.labOrdersDelta) {
+      setLabOrdersDelta((prev) => prev + (delta.labOrdersDelta ?? 0));
+    }
   };
 
   const {
@@ -129,11 +132,29 @@ export function PatientDetailView({
   const hasAsthma = isPositiveClinicalValue(background?.hasAsthma);
   const waNumber = normalizeWhatsappNumber(patient.phone);
 
+  const handleEmitPrescriptionFromConsultation = (
+    cons: MedicalConsultationItem
+  ) => {
+    setActiveTab("recetas");
+    recetasRef.current?.openFromConsultation(cons);
+  };
+
+  const handleOpenLinkedPrescription = (rx: MedicalPrescriptionItem) => {
+    setActiveTab("recetas");
+    recetasRef.current?.openPrintPreview(rx);
+  };
+
+  const handlePrescriptionCreatedFromConsultation = (
+    rx: MedicalPrescriptionItem
+  ) => {
+    setPrescriptionsList((prev) => [rx, ...prev]);
+  };
+
   const liveCounts = {
     ...counts,
-    consultations: Math.max(0, counts.consultations + countsDelta.consultations),
-    prescriptions: Math.max(0, counts.prescriptions + countsDelta.prescriptions),
-    labOrders: Math.max(0, counts.labOrders + countsDelta.labOrders),
+    consultations: consultationsList.length,
+    prescriptions: prescriptionsList.length,
+    labOrders: Math.max(0, counts.labOrders + labOrdersDelta),
   };
 
   const tabs: Array<{
@@ -706,13 +727,35 @@ export function PatientDetailView({
           initialConsultations={initialConsultations}
           initialReasons={initialConsultationReasons}
           formContext={consultationFormContext}
+          prescriptions={prescriptionsList}
           canEdit={canEdit}
           canDelete={canDelete}
           onCountsChange={handleConsultationCountsChange}
+          onConsultationsChange={setConsultationsList}
+          onPrescriptionCreated={handlePrescriptionCreatedFromConsultation}
+          onEmitPrescriptionFromConsultation={
+            handleEmitPrescriptionFromConsultation
+          }
+          onOpenLinkedPrescription={handleOpenLinkedPrescription}
         />
       </div>
 
-      {activeTab !== "resumen" && activeTab !== "consultas" ? (
+      <div className={activeTab === "recetas" ? "block" : "hidden"}>
+        <TabRecetas
+          ref={recetasRef}
+          patient={patient}
+          prescriptions={prescriptionsList}
+          onPrescriptionsChange={setPrescriptionsList}
+          vademecumOptions={consultationFormContext.vademecumOptions}
+          consultations={consultationsList}
+          canEdit={canEdit}
+          canDelete={canDelete}
+        />
+      </div>
+
+      {activeTab !== "resumen" &&
+      activeTab !== "consultas" &&
+      activeTab !== "recetas" ? (
         <Card className="border border-border bg-card">
           <CardHeader className="border-b border-border">
             <div className="flex items-center justify-between gap-2">

@@ -18,6 +18,8 @@ import type {
 import { recordAuditLog } from "@/lib/audit/audit-log";
 import { DomainError, type SessionPayload } from "@/lib/security/action-guard";
 import { getPeruDateString } from "@/lib/utils";
+import type { MedicalPrescriptionItem } from "@/features/recetas/recetas.schema";
+import { mapPrescriptionRow } from "@/features/recetas/services/recetas.service";
 import {
   calculateBmi,
   type ConsultationFormContext,
@@ -192,6 +194,7 @@ export async function createConsultation(
 ): Promise<{
   consultation: MedicalConsultationItem;
   createdPrescriptionId: string | null;
+  createdPrescription: MedicalPrescriptionItem | null;
   createdLabOrderId: string | null;
   attendedAppointmentId: string | null;
 }> {
@@ -314,6 +317,7 @@ export async function createConsultation(
     }
 
     let createdPrescriptionId: string | null = null;
+    let createdPrescription: MedicalPrescriptionItem | null = null;
     const rxLines = parseBulletLines(input.prescriptionNotes);
     if (input.generatePrescription && rxLines.length > 0) {
       const rxItems: PrescriptionItemRecord[] = rxLines.map((line, idx) => ({
@@ -347,9 +351,10 @@ export async function createConsultation(
           createdBy: ctx.userId,
           updatedBy: ctx.userId,
         })
-        .returning({ id: medicalPrescriptions.id });
+        .returning();
 
       createdPrescriptionId = rx.id;
+      createdPrescription = mapPrescriptionRow(rx);
     }
 
     let createdLabOrderId: string | null = null;
@@ -393,6 +398,7 @@ export async function createConsultation(
     return {
       consultation: mapConsultationRow(inserted),
       createdPrescriptionId,
+      createdPrescription,
       createdLabOrderId,
       attendedAppointmentId,
     };

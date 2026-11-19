@@ -148,3 +148,87 @@ export function generateConsultationWhatsAppUrl(
     ? `https://wa.me/${targetPhone}?text=${encoded}`
     : `https://wa.me/?text=${encoded}`;
 }
+
+export interface PrescriptionWhatsAppItem {
+  medicationName: string;
+  presentation: string;
+  route: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  instructions?: string;
+  quantity?: string;
+}
+
+export interface PrescriptionWhatsAppPayload {
+  patientName: string;
+  patientPhone?: string | null;
+  prescriptionDate: string;
+  doctorName: string;
+  doctorCmp?: string | null;
+  diagnosis: string;
+  cie10Code?: string | null;
+  items: PrescriptionWhatsAppItem[];
+  generalIndications?: string | null;
+  nextAppointmentDate?: string | null;
+}
+
+export function generatePrescriptionWhatsAppUrl(
+  prescription: PrescriptionWhatsAppPayload,
+  clinicInfo?: CalendarClinicInfo | null
+): string {
+  const targetPhone = cleanPhoneForWhatsApp(prescription.patientPhone);
+  const address = clinicInfo?.clinicAddress?.trim() || DEFAULT_CLINIC_ADDRESS;
+  const phone = clinicInfo?.phone?.trim() || DEFAULT_CLINIC_PHONE;
+  const formattedDate = formatPeruDateDisplay(prescription.prescriptionDate);
+  const nextApptFormatted = prescription.nextAppointmentDate
+    ? formatPeruDateDisplay(prescription.nextAppointmentDate)
+    : null;
+
+  const itemsText = prescription.items
+    .map((item, idx) =>
+      [
+        `💊 *${idx + 1}. ${item.medicationName}* (${item.presentation})`,
+        `   • *Dosis:* ${item.dosage} — ${item.route}`,
+        `   • *Frecuencia:* ${item.frequency}`,
+        `   • *Duración:* ${item.duration}`,
+        item.instructions ? `   • *Indicación:* ${item.instructions}` : "",
+        item.quantity ? `   • *Cantidad:* ${item.quantity}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n")
+    )
+    .join("\n\n");
+
+  const message = [
+    `💊 *Receta Médica Oficial • CENDO*`,
+    ``,
+    `Estimada *${prescription.patientName}*, le enviamos su prescripción médica:`,
+    ``,
+    `🗓 *Fecha:* ${formattedDate}`,
+    `👩‍⚕️ *Médico:* ${prescription.doctorName}${
+      prescription.doctorCmp ? ` (CMP ${prescription.doctorCmp})` : ""
+    }`,
+    `🩺 *Diagnóstico:* ${prescription.diagnosis}${
+      prescription.cie10Code ? ` [CIE-10: ${prescription.cie10Code}]` : ""
+    }`,
+    ``,
+    itemsText,
+    prescription.generalIndications?.trim()
+      ? `\n📌 *Indicaciones Generales:*\n${prescription.generalIndications.trim()}`
+      : "",
+    nextApptFormatted ? `\n📅 *Próximo control:* ${nextApptFormatted}` : "",
+    ``,
+    `🏥 *Sede:* ${address}`,
+    `📞 *Central de Citas:* ${phone}`,
+    ``,
+    `_Conserve esta receta para su dispensación y seguimiento médico._`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const encoded = encodeURIComponent(message);
+  return targetPhone
+    ? `https://wa.me/${targetPhone}?text=${encoded}`
+    : `https://wa.me/?text=${encoded}`;
+}

@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import type { CatalogCategoryItem } from "@/features/catalog-categories/catalog-categories.schema";
 import { useCatalogCategories } from "@/features/catalog-categories/hooks/use-catalog-categories";
 import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
+import type { MedicalPrescriptionItem } from "@/features/recetas/recetas.schema";
 import { usePagination } from "@/hooks/use-pagination";
 import { getPeruDateString } from "@/lib/utils";
 import {
@@ -136,6 +137,8 @@ export interface UseConsultasParams {
   initialReasons: CatalogCategoryItem[];
   formContext: ConsultationFormContext;
   onCountsChange?: (delta: ConsultationCountsDelta) => void;
+  onConsultationsChange?: (items: MedicalConsultationItem[]) => void;
+  onPrescriptionCreated?: (prescription: MedicalPrescriptionItem) => void;
 }
 
 export function useConsultas({
@@ -144,6 +147,8 @@ export function useConsultas({
   initialReasons,
   formContext,
   onCountsChange,
+  onConsultationsChange,
+  onPrescriptionCreated,
 }: UseConsultasParams) {
   const searchParams = useSearchParams();
   const todayStr = useMemo(() => getPeruDateString(), []);
@@ -443,6 +448,7 @@ export function useConsultas({
       const saved = res.data;
       const nextItems = items.map((row) => (row.id === saved.id ? saved : row));
       setItems(nextItems);
+      onConsultationsChange?.(nextItems);
       reasonManager.syncUsageCounts(nextItems.map((i) => i.reasonForVisit));
       setDialogOpen(false);
       setEditingItem(null);
@@ -472,12 +478,17 @@ export function useConsultas({
     const {
       consultation,
       createdPrescriptionId,
+      createdPrescription,
       createdLabOrderId,
       attendedAppointmentId,
     } = res.data;
 
     const nextItems = [consultation, ...items];
     setItems(nextItems);
+    onConsultationsChange?.(nextItems);
+    if (createdPrescription) {
+      onPrescriptionCreated?.(createdPrescription);
+    }
     reasonManager.syncUsageCounts(nextItems.map((i) => i.reasonForVisit));
 
     if (attendedAppointmentId) {
@@ -529,6 +540,7 @@ export function useConsultas({
 
     const nextItems = items.filter((row) => row.id !== target.id);
     setItems(nextItems);
+    onConsultationsChange?.(nextItems);
     reasonManager.syncUsageCounts(nextItems.map((i) => i.reasonForVisit));
     onCountsChange?.({ consultationsDelta: -1 });
     setDeleteTarget(null);

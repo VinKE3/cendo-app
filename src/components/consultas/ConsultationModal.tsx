@@ -61,6 +61,9 @@ interface ConsultationModalProps {
   onFillNormalPhysicalExam: () => void;
   onAppendLabTemplate: (templateId: string) => void;
   onAppendMedication: (medId: string) => void;
+  linkedPrescriptionsCount?: number;
+  onOpenLinkedPrescriptions?: () => void;
+  onEmitPrescriptionFromConsultation?: (cons: MedicalConsultationItem) => void;
   onSaveAndPrintIntent: (printAfterSave: boolean) => void;
   onSubmit: (e?: BaseSyntheticEvent) => Promise<void>;
 }
@@ -104,6 +107,9 @@ export function ConsultationModal({
   onFillNormalPhysicalExam,
   onAppendLabTemplate,
   onAppendMedication,
+  linkedPrescriptionsCount = 0,
+  onOpenLinkedPrescriptions,
+  onEmitPrescriptionFromConsultation,
   onSaveAndPrintIntent,
   onSubmit,
 }: ConsultationModalProps) {
@@ -675,6 +681,66 @@ export function ConsultationModal({
                     Generar Receta Médica vinculada automáticamente al guardar
                   </span>
                 </label>
+              ) : null}
+
+              {editingItem &&
+              (linkedPrescriptionsCount > 0 ||
+                onEmitPrescriptionFromConsultation) ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2">
+                  {linkedPrescriptionsCount > 0 ? (
+                    <Badge variant="secondary" className="gap-1 font-mono text-[11px]">
+                      <Pill className="size-3 text-primary" />
+                      Receta vinculada ({linkedPrescriptionsCount})
+                    </Badge>
+                  ) : (
+                    <span className="text-[11px] text-muted-foreground">
+                      Sin receta estructurada emitida para esta consulta.
+                    </span>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {linkedPrescriptionsCount > 0 && onOpenLinkedPrescriptions ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="xs"
+                        onClick={() => {
+                          onOpenChange(false);
+                          onOpenLinkedPrescriptions();
+                        }}
+                      >
+                        <Printer className="size-3" />
+                        Ver / Imprimir Receta
+                      </Button>
+                    ) : null}
+
+                    {onEmitPrescriptionFromConsultation ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="xs"
+                        onClick={() => {
+                          const currentValues = form.getValues();
+                          onOpenChange(false);
+                          onEmitPrescriptionFromConsultation({
+                            ...editingItem,
+                            diagnosis:
+                              currentValues.diagnosis.trim() || editingItem.diagnosis,
+                            cie10Code:
+                              currentValues.cie10Code.trim() || editingItem.cie10Code,
+                            prescriptionNotes: currentValues.prescriptionNotes,
+                            nextAppointmentDate: currentValues.nextAppointmentDate,
+                          });
+                        }}
+                      >
+                        <Pill className="size-3" />
+                        {linkedPrescriptionsCount > 0
+                          ? "+ Emitir Nueva Receta"
+                          : "Emitir Receta Oficial"}
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
               ) : null}
             </div>
 

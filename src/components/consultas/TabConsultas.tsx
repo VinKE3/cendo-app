@@ -6,6 +6,7 @@ import {
   CalendarPlus,
   MessageCircle,
   Pencil,
+  Pill,
   Plus,
   Printer,
   Search,
@@ -52,6 +53,7 @@ import {
   type ConsultationCountsDelta,
 } from "@/features/consultas/hooks/use-consultas";
 import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
+import type { MedicalPrescriptionItem } from "@/features/recetas/recetas.schema";
 import { formatPeruDateDisplay } from "@/lib/utils";
 import { generateConsultationWhatsAppUrl } from "@/lib/whatsapp-share";
 import { ConsultationModal } from "./ConsultationModal";
@@ -62,9 +64,14 @@ interface TabConsultasProps {
   initialConsultations: MedicalConsultationItem[];
   initialReasons: CatalogCategoryItem[];
   formContext: ConsultationFormContext;
+  prescriptions: MedicalPrescriptionItem[];
   canEdit: boolean;
   canDelete: boolean;
   onCountsChange?: (delta: ConsultationCountsDelta) => void;
+  onConsultationsChange?: (items: MedicalConsultationItem[]) => void;
+  onPrescriptionCreated?: (prescription: MedicalPrescriptionItem) => void;
+  onEmitPrescriptionFromConsultation?: (cons: MedicalConsultationItem) => void;
+  onOpenLinkedPrescription?: (prescription: MedicalPrescriptionItem) => void;
 }
 
 export function TabConsultas({
@@ -72,9 +79,14 @@ export function TabConsultas({
   initialConsultations,
   initialReasons,
   formContext,
+  prescriptions,
   canEdit,
   canDelete,
   onCountsChange,
+  onConsultationsChange,
+  onPrescriptionCreated,
+  onEmitPrescriptionFromConsultation,
+  onOpenLinkedPrescription,
 }: TabConsultasProps) {
   const {
     items,
@@ -125,6 +137,8 @@ export function TabConsultas({
     initialReasons,
     formContext,
     onCountsChange,
+    onConsultationsChange,
+    onPrescriptionCreated,
   });
 
   return (
@@ -190,6 +204,9 @@ export function TabConsultas({
                 {items.length > 0 ? (
                   items.map((cons) => {
                     const rowAlerts = getVitalSignAlerts(cons.vitalSigns);
+                    const linkedRx = prescriptions.filter(
+                      (rx) => rx.consultationId === cons.id
+                    );
 
                     return (
                       <TableRow key={cons.id}>
@@ -231,16 +248,31 @@ export function TabConsultas({
                               {cons.treatmentPlan}
                             </p>
 
-                            {cons.nextAppointmentDate ? (
-                              <Link
-                                href={`/agenda?new=1&patientId=${patient.id}`}
-                                className="inline-flex items-center gap-1 font-mono text-[10.5px] font-medium text-primary hover:underline"
-                              >
-                                <CalendarPlus className="size-3" />
-                                Próximo control:{" "}
-                                {formatPeruDateDisplay(cons.nextAppointmentDate)}
-                              </Link>
-                            ) : null}
+                            <div className="flex flex-wrap items-center gap-2">
+                              {cons.nextAppointmentDate ? (
+                                <Link
+                                  href={`/agenda?new=1&patientId=${patient.id}`}
+                                  className="inline-flex items-center gap-1 font-mono text-[10.5px] font-medium text-primary hover:underline"
+                                >
+                                  <CalendarPlus className="size-3" />
+                                  Próximo control:{" "}
+                                  {formatPeruDateDisplay(cons.nextAppointmentDate)}
+                                </Link>
+                              ) : null}
+
+                              {linkedRx.length > 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    onOpenLinkedPrescription?.(linkedRx[0])
+                                  }
+                                  className="inline-flex cursor-pointer items-center gap-1 rounded border border-primary/30 bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-primary transition-colors hover:bg-primary/20"
+                                >
+                                  <Pill className="size-2.5" />
+                                  Receta ({linkedRx.length})
+                                </button>
+                              ) : null}
+                            </div>
                           </div>
                         </TableCell>
 
@@ -328,6 +360,21 @@ export function TabConsultas({
                               A4
                             </Button>
 
+                            {canEdit && onEmitPrescriptionFromConsultation ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon-xs"
+                                onClick={() =>
+                                  onEmitPrescriptionFromConsultation(cons)
+                                }
+                                aria-label="Emitir receta desde consulta"
+                                title="Emitir receta oficial desde esta consulta"
+                              >
+                                <Pill className="size-3.5 text-primary" />
+                              </Button>
+                            ) : null}
+
                             {canEdit ? (
                               <Button
                                 type="button"
@@ -412,6 +459,25 @@ export function TabConsultas({
         onFillNormalPhysicalExam={fillNormalPhysicalExam}
         onAppendLabTemplate={appendLabTemplate}
         onAppendMedication={appendVademecumMedication}
+        linkedPrescriptionsCount={
+          editingItem
+            ? prescriptions.filter((rx) => rx.consultationId === editingItem.id)
+                .length
+            : 0
+        }
+        onOpenLinkedPrescriptions={
+          editingItem
+            ? () => {
+                const matched = prescriptions.find(
+                  (rx) => rx.consultationId === editingItem.id
+                );
+                if (matched) onOpenLinkedPrescription?.(matched);
+              }
+            : undefined
+        }
+        onEmitPrescriptionFromConsultation={
+          canEdit ? onEmitPrescriptionFromConsultation : undefined
+        }
         onSaveAndPrintIntent={setSaveAndPrintIntent}
         onSubmit={onSubmit}
       />
