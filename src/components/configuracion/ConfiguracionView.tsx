@@ -47,6 +47,7 @@ import {
   type UpdateDoctorConfigInput,
 } from "@/features/configuracion/configuracion.schema";
 import { cn } from "@/lib/utils";
+import { ChangePasswordCard } from "./ChangePasswordCard";
 import { SignaturePadCanvas } from "./SignaturePadCanvas";
 
 interface ConfiguracionViewProps {
@@ -540,6 +541,10 @@ export function ConfiguracionView({ initialProfile }: ConfiguracionViewProps) {
             </form>
           </CardContent>
         </Card>
+
+        <div className="max-w-xl">
+          <ChangePasswordCard />
+        </div>
       </div>
     );
   }
@@ -838,6 +843,8 @@ export function ConfiguracionView({ initialProfile }: ConfiguracionViewProps) {
               </div>
             </CardContent>
           </Card>
+
+          <ChangePasswordCard />
         </div>
 
         {/* COLUMNA DERECHA: PREVIEW REAL EN PDF + DATOS DEL SELLO */}

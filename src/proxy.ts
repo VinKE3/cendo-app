@@ -27,6 +27,18 @@ export async function proxy(request: NextRequest) {
 
   // 1. Bloquear acceso sin sesión válida a rutas privadas
   if (!session.valid && !isPublicRoute) {
+    if (pathname.startsWith("/api/")) {
+      const response = NextResponse.json(
+        {
+          success: false,
+          error: "Sesión inválida o expirada. Inicie sesión nuevamente.",
+        },
+        { status: 401 }
+      );
+      if (sessionCookie) response.cookies.delete("session_token");
+      return response;
+    }
+
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirect", pathname);
     const response = NextResponse.redirect(loginUrl);
@@ -41,7 +53,10 @@ export async function proxy(request: NextRequest) {
 
   // 3. Verificar rol extraído del payload firmado criptográficamente
   if (isAdminRoute && session.data?.role !== "admin") {
-    return NextResponse.json({ error: "Acceso denegado: permisos insuficientes" }, { status: 403 });
+    return NextResponse.json(
+      { success: false, error: "Acceso denegado: permisos insuficientes" },
+      { status: 403 }
+    );
   }
 
   return NextResponse.next();

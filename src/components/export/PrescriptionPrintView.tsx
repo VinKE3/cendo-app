@@ -85,10 +85,12 @@ export function PrescriptionPrintView({
           patientFullName={patient.fullName}
           documentNumber={`${patient.documentType} ${patient.documentNumber}`}
           doctorName={prescription.doctorName.toUpperCase()}
+          doctorSpecialty={resolvedSig.doctorSpecialty}
           doctorCredentials={credentials || "CMP 61693 • RNE 38657"}
           clinicAddress={clinicAddress}
           clinicEmail={clinicEmail}
           clinicPhone={clinicPhone}
+          paperFormat={paperFormat}
         />
       ) : null}
 

@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { profiles } from "@/db/schema";
 import { recordAuditLog } from "@/lib/audit/audit-log";
 import { DomainError, type SessionPayload } from "@/lib/security/action-guard";
+import { hashPassword, verifyPassword } from "@/lib/security/password";
 import {
   deletePrivateStorageObject,
   downloadPrivateStorageObject,
@@ -11,6 +12,7 @@ import {
 import {
   detectVerifiedImageType,
   MAX_SIGNATURE_FILE_BYTES,
+  type ChangePasswordInput,
   type DoctorConfigProfile,
   type DoctorSignatureEntry,
   type UpdateDoctorConfigInput,
@@ -399,5 +401,59 @@ export async function getDoctorSignatureBinary(
     buffer: downloaded.buffer,
     contentType: downloaded.contentType,
     updatedAt: profile.updatedAt.toISOString(),
+  };
+}
+
+export async function changeOwnPassword(
+  ctx: SessionPayload,
+  actorName: string,
+  input: ChangePasswordInput
+): Promise<{ updatedAt: string }> {
+  if (!ctx.tenantId) {
+    throw new DomainError("Sesión sin sede clínica asociada.");
+  }
+
+  const current = await getActiveProfileRow(ctx.tenantId, ctx.userId);
+  if (!current) {
+    throw new DomainError("Perfil profesional no encontrado o inactivo.");
+  }
+
+  const isCurrentValid = await verifyPassword(
+    input.currentPassword,
+    current.passwordHash
+  );
+  if (!isCurrentValid) {
+    throw new DomainError("La contraseña actual es incorrecta.");
+  }
+
+  const nextHash = await hashPassword(input.newPassword);
+  const now = new Date();
+
+  const [updated] = await db
+    .update(profiles)
+    .set({
+      passwordHash: nextHash,
+      updatedAt: now,
+    })
+    .where(and(eq(profiles.id, ctx.userId), eq(profiles.tenantId, ctx.tenantId)))
+    .returning({ updatedAt: profiles.updatedAt });
+
+  if (!updated) {
+    throw new DomainError("No se pudo actualizar la contraseña.");
+  }
+
+  await recordAuditLog({
+    ctx,
+    actorName,
+    action: "UPDATE",
+    entityType: "profile_password",
+    entityId: ctx.userId,
+    changesSummary: {
+      changedBySelf: true,
+    },
+  });
+
+  return {
+    updatedAt: updated.updatedAt.toISOString(),
   };
 }

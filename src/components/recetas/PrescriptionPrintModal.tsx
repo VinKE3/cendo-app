@@ -163,7 +163,8 @@ export function PrescriptionPrintModal({
                 onClick={() => {
                   printHtmlElement(
                     "prescription-print-sheet",
-                    `Receta_${patient.fullName}_${prescription.prescriptionDate}`
+                    `Receta_${patient.fullName}_${prescription.prescriptionDate}`,
+                    { paperFormat }
                   );
                 }}
               >

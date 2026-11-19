@@ -50,16 +50,27 @@ export async function readFileAsUint8Array(file: Blob): Promise<Uint8Array> {
   return new Uint8Array(arrayBuffer);
 }
 
+export type PrintPaperFormat = "A4" | "A5";
+
 /**
- * Abre una ventana de impresión A4 limpia para el elemento HTML indicado,
+ * Abre una ventana de impresión A4/A5 limpia para el elemento HTML indicado,
  * preservando hojas con salto de página calibrado (.page-sheet) y forzando modo claro para impresión.
  */
-export function printHtmlElement(elementId: string, documentTitle = "Informe CENDO"): boolean {
+export function printHtmlElement(
+  elementId: string,
+  documentTitle = "Informe CENDO",
+  options?: { paperFormat?: PrintPaperFormat }
+): boolean {
   const sourceElement = document.getElementById(elementId);
   if (!sourceElement) return false;
 
   const printWindow = window.open("", "_blank", "width=1024,height=768");
   if (!printWindow) return false;
+
+  const format: PrintPaperFormat = options?.paperFormat ?? "A4";
+  const pageSize = format === "A5" ? "A5 portrait" : "A4 portrait";
+  const sheetWidth = format === "A5" ? "148mm" : "210mm";
+  const sheetMinHeight = format === "A5" ? "210mm" : "297mm";
 
   const styleNodes = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
     .map((node) => node.outerHTML)
@@ -91,7 +102,7 @@ export function printHtmlElement(elementId: string, documentTitle = "Informe CEN
         --muted-foreground: #526875 !important;
       }
       @page {
-        size: A4 portrait;
+        size: ${pageSize};
         margin: 0;
       }
       @media print {
@@ -106,8 +117,8 @@ export function printHtmlElement(elementId: string, documentTitle = "Informe CEN
           display: none !important;
         }
         .page-sheet {
-          width: 210mm !important;
-          min-height: 297mm !important;
+          width: ${sheetWidth} !important;
+          min-height: ${sheetMinHeight} !important;
           margin: 0 !important;
           padding: 0 !important;
           box-shadow: none !important;

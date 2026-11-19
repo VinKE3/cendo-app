@@ -12,6 +12,7 @@ interface CendoCoverPageProps {
   clinicAddress?: string;
   clinicEmail?: string;
   clinicPhone?: string;
+  paperFormat?: "A4" | "A5";
   className?: string;
 }
 
@@ -25,34 +26,64 @@ export function CendoCoverPage({
   clinicAddress,
   clinicEmail,
   clinicPhone,
+  paperFormat = "A4",
   className,
 }: CendoCoverPageProps) {
+  const isA5 = paperFormat === "A5";
+
   return (
     <section
       className={cn(
-        "page-sheet relative mx-auto flex min-h-[297mm] w-[210mm] flex-col justify-between overflow-hidden border border-border bg-card text-foreground shadow-sm print:border-none print:shadow-none",
+        "page-sheet relative mx-auto flex flex-col justify-between overflow-hidden border border-border bg-card text-foreground shadow-sm print:border-none print:shadow-none",
+        isA5 ? "min-h-[210mm] w-[148mm]" : "min-h-[297mm] w-[210mm]",
         className,
       )}
       aria-label={`Carátula institucional - ${documentTitle}`}
     >
       {/* Membrete institucional superior izquierdo */}
-      <div className="px-14 pt-12">
-        <BrandLogo size="lg" layout="vertical" />
+      <div className={isA5 ? "px-9 pt-8" : "px-14 pt-12"}>
+        <BrandLogo size={isA5 ? "md" : "lg"} layout="vertical" />
       </div>
 
       {/* Bloque central del informe y datos de la paciente */}
-      <div className="flex flex-1 flex-col items-center justify-center px-16 text-center">
-        <p className="text-lg font-medium uppercase tracking-[0.28em] text-primary">
+      <div
+        className={cn(
+          "flex flex-1 flex-col items-center justify-center text-center",
+          isA5 ? "px-9" : "px-16",
+        )}
+      >
+        <p
+          className={cn(
+            "font-medium uppercase tracking-[0.28em] text-primary",
+            isA5 ? "text-sm" : "text-lg",
+          )}
+        >
           INFORME
         </p>
 
-        <h1 className="mt-4 max-w-xl text-3xl font-extrabold uppercase tracking-wide text-primary">
+        <h1
+          className={cn(
+            "mt-3 max-w-xl font-extrabold uppercase tracking-wide text-primary",
+            isA5 ? "text-2xl" : "mt-4 text-3xl",
+          )}
+        >
           {documentTitle}
         </h1>
 
-        <div className="my-7 h-[3px] w-24 rounded-full bg-warning" aria-hidden="true" />
+        <div
+          className={cn(
+            "h-[3px] w-24 rounded-full bg-warning",
+            isA5 ? "my-5" : "my-7",
+          )}
+          aria-hidden="true"
+        />
 
-        <p className="text-xl font-semibold uppercase tracking-wide text-primary">
+        <p
+          className={cn(
+            "font-semibold uppercase tracking-wide text-primary",
+            isA5 ? "text-lg" : "text-xl",
+          )}
+        >
           {patientFullName}
         </p>
 
@@ -65,7 +96,7 @@ export function CendoCoverPage({
 
       {/* Bloque de firma del médico tratante + cenefa inferior */}
       <div className="flex flex-col">
-        <div className="px-14 pb-8 text-right">
+        <div className={cn("text-right", isA5 ? "px-9 pb-5" : "px-14 pb-8")}>
           <p className="text-sm font-bold uppercase tracking-wide text-primary">
             {doctorName}
           </p>

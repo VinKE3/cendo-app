@@ -4,9 +4,13 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getSessionDoctorProfile } from "@/features/auth/services/auth.service";
 import { DomainError, guardedAction } from "@/lib/security/action-guard";
-import { mutationLimiter } from "@/lib/security/rate-limit";
-import { updateDoctorConfigSchema } from "../configuracion.schema";
+import { authLimiter, mutationLimiter } from "@/lib/security/rate-limit";
 import {
+  changePasswordSchema,
+  updateDoctorConfigSchema,
+} from "../configuracion.schema";
+import {
+  changeOwnPassword,
   deleteOwnSignature,
   listTenantSignatureDirectory,
   updateOwnConfigProfile,
@@ -78,4 +82,26 @@ export async function listSignatureDirectoryAction() {
     },
   });
   return runner({});
+}
+
+export async function changeOwnPasswordAction(rawData: unknown) {
+  const runner = await guardedAction({
+    schema: changePasswordSchema,
+    action: async (input, ctx) => {
+      const rate = authLimiter.check(`pwd-change:${ctx.userId}`);
+      if (!rate.success) {
+        throw new DomainError(
+          `Demasiados intentos de cambio de clave. Espere ${rate.resetInSeconds}s.`
+        );
+      }
+
+      const actor = await getSessionDoctorProfile(ctx.userId, ctx.tenantId);
+      const actorName = actor
+        ? `${actor.doctorTitle} ${actor.fullName}`
+        : ctx.userId;
+
+      return changeOwnPassword(ctx, actorName, input);
+    },
+  });
+  return runner(rawData);
 }

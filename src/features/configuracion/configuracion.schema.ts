@@ -134,3 +134,45 @@ export const signatureDoctorQuerySchema = z
     doctorId: pgUuidSchema("ID de médico inválido.").optional(),
   })
   .strict();
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z
+      .string()
+      .min(1, "Ingrese su contraseña actual.")
+      .max(128, "Contraseña demasiado larga."),
+    newPassword: z
+      .string()
+      .min(8, "La nueva contraseña debe tener al menos 8 caracteres.")
+      .max(128, "Contraseña demasiado larga.")
+      .regex(
+        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/,
+        "Debe incluir al menos una mayúscula, una minúscula y un número."
+      ),
+    confirmPassword: z
+      .string()
+      .min(1, "Confirme su nueva contraseña.")
+      .max(128, "Contraseña demasiado larga."),
+  })
+  .strict()
+  .superRefine((data, ctx) => {
+    if (data.newPassword !== data.confirmPassword) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["confirmPassword"],
+        message: "Las contraseñas no coinciden.",
+      });
+    }
+    if (
+      data.currentPassword.length > 0 &&
+      data.newPassword === data.currentPassword
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["newPassword"],
+        message: "La nueva contraseña debe ser diferente a la actual.",
+      });
+    }
+  });
+
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;

@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import assert from "node:assert/strict";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { clinicalAuditLogs } from "@/db/schema";
+import { clinicalAuditLogs, profiles } from "@/db/schema";
 import { env } from "@/env";
 import { authenticateDoctorByCredentials } from "@/features/auth/services/auth.service";
 import type {
@@ -10,6 +10,7 @@ import type {
   DoctorSignatureEntry,
 } from "@/features/configuracion/configuracion.schema";
 import { signPayload } from "@/lib/security/crypto";
+import { hashPassword } from "@/lib/security/password";
 
 const TEST_PORT = 3105;
 const BASE_URL = `http://127.0.0.1:${TEST_PORT}`;
@@ -79,28 +80,44 @@ async function main() {
   const serverProc = startProductionServer();
   let drPatrickCookie = "";
   let drPatrickNeedsRestore = false;
+  let drCarlosNeedsPwdRestore = false;
+  const defaultPwd = process.env.SEED_DEFAULT_PASSWORD || "Cendo123";
 
   try {
     await waitForServerReady(serverProc);
-    console.log(`[1/10] Servidor Next listo en ${BASE_URL}`);
+    console.log(`[1/11] Servidor Next listo en ${BASE_URL}`);
 
-    // 1. Sin cookie -> bloqueado (401 directo o 307 a /login en proxy.ts, nunca 200 ni imagen)
-    const unauthRes = await fetch(`${BASE_URL}/api/configuracion/firma`, {
-      redirect: "manual",
-      signal: AbortSignal.timeout(15000),
-    });
-    const unauthLocation = unauthRes.headers.get("location") || "";
-    const isBlockedUnauth =
-      unauthRes.status === 401 ||
-      ((unauthRes.status === 307 || unauthRes.status === 302) &&
-        unauthLocation.includes("/login"));
+    // 1. /api/* sin cookie -> 401 JSON directo; página web sin cookie -> 307 a /login
+    const [unauthSigRes, unauthCfgRes, unauthPageRes] = await Promise.all([
+      fetch(`${BASE_URL}/api/configuracion/firma`, {
+        redirect: "manual",
+        signal: AbortSignal.timeout(15000),
+      }),
+      fetch(`${BASE_URL}/api/configuracion`, {
+        redirect: "manual",
+        signal: AbortSignal.timeout(15000),
+      }),
+      fetch(`${BASE_URL}/configuracion`, {
+        redirect: "manual",
+        signal: AbortSignal.timeout(15000),
+      }),
+    ]);
+
+    assert.equal(unauthSigRes.status, 401, "GET /api/configuracion/firma sin sesión debe devolver 401");
+    assert.ok((unauthSigRes.headers.get("content-type") || "").includes("application/json"));
+    const unauthSigJson = (await unauthSigRes.json()) as { success: boolean };
+    assert.equal(unauthSigJson.success, false);
+
+    assert.equal(unauthCfgRes.status, 401, "GET /api/configuracion sin sesión debe devolver 401");
+    assert.ok((unauthCfgRes.headers.get("content-type") || "").includes("application/json"));
+
+    assert.equal(unauthPageRes.status, 307, "GET /configuracion sin sesión debe redirigir 307");
     assert.ok(
-      isBlockedUnauth,
-      `GET /api/configuracion/firma sin sesión debe bloquearse (401 o redirect a /login), recibió ${unauthRes.status}`
+      (unauthPageRes.headers.get("location") || "").includes("/login?redirect=%2Fconfiguracion"),
+      "Redirect debe preservar ?redirect=%2Fconfiguracion"
     );
-    console.log(`[2/10] Bloqueo Zero Trust sin sesión OK (${unauthRes.status})`);
+    console.log("[2/11] Bloqueo Zero Trust OK (401 JSON en /api/* y 307 a /login en páginas)");
 
-    const defaultPwd = process.env.SEED_DEFAULT_PASSWORD || "Cendo123";
     drPatrickCookie = await buildCookieForDoctor("cendoperu@gmail.com", defaultPwd);
     const drCarlosCookie = await buildCookieForDoctor("cbenavides@cendo.pe", defaultPwd);
 
@@ -284,33 +301,142 @@ async function main() {
       signal: AbortSignal.timeout(15000),
     });
     assert.equal(carlosAfterDelRes.status, 404, "Después de eliminar, GET debe responder 404");
-    console.log("[9/10] Aislamiento y ciclo POST/GET/DELETE Dr. Carlos OK (estado limpio)");
+    console.log("[9/11] Aislamiento y ciclo POST/GET/DELETE Dr. Carlos OK (estado limpio)");
 
-    // 10. Auditoría en clinical_audit_logs
+    // 10. Cambio de contraseña propio en /api/configuracion/password (Dr. Carlos) + restauración
+    const weakPwdRes = await fetch(`${BASE_URL}/api/configuracion/password`, {
+      method: "POST",
+      headers: {
+        Cookie: drCarlosCookie,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        currentPassword: defaultPwd,
+        newPassword: "123",
+        confirmPassword: "123",
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    assert.equal(weakPwdRes.status, 422, "Contraseña débil debe fallar con 422");
+
+    const mismatchPwdRes = await fetch(`${BASE_URL}/api/configuracion/password`, {
+      method: "POST",
+      headers: {
+        Cookie: drCarlosCookie,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        currentPassword: defaultPwd,
+        newPassword: "CendoTemp2026",
+        confirmPassword: "OtraClave2026",
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    assert.equal(mismatchPwdRes.status, 422, "Confirmación distinta debe fallar con 422");
+
+    const wrongCurPwdRes = await fetch(`${BASE_URL}/api/configuracion/password`, {
+      method: "POST",
+      headers: {
+        Cookie: drCarlosCookie,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        currentPassword: "ClaveIncorrecta99",
+        newPassword: "CendoTemp2026",
+        confirmPassword: "CendoTemp2026",
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    assert.equal(wrongCurPwdRes.status, 400, "Contraseña actual incorrecta debe fallar con 400");
+
+    drCarlosNeedsPwdRestore = true;
+    const changeOkRes = await fetch(`${BASE_URL}/api/configuracion/password`, {
+      method: "POST",
+      headers: {
+        Cookie: drCarlosCookie,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        currentPassword: defaultPwd,
+        newPassword: "CendoTemp2026",
+        confirmPassword: "CendoTemp2026",
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    assert.equal(changeOkRes.status, 200, "Cambio válido de contraseña debe responder 200");
+
+    const authNewDoc = await authenticateDoctorByCredentials("cbenavides@cendo.pe", "CendoTemp2026");
+    assert.ok(authNewDoc, "El login con la nueva contraseña debe funcionar");
+    const authOldDoc = await authenticateDoctorByCredentials("cbenavides@cendo.pe", defaultPwd);
+    assert.equal(authOldDoc, null, "El login con la contraseña anterior debe fallar");
+
+    const restoreOkRes = await fetch(`${BASE_URL}/api/configuracion/password`, {
+      method: "POST",
+      headers: {
+        Cookie: drCarlosCookie,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        currentPassword: "CendoTemp2026",
+        newPassword: defaultPwd,
+        confirmPassword: defaultPwd,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    assert.equal(restoreOkRes.status, 200, "Restauración de contraseña original debe responder 200");
+    drCarlosNeedsPwdRestore = false;
+
+    const authRestored = await authenticateDoctorByCredentials("cbenavides@cendo.pe", defaultPwd);
+    assert.ok(authRestored, "La contraseña original debe quedar restaurada");
+    console.log("[10/11] Flujo cambio de contraseña propio (/api/configuracion/password) + restauración OK");
+
+    // 11. Auditoría en clinical_audit_logs (sin contraseñas en texto plano)
     const recentLogs = await db
       .select({
         action: clinicalAuditLogs.action,
         entityType: clinicalAuditLogs.entityType,
         entityId: clinicalAuditLogs.entityId,
+        changesSummary: clinicalAuditLogs.changesSummary,
       })
       .from(clinicalAuditLogs)
       .where(
         and(
           eq(clinicalAuditLogs.tenantId, TENANT_ID),
-          inArray(clinicalAuditLogs.entityType, ["profile_signature", "profile_settings"])
+          inArray(clinicalAuditLogs.entityType, [
+            "profile_signature",
+            "profile_settings",
+            "profile_password",
+          ])
         )
       )
       .orderBy(desc(clinicalAuditLogs.createdAt))
-      .limit(10);
+      .limit(15);
 
     const hasSigAudit = recentLogs.some((l) => l.entityType === "profile_signature");
     const hasSettingsAudit = recentLogs.some((l) => l.entityType === "profile_settings");
+    const pwdAudit = recentLogs.find((l) => l.entityType === "profile_password");
     assert.ok(hasSigAudit, "Debe existir auditoría para profile_signature");
     assert.ok(hasSettingsAudit, "Debe existir auditoría para profile_settings");
-    console.log(`[10/10] Auditoría clinical_audit_logs verificada (${recentLogs.length} registros recientes)`);
+    assert.ok(pwdAudit, "Debe existir auditoría para profile_password");
+    assert.ok(
+      !JSON.stringify(pwdAudit.changesSummary || {}).includes("CendoTemp2026"),
+      "La auditoría no debe almacenar contraseñas en texto plano"
+    );
+    console.log(`[11/11] Auditoría clinical_audit_logs verificada (${recentLogs.length} registros recientes)`);
 
-    console.log("\nVALIDACIÓN E2E CONFIGURACIÓN & FIRMA COMPLETADA AL 100%.");
+    console.log("\nVALIDACIÓN E2E CONFIGURACIÓN, FIRMA & OPCIÓN A COMPLETADA AL 100%.");
   } finally {
+    if (drCarlosNeedsPwdRestore) {
+      try {
+        const restoredHash = await hashPassword(defaultPwd);
+        await db
+          .update(profiles)
+          .set({ passwordHash: restoredHash, updatedAt: new Date() })
+          .where(eq(profiles.id, DR_CARLOS_ID));
+      } catch {
+        // Mejor esfuerzo en cleanup de contraseña
+      }
+    }
     if (drPatrickNeedsRestore && drPatrickCookie) {
       try {
         await fetch(`${BASE_URL}/api/configuracion`, {
