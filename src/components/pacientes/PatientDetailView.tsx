@@ -35,11 +35,13 @@ import {
   type PatientDetailTab,
 } from "@/features/pacientes/hooks/use-patient-detail";
 import type { CatalogCategoryItem } from "@/features/catalog-categories/catalog-categories.schema";
+import type { ColposcopyReportItem } from "@/features/colposcopia/colposcopia.schema";
 import type {
   ConsultationFormContext,
   MedicalConsultationItem,
 } from "@/features/consultas/consultas.schema";
 import type { ProcedureQuoteItem } from "@/features/cotizaciones/cotizaciones.schema";
+import type { UltrasoundReportItem } from "@/features/ecografias/ecografias.schema";
 import type {
   LabOrderItem,
   LabOrderTemplateItem,
@@ -48,6 +50,7 @@ import type { PatientDetailData } from "@/features/pacientes/pacientes.schema";
 import type { MedicalPrescriptionItem } from "@/features/recetas/recetas.schema";
 import type { ProcedureTariffItem } from "@/features/tarifario/tarifario.schema";
 import { cn, formatPeruDateDisplay } from "@/lib/utils";
+import { TabChequeos } from "../chequeos/TabChequeos";
 import { TabConsultas } from "../consultas/TabConsultas";
 import {
   TabLaboratorioCotizaciones,
@@ -65,6 +68,8 @@ interface PatientDetailViewProps {
   initialLabOrders: LabOrderItem[];
   initialLabTemplates: LabOrderTemplateItem[];
   initialQuotes: ProcedureQuoteItem[];
+  initialUltrasounds: UltrasoundReportItem[];
+  initialColposcopies: ColposcopyReportItem[];
   initialTariffs: ProcedureTariffItem[];
   consultationFormContext: ConsultationFormContext;
   canEdit: boolean;
@@ -98,6 +103,8 @@ export function PatientDetailView({
   initialLabOrders,
   initialLabTemplates,
   initialQuotes,
+  initialUltrasounds,
+  initialColposcopies,
   initialTariffs,
   consultationFormContext,
   canEdit,
@@ -115,6 +122,10 @@ export function PatientDetailView({
     useState<LabOrderTemplateItem[]>(initialLabTemplates);
   const [quotesList, setQuotesList] =
     useState<ProcedureQuoteItem[]>(initialQuotes);
+  const [ultrasoundsList, setUltrasoundsList] =
+    useState<UltrasoundReportItem[]>(initialUltrasounds);
+  const [colposcopiesList, setColposcopiesList] =
+    useState<ColposcopyReportItem[]>(initialColposcopies);
 
   const {
     patient,
@@ -198,9 +209,16 @@ export function PatientDetailView({
     labCotizRef.current?.openQuoteFromConsultation(cons);
   };
 
+  const handleEmitBiopsyOrderFromColposcopy = (colpo: ColposcopyReportItem) => {
+    setActiveTab("laboratorio");
+    labCotizRef.current?.openBiopsyFromColposcopy(colpo);
+  };
+
   const liveCounts = {
     ...counts,
     consultations: consultationsList.length,
+    ultrasounds: ultrasoundsList.length,
+    colposcopies: colposcopiesList.length,
     prescriptions: prescriptionsList.length,
     labOrders: labOrdersList.length,
     quotes: quotesList.length,
@@ -795,6 +813,21 @@ export function PatientDetailView({
         />
       </div>
 
+      <div className={activeTab === "chequeos" ? "block" : "hidden"}>
+        <TabChequeos
+          patient={patient}
+          ultrasounds={ultrasoundsList}
+          onUltrasoundsChange={setUltrasoundsList}
+          colposcopies={colposcopiesList}
+          onColposcopiesChange={setColposcopiesList}
+          consultations={consultationsList}
+          checkupsCount={liveCounts.checkups}
+          canEdit={canEdit}
+          canDelete={canDelete}
+          onEmitBiopsyOrderFromColposcopy={handleEmitBiopsyOrderFromColposcopy}
+        />
+      </div>
+
       <div className={activeTab === "recetas" ? "block" : "hidden"}>
         <TabRecetas
           ref={recetasRef}
@@ -828,6 +861,7 @@ export function PatientDetailView({
 
       {activeTab !== "resumen" &&
       activeTab !== "consultas" &&
+      activeTab !== "chequeos" &&
       activeTab !== "recetas" &&
       activeTab !== "laboratorio" ? (
         <Card className="border border-border bg-card">

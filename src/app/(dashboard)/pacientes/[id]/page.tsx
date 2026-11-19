@@ -3,11 +3,13 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 import { PatientDetailView } from "@/components/pacientes/PatientDetailView";
 import { listCategories } from "@/features/catalog-categories/services/catalog-categories.service";
+import { listColposcopiesByPatient } from "@/features/colposcopia/services/colposcopia.service";
 import {
   getConsultationFormContext,
   listConsultationsByPatient,
 } from "@/features/consultas/services/consultas.service";
 import { listQuotesByPatient } from "@/features/cotizaciones/services/cotizaciones.service";
+import { listUltrasoundsByPatient } from "@/features/ecografias/services/ecografias.service";
 import {
   listLabOrdersByPatient,
   listLabTemplates,
@@ -49,6 +51,10 @@ export default async function PacienteDetailPage({
     listLabTemplates(doctor.tenantId),
     listQuotesByPatient(doctor.tenantId, parsedId.data),
   ]);
+  const [ultrasounds, colposcopies] = await Promise.all([
+    listUltrasoundsByPatient(doctor.tenantId, parsedId.data),
+    listColposcopiesByPatient(doctor.tenantId, parsedId.data),
+  ]);
   const consultationFormContext = await getConsultationFormContext(
     doctor.tenantId,
     parsedId.data
@@ -74,6 +80,8 @@ export default async function PacienteDetailPage({
         initialLabOrders={labOrders}
         initialLabTemplates={labTemplates}
         initialQuotes={quotes}
+        initialUltrasounds={ultrasounds}
+        initialColposcopies={colposcopies}
         initialTariffs={tariffs}
         consultationFormContext={consultationFormContext}
         canEdit={canEdit}

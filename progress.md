@@ -1,4 +1,4 @@
-# Estado del Proyecto: Fase 3 Completada (Agenda, Consultas, Recetas, Laboratorio & Cotizaciones)
+# Estado del Proyecto: Fase 4 — Etapa 4A Completada (Imágenes Privadas, Ecografías IDEA/BI-RADS & Colposcopía Digital IFCPC)
 
 ## 1. Objetivo General
 Plataforma médica oficial de producción (**cendo-app**) para el Centro de Endometriosis y Ginecología Especializada **CENDO** (Sede Miraflores, Lima - Perú), liderado por el Director Médico **Dr. Patrick José Jacinto Gomero** (CMP 61693 | RNE 38657).
@@ -28,11 +28,17 @@ Plataforma médica oficial de producción (**cendo-app**) para el Centro de Endo
 - [x] Fase 3 (Parte 2 - Laboratorio & Cotizaciones): Sub-tabs completos a ancho completo dentro de `Laboratorio & Cotiz.` (`TabLaboratorioCotizaciones`): Órdenes de Laboratorio (`laboratorio`, `/api/laboratorio`, `LabOrderModal`, `LabOrderPrintView` A4 + cadena de custodia) con gestor CRUD de plantillas (`/api/lab-templates`, `LabTemplatesManagerModal`, protección de plantillas oficiales CENDO) y auto-hidratación de FUR/paridad/MAC en biopsias/citología; Cotizaciones (`cotizaciones`, `/api/cotizaciones`, `QuoteModal`, `QuotePrintView` A4 + WhatsApp) conectadas al Tarifario real (`procedures_tariff`) con cálculo financiero Zero Trust en servidor, vigencia automática y renovación de tarifas; fuente única de verdad en `TabConsultas` (`Lab (N)` + `Cotizar`) y 3 órdenes + 3 presupuestos verificados end-to-end
 - [x] Módulo Transversal — Configuración Profesional, Sello y Firma Digital Privada (`/configuracion`, `/api/configuracion`, `/api/configuracion/firma`): columna `show_signature_by_default` (`0002_curvy_alice.sql`), extracción limpia de la firma del Dr. Patrick desde `informe.pdf` a PNG transparente en bucket privado `clinical-images`, vista previa en vivo, carga de imagen con limpieza de fondo blanco o pad de dibujo `<canvas>`, `<CendoSignatureBlock />` + `<SignatureToggleSwitch />` integrados en Consultas/Recetas/Laboratorio/Cotizaciones, mejora en `pdfGenerator.ts` (espera de carga de imágenes) y batería E2E verificada al 100% (`validate-configuracion-firma.ts`)
 - [x] Pulido Técnico & Hardening (Opción A): Impresión A5 real (`148mm × 210mm`) en `pdfGenerator.ts` + carátula adaptable (`CendoCoverPage`), cambio de contraseña propio PBKDF2-SHA256 con verificación de clave actual y auditoría (`/api/configuracion/password` + `ChangePasswordCard`), respuesta `401 JSON` en `/api/*` expirados (`proxy.ts`) y boundaries de resiliencia (`(dashboard)/loading.tsx`, `(dashboard)/error.tsx`, `not-found.tsx`) — todo verificado E2E (`11/11`)
-- [ ] Fase 4: Alta Especialidad dentro de la ficha (`chequeos` [ecografías + colposcopía IFCPC integradas], `procedimientos`, `prenatal` y unión de estudios en 1 PDF)
+- [x] Fase 4 — Etapa 4A (Chequeos: Imágenes Privadas, Ecografías IDEA/BI-RADS & Colposcopía IFCPC):
+  - **Storage Clínico Privado (`/api/clinical-images`)**: endpoint Zero Trust (`GET`/`POST`/`DELETE`) con validación de magic bytes, rechazo de SVG/traversal/cross-tenant, compresión cliente JPEG (`src/lib/image-compressor.ts`) y rate limit de subida (`uploadLimiter`).
+  - **Ecografías (`src/features/ecografias/`, `/api/ecografias`)**: 6 modalidades y 7 presets CENDO (incluyendo Protocolo IDEA de Endometriosis: `slidingSign` y `uterosacralLigaments`, y ACR BI-RADS), cálculo automático de volumen elipsoidal en servidor (`cc`), limpieza de huérfanas, auditoría, WhatsApp (`generateUltrasoundWhatsAppUrl`) e impresión A4 con `<CendoSignatureBlock />` y anexos fotográficos automáticos de hasta 6 fotos/página (`UltrasoundPrintView`).
+  - **Colposcopía Digital IFCPC 2011 (`src/features/colposcopia/`, `/api/colposcopia`)**: reloj cervical interactivo SVG (`CervicalClock`), clasificador automático IFCPC (Normal / Grado 1 / Grado 2 / Sospecha Invasión + sugerencia CIE-10), ordenamiento/limpieza de horas de biopsia en servidor, puente en 1 clic hacia Orden de Biopsia en Laboratorio (`openBiopsyFromColposcopy`), WhatsApp (`generateColposcopyWhatsAppUrl`) e impresión A4 con `<CendoSignatureBlock />` y anexos de 4 fotos/página (`ColposcopyPrintView`).
+  - **Integración unificada (`TabChequeos`)** dentro de `/pacientes/[id]` y validación E2E al 100% (`scripts/validate-etapa-4a.ts`, 9/9 checks + demo IDEA en Gabriela Paredes y demo IFCPC en Daniela Castro).
+- [ ] Fase 4 — Etapa 4B: `Chequeo Ginecológico Integral` + `Dossier PDF Unificado` con `pdf-lib`
+- [ ] Fase 4 — Continuación: `Procedimientos Menores` y `Control Prenatal MINSA / CLAP`
 - [ ] Fase 5: Documentos externos, Impresión A4 oficial CENDO, WhatsApp y Excel clínico (59 cols)
 
 ## 4. Tarea Actual
-- Iniciar **Fase 4**: módulos de Alta Especialidad dentro de `/pacientes/[id]` (`Chequeos` unificando `Ecografías` + `Colposcopía Digital IFCPC`, `Procedimientos Menores` y `Control Prenatal MINSA / CLAP`).
+- Analizar casuísticas clínicas, técnicas y de UX para **Fase 4 — Etapa 4B** (`Chequeo Ginecológico Integral` + `Dossier PDF Unificado` con `pdf-lib`) antes de su implementación.
 
 ## 5. Bloqueos / Notas
 - Nota de despliegue: Si el proyecto escala en entorno Serverless multi-instancia (Vercel), migrar `rate-limit.ts` a `@upstash/ratelimit`.

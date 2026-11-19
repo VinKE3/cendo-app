@@ -73,3 +73,4 @@ export class MemoryRateLimiter {
 
 export const authLimiter = new MemoryRateLimiter({ intervalMs: 60 * 1000, maxRequests: 5 });
 export const mutationLimiter = new MemoryRateLimiter({ intervalMs: 10 * 1000, maxRequests: 10 });
+export const uploadLimiter = new MemoryRateLimiter({ intervalMs: 60 * 1000, maxRequests: 40 });

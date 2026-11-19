@@ -9,13 +9,14 @@ import type {
   LabOrderItemRecord,
   LabSpecimenDetailsRecord,
 } from "@/db/schema/clinical";
+import type { ColposcopyReportItem } from "@/features/colposcopia/colposcopia.schema";
 import type { MedicalConsultationItem } from "@/features/consultas/consultas.schema";
 import type {
   PatientBackgroundItem,
   PatientDirectoryItem,
 } from "@/features/pacientes/pacientes.schema";
 import { usePagination } from "@/hooks/use-pagination";
-import { getPeruDateString } from "@/lib/utils";
+import { formatPeruDateDisplay, getPeruDateString } from "@/lib/utils";
 import {
   createLabOrderAction,
   createLabTemplateAction,
@@ -297,6 +298,67 @@ export function useLaboratorio({
       templateTitle: "",
       ...defaultSpecimenValues,
     });
+    setDialogOpen(true);
+  };
+
+  const openBiopsyFromColposcopy = (colpo: ColposcopyReportItem) => {
+    setEditingItem(null);
+    setSourceLabel(
+      `Colposcopía IFCPC del ${formatPeruDateDisplay(colpo.reportDate)}`
+    );
+    setSaveAndPrintIntent(false);
+    setCatalogSearch("");
+    setCatalogCategory("Anatomía Patológica & Biopsias");
+    setManualTestName("");
+
+    const matchedBiopsyTmpl = labTemplates.find(
+      (t) => t.templateType === "BIOPSIA"
+    );
+    const hoursLabel =
+      colpo.biopsyClockHours.length > 0
+        ? colpo.biopsyClockHours.map((h) => `H${h}`).join(", ")
+        : "";
+
+    setSelectedTests([
+      {
+        id: `lab-colpo-biopsy-${Date.now()}`,
+        category: "Anatomía Patológica & Biopsias",
+        testName:
+          matchedBiopsyTmpl?.defaultTests[0] ||
+          "Estudio Anatomopatológico de Biopsia de Cérvix (Biopsia Dirigida)",
+        sampleType: hoursLabel
+          ? `Biopsia cervical (${hoursLabel})`
+          : "Biopsia de cérvix en formol 10%",
+        notes: "Remisión directa desde Colposcopía Digital IFCPC CENDO",
+      },
+    ]);
+
+    form.reset({
+      consultationId: colpo.consultationId ?? consultations[0]?.id ?? "",
+      orderDate: colpo.reportDate || todayStr,
+      diagnosis: colpo.diagnosis,
+      cie10Code: colpo.cie10Code,
+      urgency: "Prioritario",
+      customTests: "",
+      patientInstructions:
+        matchedBiopsyTmpl?.clinicalNotes ||
+        getDefaultInstructionsForTemplateType("BIOPSIA"),
+      templateType: "BIOPSIA",
+      templateTitle:
+        matchedBiopsyTmpl?.title || "Biopsia de Cérvix (Anatomía Patológica)",
+      ...defaultSpecimenValues,
+      anatomicalSite: hoursLabel
+        ? `Cérvix uterino — Horario colposcópico: ${hoursLabel}`
+        : "Cérvix uterino (Exocérvix / Zona de Transformación)",
+      sampleMethod: "Punch de biopsia cervical dirigida",
+      fixative: matchedBiopsyTmpl?.fixativeTransport || "Formol tamponado al 10%",
+      containerCount: Math.max(1, colpo.biopsyClockHours.length || 1),
+      cervixAspect: `ZT ${colpo.transformationZoneType} • Schiller: ${colpo.schillerTest}`,
+      clinicalFindings: `Colposcopía del ${formatPeruDateDisplay(colpo.reportDate)}. ${colpo.diagnosis}`,
+      sampleObtainedAt: colpo.reportDate || todayStr,
+      procedureOrigin: "Unidad de Colposcopía Digital CENDO",
+    });
+
     setDialogOpen(true);
   };
 
@@ -642,6 +704,7 @@ export function useLaboratorio({
     openCreateModal,
     openEditModal,
     openFromConsultation,
+    openBiopsyFromColposcopy,
     applyTemplate,
     resetToGeneralOrder,
     applyPresetPack,

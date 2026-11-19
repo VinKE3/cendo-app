@@ -60,6 +60,8 @@ export interface UltrasoundFindingsRecord {
   ovariesNotes?: string;
   douglasPouch?: string;
   endometriosisFoci?: string;
+  slidingSign?: "Positivo" | "Negativo" | "Parcial";
+  uterosacralLigaments?: string;
   breastPattern?: string;
   rightBreastFindings?: string;
   leftBreastFindings?: string;

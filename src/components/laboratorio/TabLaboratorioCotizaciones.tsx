@@ -43,6 +43,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { ColposcopyReportItem } from "@/features/colposcopia/colposcopia.schema";
 import type { MedicalConsultationItem } from "@/features/consultas/consultas.schema";
 import { useCotizaciones } from "@/features/cotizaciones/hooks/use-cotizaciones";
 import type { ProcedureQuoteItem } from "@/features/cotizaciones/cotizaciones.schema";
@@ -67,6 +68,7 @@ import { LabTemplatesManagerModal } from "./LabTemplatesManagerModal";
 
 export interface TabLabCotizHandle {
   openLabFromConsultation: (consultation: MedicalConsultationItem) => void;
+  openBiopsyFromColposcopy: (colposcopy: ColposcopyReportItem) => void;
   openLabPrintPreview: (labOrder: LabOrderItem) => void;
   openLabEdit: (labOrder: LabOrderItem) => void;
   openQuoteFromConsultation: (consultation: MedicalConsultationItem) => void;
@@ -133,6 +135,10 @@ export function TabLaboratorioCotizaciones({
       openLabFromConsultation: (cons) => {
         setSubTab("laboratorio");
         lab.openFromConsultation(cons);
+      },
+      openBiopsyFromColposcopy: (colpo) => {
+        setSubTab("laboratorio");
+        lab.openBiopsyFromColposcopy(colpo);
       },
       openLabPrintPreview: (ord) => {
         setSubTab("laboratorio");

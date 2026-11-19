@@ -371,3 +371,111 @@ export function generateQuoteWhatsAppUrl(
     ? `https://wa.me/${targetPhone}?text=${encoded}`
     : `https://wa.me/?text=${encoded}`;
 }
+
+export interface UltrasoundWhatsAppPayload {
+  patientName: string;
+  patientPhone?: string | null;
+  reportDate: string;
+  doctorName: string;
+  doctorCmp?: string | null;
+  ultrasoundTypeLabel: string;
+  indication: string;
+  conclusion: string;
+  recommendations?: string | null;
+  biradsCategory?: string | null;
+}
+
+export function generateUltrasoundWhatsAppUrl(
+  report: UltrasoundWhatsAppPayload,
+  clinicInfo?: CalendarClinicInfo | null
+): string {
+  const targetPhone = cleanPhoneForWhatsApp(report.patientPhone);
+  const address = clinicInfo?.clinicAddress?.trim() || DEFAULT_CLINIC_ADDRESS;
+  const phone = clinicInfo?.phone?.trim() || DEFAULT_CLINIC_PHONE;
+  const formattedDate = formatPeruDateDisplay(report.reportDate);
+
+  const message = [
+    `🩺 *Informe de Ecografía Especializada • CENDO*`,
+    ``,
+    `Estimada *${report.patientName}*, compartimos el resumen de su estudio ecográfico:`,
+    ``,
+    `🗓 *Fecha:* ${formattedDate}`,
+    `👩‍⚕️ *Especialista:* ${report.doctorName}${report.doctorCmp ? ` (CMP ${report.doctorCmp})` : ""}`,
+    `🔬 *Estudio:* ${report.ultrasoundTypeLabel}`,
+    `📋 *Indicación:* ${report.indication}`,
+    report.biradsCategory ? `🏷 *Categoría:* *${report.biradsCategory}*` : "",
+    ``,
+    `*Conclusión Diagnóstica:*`,
+    report.conclusion,
+    report.recommendations?.trim()
+      ? `\n📌 *Sugerencias:* ${report.recommendations.trim()}`
+      : "",
+    ``,
+    `🏥 *Sede:* ${address}`,
+    `📞 *Central de Citas:* ${phone}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const encoded = encodeURIComponent(message);
+  return targetPhone
+    ? `https://wa.me/${targetPhone}?text=${encoded}`
+    : `https://wa.me/?text=${encoded}`;
+}
+
+export interface ColposcopyWhatsAppPayload {
+  patientName: string;
+  patientPhone?: string | null;
+  reportDate: string;
+  doctorName: string;
+  doctorCmp?: string | null;
+  classificationLabel: string;
+  transformationZoneType: string;
+  schillerTest: string;
+  cervicalBiopsyTaken: boolean;
+  biopsyClockHours: string[];
+  diagnosis: string;
+  cie10Code: string;
+  planRecommendations: string;
+}
+
+export function generateColposcopyWhatsAppUrl(
+  report: ColposcopyWhatsAppPayload,
+  clinicInfo?: CalendarClinicInfo | null
+): string {
+  const targetPhone = cleanPhoneForWhatsApp(report.patientPhone);
+  const address = clinicInfo?.clinicAddress?.trim() || DEFAULT_CLINIC_ADDRESS;
+  const phone = clinicInfo?.phone?.trim() || DEFAULT_CLINIC_PHONE;
+  const formattedDate = formatPeruDateDisplay(report.reportDate);
+
+  const biopsyLine = report.cervicalBiopsyTaken
+    ? report.biopsyClockHours.length > 0
+      ? `Sí (Horas: ${report.biopsyClockHours.map((h) => `${h}h`).join(", ")})`
+      : "Sí (Biopsia dirigida)"
+    : "No requerida";
+
+  const message = [
+    `🔬 *Informe de Colposcopía Digital IFCPC • CENDO*`,
+    ``,
+    `Estimada *${report.patientName}*, compartimos el resumen de su evaluación colposcópica:`,
+    ``,
+    `🗓 *Fecha:* ${formattedDate}`,
+    `👩‍⚕️ *Especialista:* ${report.doctorName}${report.doctorCmp ? ` (CMP ${report.doctorCmp})` : ""}`,
+    `🏷 *Clasificación:* ${report.classificationLabel}`,
+    `🔎 *Zona Transformación:* ${report.transformationZoneType} • *Schiller:* ${report.schillerTest}`,
+    `🧪 *Biopsia Cervical:* ${biopsyLine}`,
+    ``,
+    `🩺 *Diagnóstico:* ${report.diagnosis}${report.cie10Code ? ` [CIE-10: ${report.cie10Code}]` : ""}`,
+    ``,
+    `📌 *Indicaciones y Seguimiento:*`,
+    report.planRecommendations,
+    ``,
+    `🏥 *Sede:* ${address}`,
+    `📞 *Central de Citas:* ${phone}`,
+  ].join("\n");
+
+  const encoded = encodeURIComponent(message);
+  return targetPhone
+    ? `https://wa.me/${targetPhone}?text=${encoded}`
+    : `https://wa.me/?text=${encoded}`;
+}
