@@ -79,7 +79,7 @@ export function VademecumView({
               onClick={() => categoryManager.setOpen(true)}
             >
               <Tags className="size-4" />
-              Gestionar Categorías
+              Gestionar Grupos
             </Button>
             <Button type="button" onClick={openCreateModal}>
               <Plus className="size-4" />
