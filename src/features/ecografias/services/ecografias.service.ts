@@ -6,13 +6,20 @@ import {
   profiles,
   ultrasoundReports,
 } from "@/db/schema";
-import type { UltrasoundFindingsRecord } from "@/db/schema/specialty";
+import type {
+  UltrasoundBreastLesionRecord,
+  UltrasoundDopplerRecord,
+  UltrasoundDopplerVesselRecord,
+  UltrasoundFindingsRecord,
+} from "@/db/schema/specialty";
 import { recordAuditLog } from "@/lib/audit/audit-log";
 import { isValidPatientClinicalImagePath } from "@/lib/clinical-images";
 import { DomainError, type SessionPayload } from "@/lib/security/action-guard";
 import { deletePrivateStorageObject } from "@/lib/supabase/storage";
 import {
+  calculateDopplerDerivedIndices,
   calculateEllipsoidVolumeCc,
+  DOPPLER_VESSEL_META,
   type CreateUltrasoundInput,
   type UltrasoundReportItem,
   type UltrasoundType,
@@ -42,78 +49,230 @@ export function mapUltrasoundRow(
   };
 }
 
+function setOptStr<K extends keyof UltrasoundFindingsRecord>(
+  target: UltrasoundFindingsRecord,
+  key: K,
+  value: unknown
+) {
+  if (typeof value === "string" && value.trim()) {
+    target[key] = value.trim() as UltrasoundFindingsRecord[K];
+  }
+}
+
+function setOptNum<K extends keyof UltrasoundFindingsRecord>(
+  target: UltrasoundFindingsRecord,
+  key: K,
+  value: unknown,
+  decimals = 1
+) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const rounded =
+      decimals === 0 ? Math.round(value) : Number(value.toFixed(decimals));
+    target[key] = rounded as UltrasoundFindingsRecord[K];
+  }
+}
+
+function normalizeBreastLesions(
+  rawLesions?: CreateUltrasoundInput["findings"]["breastLesions"]
+): UltrasoundBreastLesionRecord[] | undefined {
+  if (!Array.isArray(rawLesions) || rawLesions.length === 0) return undefined;
+  const cleaned: UltrasoundBreastLesionRecord[] = [];
+  for (const l of rawLesions) {
+    if (!l || !l.lesionType?.trim()) continue;
+    const item: UltrasoundBreastLesionRecord = {
+      id: l.id.trim(),
+      breastSide: l.breastSide,
+      lesionType: l.lesionType.trim(),
+    };
+    if (l.clockHour?.trim()) item.clockHour = l.clockHour.trim();
+    if (l.distanceFromNippleCm?.trim()) {
+      item.distanceFromNippleCm = l.distanceFromNippleCm.trim();
+    }
+    if (l.depthFromSkinMm?.trim()) item.depthFromSkinMm = l.depthFromSkinMm.trim();
+    if (l.dimensionsMm?.trim()) item.dimensionsMm = l.dimensionsMm.trim();
+    if (l.shape?.trim()) item.shape = l.shape.trim();
+    if (l.margins?.trim()) item.margins = l.margins.trim();
+    if (l.orientation?.trim()) item.orientation = l.orientation.trim();
+    if (l.echoPattern?.trim()) item.echoPattern = l.echoPattern.trim();
+    if (l.posteriorAcoustic?.trim()) {
+      item.posteriorAcoustic = l.posteriorAcoustic.trim();
+    }
+    if (l.notes?.trim()) item.notes = l.notes.trim();
+    cleaned.push(item);
+  }
+  return cleaned.length > 0 ? cleaned : undefined;
+}
+
+function normalizeDoppler(
+  rawDoppler?: CreateUltrasoundInput["findings"]["doppler"]
+): UltrasoundDopplerRecord | undefined {
+  if (!rawDoppler) return undefined;
+  const normalized: UltrasoundDopplerRecord = {};
+  let hasAny = false;
+
+  for (const meta of DOPPLER_VESSEL_META) {
+    const v = rawDoppler[meta.key];
+    if (!v) continue;
+    const entry: UltrasoundDopplerVesselRecord = {};
+    if (typeof v.pi === "number" && Number.isFinite(v.pi)) {
+      entry.pi = Number(v.pi.toFixed(2));
+    }
+    if (v.percentile?.trim()) entry.percentile = v.percentile.trim();
+    if (v.status) entry.status = v.status;
+    if (
+      entry.pi !== undefined ||
+      entry.percentile !== undefined ||
+      entry.status !== undefined
+    ) {
+      normalized[meta.key] = entry;
+      hasAny = true;
+    }
+  }
+
+  if (!hasAny) return undefined;
+
+  const derived = calculateDopplerDerivedIndices(normalized);
+  if (
+    derived.cerebroplacentalRatioPi !== undefined &&
+    normalized.cerebroplacentalRatio?.pi === undefined
+  ) {
+    normalized.cerebroplacentalRatio = {
+      ...normalized.cerebroplacentalRatio,
+      pi: derived.cerebroplacentalRatioPi,
+    };
+  }
+  if (
+    derived.meanUterinePi !== undefined &&
+    normalized.meanUterineArteries?.pi === undefined
+  ) {
+    normalized.meanUterineArteries = {
+      ...normalized.meanUterineArteries,
+      pi: derived.meanUterinePi,
+    };
+  }
+
+  return normalized;
+}
+
 function normalizeFindings(
   raw: CreateUltrasoundInput["findings"]
 ): UltrasoundFindingsRecord {
   const cleaned: UltrasoundFindingsRecord = {};
 
-  if (raw.uterusPosition) cleaned.uterusPosition = raw.uterusPosition;
-  if (raw.uterusDimensions?.trim()) {
-    cleaned.uterusDimensions = raw.uterusDimensions.trim();
-  }
+  // Común
+  setOptStr(cleaned, "referringDoctor", raw.referringDoctor);
 
-  const autoVolume = cleaned.uterusDimensions
+  // Ginecológica y compartidos I Trimestre
+  if (raw.uterusPosition) cleaned.uterusPosition = raw.uterusPosition;
+  setOptStr(cleaned, "uterusDimensions", raw.uterusDimensions);
+  const autoUterusVol = cleaned.uterusDimensions
     ? calculateEllipsoidVolumeCc(cleaned.uterusDimensions)
     : null;
   if (typeof raw.uterusVolumeCc === "number" && Number.isFinite(raw.uterusVolumeCc)) {
     cleaned.uterusVolumeCc = Number(raw.uterusVolumeCc.toFixed(1));
-  } else if (autoVolume !== null) {
-    cleaned.uterusVolumeCc = autoVolume;
+  } else if (autoUterusVol !== null) {
+    cleaned.uterusVolumeCc = autoUterusVol;
   }
-
-  if (raw.myometriumStatus?.trim()) cleaned.myometriumStatus = raw.myometriumStatus.trim();
-  if (
-    typeof raw.endometriumThicknessMm === "number" &&
-    Number.isFinite(raw.endometriumThicknessMm)
-  ) {
-    cleaned.endometriumThicknessMm = Number(raw.endometriumThicknessMm.toFixed(1));
-  }
+  setOptStr(cleaned, "myometriumStatus", raw.myometriumStatus);
+  setOptNum(cleaned, "endometriumThicknessMm", raw.endometriumThicknessMm, 1);
   if (raw.endometriumPattern) cleaned.endometriumPattern = raw.endometriumPattern;
-  if (raw.rightOvaryDimensions?.trim()) {
-    cleaned.rightOvaryDimensions = raw.rightOvaryDimensions.trim();
-  }
-  if (raw.leftOvaryDimensions?.trim()) {
-    cleaned.leftOvaryDimensions = raw.leftOvaryDimensions.trim();
-  }
-  if (raw.ovariesNotes?.trim()) cleaned.ovariesNotes = raw.ovariesNotes.trim();
-  if (raw.douglasPouch?.trim()) cleaned.douglasPouch = raw.douglasPouch.trim();
-  if (raw.endometriosisFoci?.trim()) cleaned.endometriosisFoci = raw.endometriosisFoci.trim();
-  if (raw.slidingSign) cleaned.slidingSign = raw.slidingSign;
-  if (raw.uterosacralLigaments?.trim()) {
-    cleaned.uterosacralLigaments = raw.uterosacralLigaments.trim();
+  setOptNum(cleaned, "cervixLengthMm", raw.cervixLengthMm, 1);
+  setOptStr(cleaned, "cervixStatus", raw.cervixStatus);
+  setOptStr(cleaned, "uterusEcopulsionPain", raw.uterusEcopulsionPain);
+
+  setOptStr(cleaned, "rightOvaryDimensions", raw.rightOvaryDimensions);
+  const autoROvVol = cleaned.rightOvaryDimensions
+    ? calculateEllipsoidVolumeCc(cleaned.rightOvaryDimensions)
+    : null;
+  if (
+    typeof raw.rightOvaryVolumeCc === "number" &&
+    Number.isFinite(raw.rightOvaryVolumeCc)
+  ) {
+    cleaned.rightOvaryVolumeCc = Number(raw.rightOvaryVolumeCc.toFixed(1));
+  } else if (autoROvVol !== null) {
+    cleaned.rightOvaryVolumeCc = autoROvVol;
   }
 
-  if (raw.breastPattern?.trim()) cleaned.breastPattern = raw.breastPattern.trim();
-  if (raw.rightBreastFindings?.trim()) {
-    cleaned.rightBreastFindings = raw.rightBreastFindings.trim();
+  setOptStr(cleaned, "leftOvaryDimensions", raw.leftOvaryDimensions);
+  const autoLOvVol = cleaned.leftOvaryDimensions
+    ? calculateEllipsoidVolumeCc(cleaned.leftOvaryDimensions)
+    : null;
+  if (
+    typeof raw.leftOvaryVolumeCc === "number" &&
+    Number.isFinite(raw.leftOvaryVolumeCc)
+  ) {
+    cleaned.leftOvaryVolumeCc = Number(raw.leftOvaryVolumeCc.toFixed(1));
+  } else if (autoLOvVol !== null) {
+    cleaned.leftOvaryVolumeCc = autoLOvVol;
   }
-  if (raw.leftBreastFindings?.trim()) {
-    cleaned.leftBreastFindings = raw.leftBreastFindings.trim();
-  }
+
+  setOptStr(cleaned, "ovaryEcopulsionPain", raw.ovaryEcopulsionPain);
+  setOptStr(cleaned, "periOvarianFluid", raw.periOvarianFluid);
+  setOptStr(cleaned, "ovariesNotes", raw.ovariesNotes);
+  setOptStr(cleaned, "douglasPouch", raw.douglasPouch);
+  setOptStr(cleaned, "endometriosisFoci", raw.endometriosisFoci);
+  if (raw.slidingSign) cleaned.slidingSign = raw.slidingSign;
+  setOptStr(cleaned, "uterosacralLigaments", raw.uterosacralLigaments);
+
+  // Mama bilateral
+  if (raw.breastAcrType) cleaned.breastAcrType = raw.breastAcrType;
+  setOptStr(cleaned, "breastPattern", raw.breastPattern);
+  setOptStr(cleaned, "rightBreastFindings", raw.rightBreastFindings);
+  setOptStr(cleaned, "leftBreastFindings", raw.leftBreastFindings);
+  const normalizedLesions = normalizeBreastLesions(raw.breastLesions);
+  if (normalizedLesions) cleaned.breastLesions = normalizedLesions;
+  setOptStr(cleaned, "breastComplement", raw.breastComplement);
   if (raw.biradsCategory) cleaned.biradsCategory = raw.biradsCategory;
 
-  if (
-    typeof raw.gestationalSacsCount === "number" &&
-    Number.isFinite(raw.gestationalSacsCount)
-  ) {
-    cleaned.gestationalSacsCount = raw.gestationalSacsCount;
+  // Obstétrica I Trimestre y Genética
+  setOptNum(cleaned, "gestationalSacsCount", raw.gestationalSacsCount, 0);
+  setOptNum(cleaned, "gestationalSacMm", raw.gestationalSacMm, 1);
+  setOptNum(cleaned, "yolkSacMm", raw.yolkSacMm, 1);
+  setOptNum(cleaned, "embryoCrownRumpLengthMm", raw.embryoCrownRumpLengthMm, 1);
+  setOptStr(cleaned, "gestationalAgeByEcho", raw.gestationalAgeByEcho);
+  setOptNum(cleaned, "fetalHeartRate", raw.fetalHeartRate, 0);
+  setOptStr(cleaned, "choriodecidualReaction", raw.choriodecidualReaction);
+  setOptNum(cleaned, "nuchalTranslucencyMm", raw.nuchalTranslucencyMm, 1);
+  if (raw.nasalBone) cleaned.nasalBone = raw.nasalBone;
+  if (raw.ductusVenosusWave) cleaned.ductusVenosusWave = raw.ductusVenosusWave;
+  setOptNum(cleaned, "ductusVenosusPi", raw.ductusVenosusPi, 2);
+  setOptNum(cleaned, "uterineArteriesMeanPi", raw.uterineArteriesMeanPi, 2);
+  if (raw.chromosomopathyRisk) cleaned.chromosomopathyRisk = raw.chromosomopathyRisk;
+  if (raw.preeclampsiaRisk) cleaned.preeclampsiaRisk = raw.preeclampsiaRisk;
+
+  // Obstétrica II-III Trimestre, Morfológica & Doppler
+  setOptStr(cleaned, "fetalStatic", raw.fetalStatic);
+  if (raw.fetalSex) cleaned.fetalSex = raw.fetalSex;
+  setOptStr(cleaned, "fetalAnatomySummary", raw.fetalAnatomySummary);
+  setOptStr(cleaned, "fetalHeartFourChambers", raw.fetalHeartFourChambers);
+  setOptStr(cleaned, "fetalAbdominalWall", raw.fetalAbdominalWall);
+  setOptStr(cleaned, "fetalKidneys", raw.fetalKidneys);
+  setOptStr(cleaned, "fetalSpine", raw.fetalSpine);
+  setOptNum(cleaned, "bpdMm", raw.bpdMm, 1);
+  setOptNum(cleaned, "hcMm", raw.hcMm, 1);
+  setOptNum(cleaned, "acMm", raw.acMm, 1);
+  setOptNum(cleaned, "flMm", raw.flMm, 1);
+  setOptNum(cleaned, "estimatedFetalWeightGr", raw.estimatedFetalWeightGr, 0);
+  setOptStr(
+    cleaned,
+    "estimatedFetalWeightPercentile",
+    raw.estimatedFetalWeightPercentile
+  );
+  setOptNum(cleaned, "bppBodyMovements", raw.bppBodyMovements, 0);
+  setOptNum(cleaned, "bppBreathingMovements", raw.bppBreathingMovements, 0);
+  setOptNum(cleaned, "bppMuscleTone", raw.bppMuscleTone, 0);
+  setOptNum(cleaned, "bppAmnioticFluid", raw.bppAmnioticFluid, 0);
+  setOptStr(cleaned, "placentaLocation", raw.placentaLocation);
+  setOptStr(cleaned, "placentaGrade", raw.placentaGrade);
+  setOptStr(cleaned, "placentaHematomas", raw.placentaHematomas);
+  setOptStr(cleaned, "umbilicalCord", raw.umbilicalCord);
+  setOptStr(cleaned, "amnioticFluidIndex", raw.amnioticFluidIndex);
+  setOptNum(cleaned, "amnioticFluidIlaMm", raw.amnioticFluidIlaMm, 1);
+  if (typeof raw.includeDoppler === "boolean") {
+    cleaned.includeDoppler = raw.includeDoppler;
   }
-  if (
-    typeof raw.embryoCrownRumpLengthMm === "number" &&
-    Number.isFinite(raw.embryoCrownRumpLengthMm)
-  ) {
-    cleaned.embryoCrownRumpLengthMm = Number(raw.embryoCrownRumpLengthMm.toFixed(1));
-  }
-  if (raw.gestationalAgeByEcho?.trim()) {
-    cleaned.gestationalAgeByEcho = raw.gestationalAgeByEcho.trim();
-  }
-  if (typeof raw.fetalHeartRate === "number" && Number.isFinite(raw.fetalHeartRate)) {
-    cleaned.fetalHeartRate = raw.fetalHeartRate;
-  }
-  if (raw.placentaLocation?.trim()) cleaned.placentaLocation = raw.placentaLocation.trim();
-  if (raw.amnioticFluidIndex?.trim()) {
-    cleaned.amnioticFluidIndex = raw.amnioticFluidIndex.trim();
-  }
+  const normalizedDoppler = normalizeDoppler(raw.doppler);
+  if (normalizedDoppler) cleaned.doppler = normalizedDoppler;
 
   return cleaned;
 }

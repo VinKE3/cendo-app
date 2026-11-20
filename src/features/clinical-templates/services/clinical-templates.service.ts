@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { clinicalTemplates } from "@/db/schema";
 import { recordAuditLog } from "@/lib/audit/audit-log";
@@ -106,19 +106,29 @@ export async function ensureOfficialClinicalTemplatesSeeded(
     ? [targetScope]
     : [...CLINICAL_TEMPLATE_SCOPES];
 
-  const existingScopeRows = await db
-    .select({ scope: clinicalTemplates.scope })
+  const existingRows = await db
+    .select({
+      scope: clinicalTemplates.scope,
+      code: clinicalTemplates.code,
+    })
     .from(clinicalTemplates)
-    .where(eq(clinicalTemplates.tenantId, tenantId))
-    .groupBy(clinicalTemplates.scope);
+    .where(
+      and(
+        eq(clinicalTemplates.tenantId, tenantId),
+        inArray(clinicalTemplates.scope, scopesToCheck)
+      )
+    );
 
-  const presentScopes = new Set(existingScopeRows.map((r) => r.scope));
-  const missingScopes = scopesToCheck.filter((s) => !presentScopes.has(s));
+  const presentKeys = new Set(
+    existingRows.map(
+      (r) => `${r.scope}:${r.code.trim().toLowerCase()}`
+    )
+  );
 
-  if (missingScopes.length === 0) return;
-
-  const seedsToInsert = OFFICIAL_CLINICAL_TEMPLATES.filter((t) =>
-    missingScopes.includes(t.scope)
+  const seedsToInsert = OFFICIAL_CLINICAL_TEMPLATES.filter(
+    (t) =>
+      scopesToCheck.includes(t.scope) &&
+      !presentKeys.has(`${t.scope}:${t.code.trim().toLowerCase()}`)
   );
 
   if (seedsToInsert.length === 0) return;

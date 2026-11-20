@@ -65,7 +65,9 @@ export function usePrenatal({
       ultrasounds.filter(
         (u) =>
           u.ultrasoundType === "OBSTETRICA_1T" ||
+          u.ultrasoundType === "OBSTETRICA_GENETICA" ||
           u.ultrasoundType === "OBSTETRICA_2T_3T" ||
+          u.ultrasoundType === "OBSTETRICA_MORFOLOGICA" ||
           Boolean(u.findings.gestationalAgeByEcho) ||
           Boolean(u.findings.fetalHeartRate)
       ),

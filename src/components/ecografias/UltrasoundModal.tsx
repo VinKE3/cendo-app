@@ -7,6 +7,8 @@ import {
   BookmarkPlus,
   Calculator,
   Camera,
+  ChevronDown,
+  ChevronUp,
   ImagePlus,
   Loader2,
   Printer,
@@ -21,7 +23,10 @@ import {
   PatientBackgroundQuickPanel,
   ViewBackgroundButton,
 } from "@/components/pacientes/PatientBackgroundQuickPanel";
-import type { ClinicalImageRecord } from "@/db/schema/specialty";
+import type {
+  ClinicalImageRecord,
+  UltrasoundBreastLesionRecord,
+} from "@/db/schema/specialty";
 import {
   ultrasoundTemplatePayloadSchema,
   type UltrasoundClinicalTemplateItem,
@@ -30,12 +35,19 @@ import {
 import type { ColposcopyReportItem } from "@/features/colposcopia/colposcopia.schema";
 import type { MedicalConsultationItem } from "@/features/consultas/consultas.schema";
 import {
+  BIRADS_OPTIONS,
+  BREAST_ACR_TYPES,
+  BREAST_LESION_TYPES,
+  getUltrasoundModeFlags,
   ULTRASOUND_TYPE_LABELS,
   type CreateUltrasoundInput,
   type UltrasoundReportItem,
   type UltrasoundType,
 } from "@/features/ecografias/ecografias.schema";
-import { toOptionalNumber } from "@/features/ecografias/hooks/use-ecografias";
+import {
+  toOptionalEnumValue,
+  toOptionalNumber,
+} from "@/features/ecografias/hooks/use-ecografias";
 import type {
   PatientBackgroundItem,
   PatientDirectoryItem,
@@ -54,6 +66,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { UltrasoundBreastFields } from "./UltrasoundBreastFields";
+import { UltrasoundObstetricFields } from "./UltrasoundObstetricFields";
 
 interface UltrasoundModalProps {
   open: boolean;
@@ -72,6 +86,11 @@ interface UltrasoundModalProps {
   watchedBirads?: string;
   watchedEndometrium?: number;
   watchedVolume?: number;
+  watchedRightOvaryVolume?: number;
+  watchedLeftOvaryVolume?: number;
+  watchedBreastLesions: UltrasoundBreastLesionRecord[];
+  watchedIncludeDoppler?: boolean;
+  bppTotal: number | null;
   templates: UltrasoundClinicalTemplateItem[];
   canEditTemplates?: boolean;
   isSavingTemplate?: boolean;
@@ -84,15 +103,10 @@ interface UltrasoundModalProps {
     | "Engrosado irregular"
   )[];
   slidingSignOptions: readonly ("Positivo" | "Negativo" | "Parcial")[];
-  biradsOptions: readonly (
-    | "BI-RADS 1"
-    | "BI-RADS 2"
-    | "BI-RADS 3"
-    | "BI-RADS 4A"
-    | "BI-RADS 4B"
-    | "BI-RADS 4C"
-    | "BI-RADS 5"
-  )[];
+  biradsOptions: readonly (typeof BIRADS_OPTIONS)[number][];
+  breastAcrTypes: readonly (typeof BREAST_ACR_TYPES)[number][];
+  breastAcrLabels: Record<(typeof BREAST_ACR_TYPES)[number], string>;
+  breastLesionTypes: readonly (typeof BREAST_LESION_TYPES)[number][];
   onApplyTemplate: (template: UltrasoundClinicalTemplateItem) => void;
   onBuildTemplatePayload: () => UltrasoundTemplatePayload;
   onSaveAsTemplate: (
@@ -102,6 +116,16 @@ interface UltrasoundModalProps {
   ) => Promise<boolean>;
   onOpenTemplatesManager?: () => void;
   onAutoCalculateVolume: (dimsText?: string) => void;
+  onAutoCalculateOvaryVolume: (side: "right" | "left", dimsText?: string) => void;
+  onAutoCalculateHadlock: () => void;
+  onAutoCalculateDoppler: () => void;
+  onAddBreastLesion: (lesionType?: string) => void;
+  onUpdateBreastLesion: (
+    index: number,
+    patch: Partial<UltrasoundBreastLesionRecord>
+  ) => void;
+  onRemoveBreastLesion: (index: number) => void;
+  onFillStandardBreastComplement: () => void;
   onUploadFiles: (files: FileList | null) => Promise<void>;
   onUpdateImageCaption: (index: number, caption: string) => void;
   onRemoveImage: (index: number) => Promise<void>;
@@ -129,6 +153,11 @@ export function UltrasoundModal({
   watchedBirads,
   watchedEndometrium,
   watchedVolume,
+  watchedRightOvaryVolume,
+  watchedLeftOvaryVolume,
+  watchedBreastLesions,
+  watchedIncludeDoppler,
+  bppTotal,
   templates,
   canEditTemplates = false,
   isSavingTemplate = false,
@@ -137,11 +166,21 @@ export function UltrasoundModal({
   endometriumPatterns,
   slidingSignOptions,
   biradsOptions,
+  breastAcrTypes,
+  breastAcrLabels,
+  breastLesionTypes,
   onApplyTemplate,
   onBuildTemplatePayload,
   onSaveAsTemplate,
   onOpenTemplatesManager,
   onAutoCalculateVolume,
+  onAutoCalculateOvaryVolume,
+  onAutoCalculateHadlock,
+  onAutoCalculateDoppler,
+  onAddBreastLesion,
+  onUpdateBreastLesion,
+  onRemoveBreastLesion,
+  onFillStandardBreastComplement,
   onUploadFiles,
   onUpdateImageCaption,
   onRemoveImage,
@@ -154,11 +193,19 @@ export function UltrasoundModal({
   } = form;
 
   const [showBackground, setShowBackground] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [pendingTemplate, setPendingTemplate] =
     useState<UltrasoundClinicalTemplateItem | null>(null);
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [tplName, setTplName] = useState("");
   const [tplDesc, setTplDesc] = useState("");
+
+  const handleDialogOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      setShowTemplates(false);
+    }
+    onOpenChange(nextOpen);
+  };
 
   const orderedTemplates = [...templates].sort((a, b) => {
     const aMatch = a.payload.ultrasoundType === watchedUltrasoundType ? 0 : 1;
@@ -198,14 +245,8 @@ export function UltrasoundModal({
     }
   };
 
-  const isGynMode =
-    watchedUltrasoundType === "TRANSVAGINAL" ||
-    watchedUltrasoundType === "PELVICA" ||
-    watchedUltrasoundType === "DOPPLER";
-  const isBreastMode = watchedUltrasoundType === "MAMA_BILATERAL";
-  const isObstetricMode =
-    watchedUltrasoundType === "OBSTETRICA_1T" ||
-    watchedUltrasoundType === "OBSTETRICA_2T_3T";
+  const modeFlags = getUltrasoundModeFlags(watchedUltrasoundType);
+  const { isGynMode, isBreastMode, isAnyObstetricMode } = modeFlags;
 
   const highBiradsAlert =
     isBreastMode &&
@@ -221,7 +262,7 @@ export function UltrasoundModal({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={handleDialogOpenChange}>
         <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-5xl">
           <DialogHeader>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:pr-8">
@@ -255,13 +296,27 @@ export function UltrasoundModal({
           />
 
           <form onSubmit={onSubmit} className="space-y-5">
-            {/* Plantillas Clínicas Editables CENDO */}
-            <div className="space-y-2 rounded-xl border border-primary/20 bg-primary/5 p-3">
+            {/* Plantillas Clínicas Editables CENDO (colapsadas por defecto) */}
+            <div className="rounded-xl border border-border bg-muted/20 px-3.5 py-2.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="flex items-center gap-1.5 text-xs font-semibold text-primary">
-                  <Sparkles className="size-3.5" />
-                  Plantillas Diagnósticas Rápidas CENDO (1 clic)
-                </span>
+                <button
+                  type="button"
+                  aria-expanded={showTemplates}
+                  onClick={() => setShowTemplates((prev) => !prev)}
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                >
+                  <Sparkles className="size-3.5 text-primary" />
+                  <span>Plantillas Diagnósticas CENDO</span>
+                  <span className="font-mono text-[11px] text-muted-foreground">
+                    ({orderedTemplates.length})
+                  </span>
+                  {showTemplates ? (
+                    <ChevronUp className="size-3.5 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="size-3.5 text-muted-foreground" />
+                  )}
+                </button>
+
                 <div className="flex flex-wrap items-center gap-1.5">
                   {canEditTemplates ? (
                     <>
@@ -290,33 +345,36 @@ export function UltrasoundModal({
                     </>
                   ) : (
                     <span className="font-mono text-[10px] text-muted-foreground">
-                      Protocolo IDEA / MUSA / BI-RADS
+                      Formatos CENDO
                     </span>
                   )}
                 </div>
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                {orderedTemplates.map((tmpl) => (
-                  <button
-                    key={tmpl.id}
-                    type="button"
-                    onClick={() => handleTemplateChipClick(tmpl)}
-                    className={cn(
-                      "cursor-pointer rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors",
-                      watchedUltrasoundType === tmpl.payload.ultrasoundType
-                        ? "border-primary/40 bg-card text-foreground hover:bg-primary/10"
-                        : "border-border bg-card text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {tmpl.name}
-                  </button>
-                ))}
-              </div>
+
+              {showTemplates ? (
+                <div className="mt-2.5 flex flex-wrap gap-1.5 border-t border-border pt-2.5">
+                  {orderedTemplates.map((tmpl) => (
+                    <button
+                      key={tmpl.id}
+                      type="button"
+                      onClick={() => handleTemplateChipClick(tmpl)}
+                      className={cn(
+                        "cursor-pointer rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors",
+                        watchedUltrasoundType === tmpl.payload.ultrasoundType
+                          ? "border-primary/40 bg-card text-foreground hover:bg-primary/10"
+                          : "border-border bg-card text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {tmpl.name}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
 
           {/* 1. Datos Generales & Modalidad */}
           <div className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-12">
-            <div className="space-y-1.5 sm:col-span-6">
+            <div className="space-y-1.5 sm:col-span-5">
               <label
                 htmlFor="eco-type"
                 className="block text-xs font-semibold text-foreground"
@@ -356,7 +414,7 @@ export function UltrasoundModal({
               ) : null}
             </div>
 
-            <div className="space-y-1.5 sm:col-span-3">
+            <div className="space-y-1.5 sm:col-span-4">
               <label
                 htmlFor="eco-consultation"
                 className="block text-xs font-semibold text-foreground"
@@ -378,16 +436,30 @@ export function UltrasoundModal({
               </select>
             </div>
 
-            <div className="space-y-1.5 sm:col-span-12">
+            <div className="space-y-1.5 sm:col-span-5">
+              <label
+                htmlFor="eco-referring"
+                className="block text-xs font-semibold text-foreground"
+              >
+                Indicación / Médico Solicitante
+              </label>
+              <Input
+                id="eco-referring"
+                placeholder="Ej. Dr. Patrick Jacinto / Médico referente"
+                {...register("findings.referringDoctor")}
+              />
+            </div>
+
+            <div className="space-y-1.5 sm:col-span-7">
               <label
                 htmlFor="eco-indication"
                 className="block text-xs font-semibold text-foreground"
               >
-                Indicación Clínica / Motivo de Estudio *
+                Motivo del Estudio *
               </label>
               <Input
                 id="eco-indication"
-                placeholder="Ej. Dismenorrea severa, mapeo ecográfico de endometriosis..."
+                placeholder="Ej. Control ginecológico preventivo, dismenorrea, tamizaje..."
                 {...register("indication")}
               />
               {errors.indication ? (
@@ -450,8 +522,11 @@ export function UltrasoundModal({
                   <select
                     id="uterus-pos"
                     className={selectClassName}
-                    {...register("findings.uterusPosition")}
+                    {...register("findings.uterusPosition", {
+                      setValueAs: toOptionalEnumValue,
+                    })}
                   >
+                    <option value="">Seleccione...</option>
                     {uterusPositions.map((pos) => (
                       <option key={pos} value={pos}>
                         {pos}
@@ -479,7 +554,7 @@ export function UltrasoundModal({
                   </div>
                   <Input
                     id="uterus-dim"
-                    placeholder="72 x 42 x 48 mm"
+                    placeholder="70 x 40 x 46 mm"
                     className="font-mono"
                     {...register("findings.uterusDimensions", {
                       onBlur: (e) =>
@@ -501,6 +576,7 @@ export function UltrasoundModal({
                     id="uterus-vol"
                     type="number"
                     step="0.1"
+                    placeholder="67.4"
                     className="font-mono"
                     {...register("findings.uterusVolumeCc", {
                       setValueAs: toOptionalNumber,
@@ -519,6 +595,7 @@ export function UltrasoundModal({
                     id="endo-mm"
                     type="number"
                     step="0.1"
+                    placeholder="6.5"
                     className="font-mono"
                     {...register("findings.endometriumThicknessMm", {
                       setValueAs: toOptionalNumber,
@@ -536,8 +613,11 @@ export function UltrasoundModal({
                   <select
                     id="endo-pat"
                     className={selectClassName}
-                    {...register("findings.endometriumPattern")}
+                    {...register("findings.endometriumPattern", {
+                      setValueAs: toOptionalEnumValue,
+                    })}
                   >
+                    <option value="">Seleccione...</option>
                     {endometriumPatterns.map((pat) => (
                       <option key={pat} value={pat}>
                         {pat}
@@ -551,19 +631,69 @@ export function UltrasoundModal({
                     htmlFor="sliding-sign"
                     className="block text-xs font-semibold text-foreground"
                   >
-                    Signo Deslizamiento (Sliding Sign)
+                    Signo Deslizamiento (IDEA)
                   </label>
                   <select
                     id="sliding-sign"
                     className={selectClassName}
-                    {...register("findings.slidingSign")}
+                    {...register("findings.slidingSign", {
+                      setValueAs: toOptionalEnumValue,
+                    })}
                   >
+                    <option value="">No evaluado</option>
                     {slidingSignOptions.map((opt) => (
                       <option key={opt} value={opt}>
                         {opt}
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-3">
+                  <label
+                    htmlFor="gyn-cervix-mm"
+                    className="block text-xs font-semibold text-foreground"
+                  >
+                    Cérvix (mm)
+                  </label>
+                  <Input
+                    id="gyn-cervix-mm"
+                    type="number"
+                    step="0.5"
+                    placeholder="33"
+                    className="font-mono"
+                    {...register("findings.cervixLengthMm", {
+                      setValueAs: toOptionalNumber,
+                    })}
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-4">
+                  <label
+                    htmlFor="gyn-cervix-status"
+                    className="block text-xs font-semibold text-foreground"
+                  >
+                    Morfología Cervical
+                  </label>
+                  <Input
+                    id="gyn-cervix-status"
+                    placeholder="Morfología conservada"
+                    {...register("findings.cervixStatus")}
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-5">
+                  <label
+                    htmlFor="gyn-ut-pain"
+                    className="block text-xs font-semibold text-foreground"
+                  >
+                    Dolor a la Ecopulsión Uterina
+                  </label>
+                  <Input
+                    id="gyn-ut-pain"
+                    placeholder="No evidencia de dolor a la ecopulsión"
+                    {...register("findings.uterusEcopulsionPain")}
+                  />
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-12">
@@ -581,35 +711,141 @@ export function UltrasoundModal({
                   />
                 </div>
 
-                <div className="space-y-1.5 sm:col-span-6">
-                  <label
-                    htmlFor="ovary-r"
-                    className="block text-xs font-semibold text-foreground"
-                  >
-                    Ovario Derecho (OD)
-                  </label>
+                <div className="space-y-1.5 sm:col-span-4">
+                  <div className="flex items-center justify-between">
+                    <label
+                      htmlFor="ovary-r"
+                      className="block text-xs font-semibold text-foreground"
+                    >
+                      Ovario Derecho (mm)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => onAutoCalculateOvaryVolume("right")}
+                      className="inline-flex cursor-pointer items-center gap-1 font-mono text-[10.5px] font-semibold text-primary hover:underline"
+                    >
+                      <Calculator className="size-3" />
+                      Calc cc
+                    </button>
+                  </div>
                   <Input
                     id="ovary-r"
-                    placeholder="28 x 19 mm, folículos normales"
-                    {...register("findings.rightOvaryDimensions")}
+                    placeholder="28 x 19 x 20 mm"
+                    {...register("findings.rightOvaryDimensions", {
+                      onBlur: (e) =>
+                        onAutoCalculateOvaryVolume(
+                          "right",
+                          (e.target as HTMLInputElement).value
+                        ),
+                    })}
                   />
                 </div>
 
-                <div className="space-y-1.5 sm:col-span-6">
+                <div className="space-y-1.5 sm:col-span-2">
                   <label
-                    htmlFor="ovary-l"
+                    htmlFor="ovary-r-vol"
                     className="block text-xs font-semibold text-foreground"
                   >
-                    Ovario Izquierdo (OI)
+                    Vol. OD (cc)
                   </label>
                   <Input
-                    id="ovary-l"
-                    placeholder="27 x 18 mm, estroma conservado"
-                    {...register("findings.leftOvaryDimensions")}
+                    id="ovary-r-vol"
+                    type="number"
+                    step="0.1"
+                    placeholder={
+                      typeof watchedRightOvaryVolume === "number"
+                        ? String(watchedRightOvaryVolume)
+                        : "5.6"
+                    }
+                    className="font-mono"
+                    {...register("findings.rightOvaryVolumeCc", {
+                      setValueAs: toOptionalNumber,
+                    })}
                   />
                 </div>
 
-                <div className="space-y-1.5 sm:col-span-6">
+                <div className="space-y-1.5 sm:col-span-4">
+                  <div className="flex items-center justify-between">
+                    <label
+                      htmlFor="ovary-l"
+                      className="block text-xs font-semibold text-foreground"
+                    >
+                      Ovario Izquierdo (mm)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => onAutoCalculateOvaryVolume("left")}
+                      className="inline-flex cursor-pointer items-center gap-1 font-mono text-[10.5px] font-semibold text-primary hover:underline"
+                    >
+                      <Calculator className="size-3" />
+                      Calc cc
+                    </button>
+                  </div>
+                  <Input
+                    id="ovary-l"
+                    placeholder="27 x 18 x 19 mm"
+                    {...register("findings.leftOvaryDimensions", {
+                      onBlur: (e) =>
+                        onAutoCalculateOvaryVolume(
+                          "left",
+                          (e.target as HTMLInputElement).value
+                        ),
+                    })}
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label
+                    htmlFor="ovary-l-vol"
+                    className="block text-xs font-semibold text-foreground"
+                  >
+                    Vol. OI (cc)
+                  </label>
+                  <Input
+                    id="ovary-l-vol"
+                    type="number"
+                    step="0.1"
+                    placeholder={
+                      typeof watchedLeftOvaryVolume === "number"
+                        ? String(watchedLeftOvaryVolume)
+                        : "4.8"
+                    }
+                    className="font-mono"
+                    {...register("findings.leftOvaryVolumeCc", {
+                      setValueAs: toOptionalNumber,
+                    })}
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-4">
+                  <label
+                    htmlFor="peri-ov-fluid"
+                    className="block text-xs font-semibold text-foreground"
+                  >
+                    Líquido Peri-ovárico
+                  </label>
+                  <Input
+                    id="peri-ov-fluid"
+                    placeholder="Ausencia de líquido peri-ovárico"
+                    {...register("findings.periOvarianFluid")}
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-4">
+                  <label
+                    htmlFor="ov-pain"
+                    className="block text-xs font-semibold text-foreground"
+                  >
+                    Dolor Ecopulsión Anexial
+                  </label>
+                  <Input
+                    id="ov-pain"
+                    placeholder="No evidencia de dolor a la ecopulsión"
+                    {...register("findings.ovaryEcopulsionPain")}
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-4">
                   <label
                     htmlFor="douglas"
                     className="block text-xs font-semibold text-foreground"
@@ -637,12 +873,26 @@ export function UltrasoundModal({
                   />
                 </div>
 
+                <div className="space-y-1.5 sm:col-span-6">
+                  <label
+                    htmlFor="ovaries-notes"
+                    className="block text-xs font-semibold text-foreground"
+                  >
+                    Características Parénquima / Folículos Ováricos
+                  </label>
+                  <Input
+                    id="ovaries-notes"
+                    placeholder="Localización lateral al útero, parénquima homogéneo, folículos..."
+                    {...register("findings.ovariesNotes")}
+                  />
+                </div>
+
                 <div className="space-y-1.5 sm:col-span-12">
                   <label
                     htmlFor="endo-foci"
                     className="block text-xs font-semibold text-foreground"
                   >
-                    Focos de Endometriosis Profunda / Tabique Rectovaginal / Notas Anexiales
+                    Focos de Endometriosis Profunda / Tabique Rectovaginal (Opcional)
                   </label>
                   <Input
                     id="endo-foci"
@@ -656,183 +906,38 @@ export function UltrasoundModal({
 
           {/* 2B. Hallazgos Mamarios BI-RADS */}
           {isBreastMode ? (
-            <div className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
-              <h3 className="border-b border-border pb-2 text-xs font-bold tracking-wider text-primary uppercase">
-                Evaluación Ecográfica Mamaria Bilateral (ACR BI-RADS)
-              </h3>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-12">
-                <div className="space-y-1.5 sm:col-span-8">
-                  <label
-                    htmlFor="breast-pattern"
-                    className="block text-xs font-semibold text-foreground"
-                  >
-                    Patrón Fibroglandular y Planos
-                  </label>
-                  <Input
-                    id="breast-pattern"
-                    {...register("findings.breastPattern")}
-                  />
-                </div>
-
-                <div className="space-y-1.5 sm:col-span-4">
-                  <label
-                    htmlFor="birads"
-                    className="block text-xs font-semibold text-foreground"
-                  >
-                    Categoría ACR BI-RADS
-                  </label>
-                  <select
-                    id="birads"
-                    className={selectClassName}
-                    {...register("findings.biradsCategory")}
-                  >
-                    {biradsOptions.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1.5 sm:col-span-6">
-                  <label
-                    htmlFor="breast-r"
-                    className="block text-xs font-semibold text-foreground"
-                  >
-                    Mama Derecha y Axila
-                  </label>
-                  <Textarea
-                    id="breast-r"
-                    rows={3}
-                    {...register("findings.rightBreastFindings")}
-                  />
-                </div>
-
-                <div className="space-y-1.5 sm:col-span-6">
-                  <label
-                    htmlFor="breast-l"
-                    className="block text-xs font-semibold text-foreground"
-                  >
-                    Mama Izquierda y Axila
-                  </label>
-                  <Textarea
-                    id="breast-l"
-                    rows={3}
-                    {...register("findings.leftBreastFindings")}
-                  />
-                </div>
-              </div>
-            </div>
+            <UltrasoundBreastFields
+              form={form}
+              selectClassName={selectClassName}
+              biradsOptions={biradsOptions}
+              breastAcrTypes={breastAcrTypes}
+              breastAcrLabels={breastAcrLabels}
+              lesionTypes={breastLesionTypes}
+              lesions={watchedBreastLesions}
+              onAddLesion={onAddBreastLesion}
+              onUpdateLesion={onUpdateBreastLesion}
+              onRemoveLesion={onRemoveBreastLesion}
+              onFillStandardComplement={onFillStandardBreastComplement}
+            />
           ) : null}
 
-          {/* 2C. Hallazgos Obstétricos */}
-          {isObstetricMode ? (
-            <div className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
-              <h3 className="border-b border-border pb-2 text-xs font-bold tracking-wider text-primary uppercase">
-                Biometría & Vitalidad Fetal / Embrionaria
-              </h3>
-
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="sacs"
-                    className="block text-xs font-semibold text-foreground"
-                  >
-                    Sacos Gestacionales
-                  </label>
-                  <Input
-                    id="sacs"
-                    type="number"
-                    min={0}
-                    max={8}
-                    className="font-mono"
-                    {...register("findings.gestationalSacsCount", {
-                      setValueAs: toOptionalNumber,
-                    })}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="crl"
-                    className="block text-xs font-semibold text-foreground"
-                  >
-                    LCN / CRL (mm)
-                  </label>
-                  <Input
-                    id="crl"
-                    type="number"
-                    step="0.1"
-                    className="font-mono"
-                    {...register("findings.embryoCrownRumpLengthMm", {
-                      setValueAs: toOptionalNumber,
-                    })}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="eg-eco"
-                    className="block text-xs font-semibold text-foreground"
-                  >
-                    Edad Gestacional Eco
-                  </label>
-                  <Input
-                    id="eg-eco"
-                    placeholder="7 semanas 5 días"
-                    {...register("findings.gestationalAgeByEcho")}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="fcf"
-                    className="block text-xs font-semibold text-foreground"
-                  >
-                    F.C.F. Fetal (lpm)
-                  </label>
-                  <Input
-                    id="fcf"
-                    type="number"
-                    min={0}
-                    max={260}
-                    className="font-mono"
-                    {...register("findings.fetalHeartRate", {
-                      setValueAs: toOptionalNumber,
-                    })}
-                  />
-                </div>
-
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label
-                    htmlFor="placenta"
-                    className="block text-xs font-semibold text-foreground"
-                  >
-                    Implantación Placentaria / Corion
-                  </label>
-                  <Input
-                    id="placenta"
-                    placeholder="Normoinserta, sin hematomas retrocoriales"
-                    {...register("findings.placentaLocation")}
-                  />
-                </div>
-
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label
-                    htmlFor="afi"
-                    className="block text-xs font-semibold text-foreground"
-                  >
-                    Líquido Amniótico (ILA / Pozo)
-                  </label>
-                  <Input
-                    id="afi"
-                    placeholder="Acorde para edad gestacional"
-                    {...register("findings.amnioticFluidIndex")}
-                  />
-                </div>
-              </div>
-            </div>
+          {/* 2C. Hallazgos Obstétricos (I T, Genética, II-III T, Morfológica & Doppler) */}
+          {isAnyObstetricMode ? (
+            <UltrasoundObstetricFields
+              form={form}
+              selectClassName={selectClassName}
+              modeFlags={modeFlags}
+              uterusPositions={uterusPositions}
+              uterusVolume={watchedVolume}
+              rightOvaryVolume={watchedRightOvaryVolume}
+              leftOvaryVolume={watchedLeftOvaryVolume}
+              includeDoppler={watchedIncludeDoppler}
+              bppTotal={bppTotal}
+              onAutoCalculateUterusVolume={onAutoCalculateVolume}
+              onAutoCalculateOvaryVolume={onAutoCalculateOvaryVolume}
+              onAutoCalculateHadlock={onAutoCalculateHadlock}
+              onAutoCalculateDoppler={onAutoCalculateDoppler}
+            />
           ) : null}
 
           {/* 3. Galería Fotográfica Ecográfica Privada */}

@@ -7,6 +7,10 @@ import { BrandLogo } from "@/components/layout/BrandLogo";
 import { useSignatureSettings } from "@/components/providers/SignatureSettingsProvider";
 import type { ClinicalImageRecord } from "@/db/schema/specialty";
 import {
+  calculateBppTotal,
+  DOPPLER_VESSEL_META,
+  formatBreastLesionSentence,
+  getUltrasoundModeFlags,
   ULTRASOUND_COVER_TITLES,
   ULTRASOUND_TYPE_LABELS,
   type UltrasoundReportItem,
@@ -64,14 +68,33 @@ export function UltrasoundPrintView({
     .join(" • ");
 
   const f = report.findings;
-  const isGynMode =
-    report.ultrasoundType === "TRANSVAGINAL" ||
-    report.ultrasoundType === "PELVICA" ||
-    report.ultrasoundType === "DOPPLER";
-  const isBreastMode = report.ultrasoundType === "MAMA_BILATERAL";
-  const isObstetricMode =
-    report.ultrasoundType === "OBSTETRICA_1T" ||
-    report.ultrasoundType === "OBSTETRICA_2T_3T";
+  const {
+    isGynMode,
+    isBreastMode,
+    isObs1TMode,
+    isGeneticMode,
+    isObs23Mode,
+  } = getUltrasoundModeFlags(report.ultrasoundType);
+
+  const bppTotal = calculateBppTotal(f);
+  const hasDopplerEntries = Boolean(
+    f.doppler &&
+      DOPPLER_VESSEL_META.some((v) => {
+        const entry = f.doppler?.[v.key];
+        return (
+          entry &&
+          (typeof entry.pi === "number" ||
+            Boolean(entry.percentile) ||
+            Boolean(entry.status))
+        );
+      })
+  );
+  const showDopplerTable =
+    Boolean(f.doppler) &&
+    (f.includeDoppler === true ||
+      (f.includeDoppler !== false &&
+        report.ultrasoundType === "OBSTETRICA_MORFOLOGICA") ||
+      hasDopplerEntries);
 
   const photoChunks = chunkImages(report.images, 6);
 
@@ -177,18 +200,30 @@ export function UltrasoundPrintView({
               </span>
             </div>
 
-            <div className="col-span-12 border-t border-border pt-1.5 text-[11px]">
-              <strong className="text-muted-foreground">
-                Indicación Clínica:{" "}
-              </strong>
-              <span className="text-foreground">{report.indication}</span>
+            <div className="col-span-12 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-1.5 text-[11px]">
+              <div>
+                <strong className="text-muted-foreground">
+                  Motivo de Estudio:{" "}
+                </strong>
+                <span className="text-foreground">{report.indication}</span>
+              </div>
+              {f.referringDoctor ? (
+                <div>
+                  <strong className="text-muted-foreground">
+                    Indicación / Solicitante:{" "}
+                  </strong>
+                  <span className="font-medium text-foreground">
+                    {f.referringDoctor}
+                  </span>
+                </div>
+              ) : null}
             </div>
           </div>
 
           {/* 3. Hallazgos Detallados */}
           <div className="space-y-2.5 rounded-lg border border-border bg-card p-3.5">
             <h3 className="border-b border-border pb-1 text-[10px] font-bold tracking-wider text-primary uppercase">
-              Hallazgos Ecográficos Detallados
+              Informe / Hallazgos Ecográficos Detallados
             </h3>
 
             {isGynMode ? (
@@ -199,7 +234,7 @@ export function UltrasoundPrintView({
                       Posición Útero
                     </span>
                     <strong className="font-mono text-foreground">
-                      {f.uterusPosition || "AVF"}
+                      {f.uterusPosition || "—"}
                     </strong>
                   </div>
                   <div>
@@ -233,101 +268,211 @@ export function UltrasoundPrintView({
                   </div>
                 </div>
 
-                {f.myometriumStatus ? (
-                  <div>
-                    <strong className="text-muted-foreground">
-                      Miometrio y Zona de Unión:{" "}
-                    </strong>
-                    <span className="text-foreground">
-                      {f.myometriumStatus}
-                    </span>
+                {f.myometriumStatus ||
+                typeof f.cervixLengthMm === "number" ||
+                f.cervixStatus ||
+                f.uterusEcopulsionPain ? (
+                  <div className="space-y-1">
+                    {f.myometriumStatus ? (
+                      <div>
+                        <strong className="text-muted-foreground">
+                          Miometrio y Zona de Unión:{" "}
+                        </strong>
+                        <span className="text-foreground">
+                          {f.myometriumStatus}
+                        </span>
+                      </div>
+                    ) : null}
+                    {typeof f.cervixLengthMm === "number" || f.cervixStatus ? (
+                      <div>
+                        <strong className="text-muted-foreground">Cérvix: </strong>
+                        <span className="text-foreground">
+                          {[
+                            typeof f.cervixLengthMm === "number"
+                              ? `${f.cervixLengthMm} mm de longitud`
+                              : "",
+                            f.cervixStatus || "",
+                          ]
+                            .filter(Boolean)
+                            .join(" — ")}
+                        </span>
+                      </div>
+                    ) : null}
+                    {f.uterusEcopulsionPain ? (
+                      <div>
+                        <strong className="text-muted-foreground">
+                          Sensibilidad Uterina:{" "}
+                        </strong>
+                        <span className="text-foreground">
+                          {f.uterusEcopulsionPain}
+                        </span>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
 
                 <div className="grid grid-cols-2 gap-2.5">
                   <div className="rounded border border-border bg-muted/15 p-2">
-                    <span className="block text-[9px] font-semibold text-muted-foreground uppercase">
-                      Ovario Derecho
-                    </span>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[9px] font-semibold text-muted-foreground uppercase">
+                        Ovario Derecho
+                      </span>
+                      {typeof f.rightOvaryVolumeCc === "number" ? (
+                        <span className="font-mono text-[9.5px] font-semibold text-primary">
+                          Vol: {f.rightOvaryVolumeCc} cc
+                        </span>
+                      ) : null}
+                    </div>
                     <span className="text-foreground">
                       {f.rightOvaryDimensions || "Sin particularidades"}
                     </span>
                   </div>
                   <div className="rounded border border-border bg-muted/15 p-2">
-                    <span className="block text-[9px] font-semibold text-muted-foreground uppercase">
-                      Ovario Izquierdo
-                    </span>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[9px] font-semibold text-muted-foreground uppercase">
+                        Ovario Izquierdo
+                      </span>
+                      {typeof f.leftOvaryVolumeCc === "number" ? (
+                        <span className="font-mono text-[9.5px] font-semibold text-primary">
+                          Vol: {f.leftOvaryVolumeCc} cc
+                        </span>
+                      ) : null}
+                    </div>
                     <span className="text-foreground">
                       {f.leftOvaryDimensions || "Sin particularidades"}
                     </span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 rounded border border-border bg-muted/20 p-2">
-                  <div>
-                    <span className="block text-[9px] font-semibold text-muted-foreground uppercase">
-                      Signo Deslizamiento (IDEA)
-                    </span>
-                    <strong className="font-mono text-foreground">
-                      {f.slidingSign || "Positivo"}
-                    </strong>
+                {f.ovariesNotes ||
+                f.periOvarianFluid ||
+                f.ovaryEcopulsionPain ||
+                f.douglasPouch ? (
+                  <div className="space-y-1 rounded border border-border bg-muted/20 p-2">
+                    {f.ovariesNotes ? (
+                      <div>
+                        <strong className="text-muted-foreground">
+                          Características Ováricas:{" "}
+                        </strong>
+                        <span>{f.ovariesNotes}</span>
+                      </div>
+                    ) : null}
+                    {f.periOvarianFluid ? (
+                      <div>
+                        <strong className="text-muted-foreground">
+                          Espacio Peri-ovárico:{" "}
+                        </strong>
+                        <span>{f.periOvarianFluid}</span>
+                      </div>
+                    ) : null}
+                    {f.ovaryEcopulsionPain ? (
+                      <div>
+                        <strong className="text-muted-foreground">
+                          Ecopulsión Anexial:{" "}
+                        </strong>
+                        <span>{f.ovaryEcopulsionPain}</span>
+                      </div>
+                    ) : null}
+                    {f.douglasPouch ? (
+                      <div>
+                        <strong className="text-muted-foreground">
+                          Fondo de Saco de Douglas:{" "}
+                        </strong>
+                        <span>{f.douglasPouch}</span>
+                      </div>
+                    ) : null}
                   </div>
-                  <div className="col-span-2">
-                    <span className="block text-[9px] font-semibold text-muted-foreground uppercase">
-                      Fondo de Saco de Douglas
-                    </span>
-                    <span className="text-foreground">
-                      {f.douglasPouch || "Libre de colecciones"}
-                    </span>
+                ) : null}
+
+                {f.slidingSign ||
+                f.uterosacralLigaments ||
+                f.endometriosisFoci ? (
+                  <div className="grid grid-cols-3 gap-2 rounded border border-border bg-muted/20 p-2">
+                    {f.slidingSign ? (
+                      <div>
+                        <span className="block text-[9px] font-semibold text-muted-foreground uppercase">
+                          Signo Deslizamiento (IDEA)
+                        </span>
+                        <strong className="font-mono text-foreground">
+                          {f.slidingSign}
+                        </strong>
+                      </div>
+                    ) : null}
+                    {f.uterosacralLigaments ? (
+                      <div className="col-span-2">
+                        <strong className="text-muted-foreground">
+                          Ligamentos Uterosacros:{" "}
+                        </strong>
+                        <span>{f.uterosacralLigaments}</span>
+                      </div>
+                    ) : null}
+                    {f.endometriosisFoci ? (
+                      <div className="col-span-3 border-t border-border pt-1">
+                        <strong className="text-muted-foreground">
+                          Focos de Endometriosis / Notas:{" "}
+                        </strong>
+                        <span>{f.endometriosisFoci}</span>
+                      </div>
+                    ) : null}
                   </div>
-                  {f.uterosacralLigaments ? (
-                    <div className="col-span-3 border-t border-border pt-1">
-                      <strong className="text-muted-foreground">
-                        Ligamentos Uterosacros:{" "}
-                      </strong>
-                      <span>{f.uterosacralLigaments}</span>
-                    </div>
-                  ) : null}
-                  {f.endometriosisFoci ? (
-                    <div className="col-span-3 border-t border-border pt-1">
-                      <strong className="text-muted-foreground">
-                        Focos / Notas Anexiales:{" "}
-                      </strong>
-                      <span>{f.endometriosisFoci}</span>
-                    </div>
-                  ) : null}
-                </div>
+                ) : null}
               </div>
             ) : null}
 
             {isBreastMode ? (
               <div className="space-y-2.5 text-[11px]">
-                {f.breastPattern ? (
+                {f.breastPattern || f.breastAcrType ? (
                   <div>
                     <strong className="text-muted-foreground">
-                      Patrón Fibroglandular:{" "}
+                      Ecotextura Mamaria{f.breastAcrType ? ` (${f.breastAcrType})` : ""}:{" "}
                     </strong>
-                    <span>{f.breastPattern}</span>
+                    <span>{f.breastPattern || f.breastAcrType}</span>
                   </div>
                 ) : null}
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="rounded border border-border bg-muted/20 p-2.5">
-                    <strong className="mb-0.5 block text-[10px] text-primary uppercase">
-                      Mama Derecha y Axila
+
+                {f.breastLesions && f.breastLesions.length > 0 ? (
+                  <div className="space-y-1.5 rounded-lg border border-border bg-muted/15 p-2.5">
+                    <strong className="block text-[10px] font-bold text-primary uppercase">
+                      Hallazgos Focales / Lesiones Descritas
                     </strong>
-                    <p className="whitespace-pre-line text-foreground">
-                      {f.rightBreastFindings || "Sin lesiones focales."}
-                    </p>
+                    <ul className="space-y-1">
+                      {f.breastLesions.map((lesion, lIdx) => (
+                        <li key={lesion.id || lIdx} className="leading-snug text-foreground">
+                          • {formatBreastLesionSentence(lesion)}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  <div className="rounded border border-border bg-muted/20 p-2.5">
-                    <strong className="mb-0.5 block text-[10px] text-primary uppercase">
-                      Mama Izquierda y Axila
-                    </strong>
-                    <p className="whitespace-pre-line text-foreground">
-                      {f.leftBreastFindings || "Sin lesiones focales."}
-                    </p>
+                ) : null}
+
+                {f.rightBreastFindings || f.leftBreastFindings ? (
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div className="rounded border border-border bg-muted/20 p-2.5">
+                      <strong className="mb-0.5 block text-[10px] text-primary uppercase">
+                        Mama Derecha y Axila
+                      </strong>
+                      <p className="whitespace-pre-line text-foreground">
+                        {f.rightBreastFindings || "Sin lesiones focales."}
+                      </p>
+                    </div>
+                    <div className="rounded border border-border bg-muted/20 p-2.5">
+                      <strong className="mb-0.5 block text-[10px] text-primary uppercase">
+                        Mama Izquierda y Axila
+                      </strong>
+                      <p className="whitespace-pre-line text-foreground">
+                        {f.leftBreastFindings || "Sin lesiones focales."}
+                      </p>
+                    </div>
                   </div>
-                </div>
+                ) : null}
+
+                {f.breastComplement ? (
+                  <div className="rounded border border-border bg-muted/15 p-2 text-foreground">
+                    <strong className="text-muted-foreground">Complemento: </strong>
+                    <span>{f.breastComplement}</span>
+                  </div>
+                ) : null}
+
                 {f.biradsCategory ? (
                   <div className="flex items-center justify-between rounded border border-primary/25 bg-primary/5 px-3 py-1.5">
                     <span className="font-semibold text-primary">
@@ -341,25 +486,55 @@ export function UltrasoundPrintView({
               </div>
             ) : null}
 
-            {isObstetricMode ? (
+            {isObs1TMode ? (
               <div className="space-y-2.5 text-[11px]">
+                {/* Bloque Útero I Trimestre */}
+                {f.uterusDimensions || f.uterusPosition || f.myometriumStatus ? (
+                  <div className="rounded border border-border bg-muted/15 p-2">
+                    <strong className="text-primary uppercase text-[9.5px] block mb-0.5">
+                      Útero Grávido
+                    </strong>
+                    <div className="flex flex-wrap gap-x-4 gap-y-0.5">
+                      {f.uterusPosition ? (
+                        <span>
+                          <strong>Posición:</strong> {f.uterusPosition}
+                        </span>
+                      ) : null}
+                      {f.uterusDimensions ? (
+                        <span>
+                          <strong>Dimensiones:</strong> {f.uterusDimensions}
+                          {typeof f.uterusVolumeCc === "number"
+                            ? ` (${f.uterusVolumeCc} cc)`
+                            : ""}
+                        </span>
+                      ) : null}
+                      {f.myometriumStatus ? (
+                        <span>
+                          <strong>Miometrio:</strong> {f.myometriumStatus}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* Bloque Saco / Embrión */}
                 <div className="grid grid-cols-4 gap-2 rounded-lg border border-border bg-muted/25 p-2.5">
                   <div>
                     <span className="block text-[9.5px] text-muted-foreground">
                       Sacos Gestacionales
                     </span>
                     <strong className="font-mono text-foreground">
-                      {f.gestationalSacsCount ?? 1}
+                      {f.gestationalSacsCount ?? "—"}
                     </strong>
                   </div>
                   <div>
                     <span className="block text-[9.5px] text-muted-foreground">
-                      LCN / Biometría
+                      CRL / LCN
                     </span>
                     <strong className="font-mono text-foreground">
                       {typeof f.embryoCrownRumpLengthMm === "number"
                         ? `${f.embryoCrownRumpLengthMm} mm`
-                        : "Acorde"}
+                        : "—"}
                     </strong>
                   </div>
                   <div>
@@ -372,34 +547,383 @@ export function UltrasoundPrintView({
                   </div>
                   <div>
                     <span className="block text-[9.5px] text-muted-foreground">
-                      F.C.F. Fetal
+                      Actividad Cardíaca
                     </span>
                     <strong className="font-mono text-foreground">
                       {typeof f.fetalHeartRate === "number"
                         ? `${f.fetalHeartRate} lpm`
-                        : "Presente"}
+                        : "—"}
+                    </strong>
+                  </div>
+                  {typeof f.gestationalSacMm === "number" ||
+                  typeof f.yolkSacMm === "number" ||
+                  f.choriodecidualReaction ? (
+                    <div className="col-span-4 flex flex-wrap gap-x-4 border-t border-border pt-1 text-[10.5px]">
+                      {typeof f.gestationalSacMm === "number" ? (
+                        <span>
+                          <strong>Saco Gestacional:</strong> {f.gestationalSacMm} mm
+                        </span>
+                      ) : null}
+                      {typeof f.yolkSacMm === "number" ? (
+                        <span>
+                          <strong>Vesícula Vitelina:</strong> {f.yolkSacMm} mm
+                        </span>
+                      ) : null}
+                      {f.choriodecidualReaction ? (
+                        <span>
+                          <strong>Corion:</strong> {f.choriodecidualReaction}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* Marcadores Genéticos 11-14 semanas */}
+                {isGeneticMode ||
+                typeof f.nuchalTranslucencyMm === "number" ||
+                f.nasalBone ||
+                f.ductusVenosusWave ||
+                typeof f.uterineArteriesMeanPi === "number" ? (
+                  <div className="space-y-1.5 rounded-lg border border-primary/30 bg-primary/5 p-2.5">
+                    <strong className="block text-[9.5px] font-bold text-primary uppercase">
+                      Marcadores Genéticos & Riesgo FMF (11–14 Semanas)
+                    </strong>
+                    <div className="grid grid-cols-3 gap-2 font-mono text-[10.5px]">
+                      <div>
+                        <span className="block text-[9px] text-muted-foreground">
+                          Translucencia Nucal
+                        </span>
+                        <strong>
+                          {typeof f.nuchalTranslucencyMm === "number"
+                            ? `${f.nuchalTranslucencyMm} mm`
+                            : "—"}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="block text-[9px] text-muted-foreground">
+                          Hueso Nasal
+                        </span>
+                        <strong>{f.nasalBone || "—"}</strong>
+                      </div>
+                      <div>
+                        <span className="block text-[9px] text-muted-foreground">
+                          Ductus Venoso
+                        </span>
+                        <strong>
+                          {f.ductusVenosusWave || "—"}
+                          {typeof f.ductusVenosusPi === "number"
+                            ? ` (IP: ${f.ductusVenosusPi})`
+                            : ""}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="block text-[9px] text-muted-foreground">
+                          IP Prom. Art. Uterinas
+                        </span>
+                        <strong>
+                          {typeof f.uterineArteriesMeanPi === "number"
+                            ? f.uterineArteriesMeanPi
+                            : "—"}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="block text-[9px] text-muted-foreground">
+                          Riesgo Cromosomopatías
+                        </span>
+                        <strong>{f.chromosomopathyRisk || "—"}</strong>
+                      </div>
+                      <div>
+                        <span className="block text-[9px] text-muted-foreground">
+                          Riesgo Preeclampsia (&lt;37ss)
+                        </span>
+                        <strong>{f.preeclampsiaRisk || "—"}</strong>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* Cérvix, Ovarios y Douglas 1T */}
+                {typeof f.cervixLengthMm === "number" ||
+                f.cervixStatus ||
+                f.rightOvaryDimensions ||
+                f.leftOvaryDimensions ||
+                f.douglasPouch ? (
+                  <div className="space-y-1 rounded border border-border bg-muted/15 p-2 text-[10.5px]">
+                    {typeof f.cervixLengthMm === "number" || f.cervixStatus ? (
+                      <div>
+                        <strong className="text-muted-foreground">Cérvix: </strong>
+                        <span>
+                          {[
+                            typeof f.cervixLengthMm === "number"
+                              ? `${f.cervixLengthMm} mm`
+                              : "",
+                            f.cervixStatus || "",
+                          ]
+                            .filter(Boolean)
+                            .join(" — ")}
+                        </span>
+                      </div>
+                    ) : null}
+                    {f.rightOvaryDimensions || f.leftOvaryDimensions ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <strong className="text-muted-foreground">
+                            Ovario Derecho:{" "}
+                          </strong>
+                          <span>
+                            {f.rightOvaryDimensions || "—"}
+                            {typeof f.rightOvaryVolumeCc === "number"
+                              ? ` (${f.rightOvaryVolumeCc} cc)`
+                              : ""}
+                          </span>
+                        </div>
+                        <div>
+                          <strong className="text-muted-foreground">
+                            Ovario Izquierdo:{" "}
+                          </strong>
+                          <span>
+                            {f.leftOvaryDimensions || "—"}
+                            {typeof f.leftOvaryVolumeCc === "number"
+                              ? ` (${f.leftOvaryVolumeCc} cc)`
+                              : ""}
+                          </span>
+                        </div>
+                      </div>
+                    ) : null}
+                    {f.douglasPouch ? (
+                      <div>
+                        <strong className="text-muted-foreground">
+                          Fondo de Saco de Douglas:{" "}
+                        </strong>
+                        <span>{f.douglasPouch}</span>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {isObs23Mode ? (
+              <div className="space-y-2.5 text-[11px]">
+                {/* Estática, Sexo, Vitalidad & Anatomía */}
+                <div className="space-y-1 rounded border border-border bg-muted/15 p-2.5">
+                  <div className="flex flex-wrap gap-x-5 gap-y-0.5 border-b border-border pb-1">
+                    {f.fetalStatic ? (
+                      <span>
+                        <strong className="text-muted-foreground">Estática: </strong>
+                        {f.fetalStatic}
+                      </span>
+                    ) : null}
+                    {f.gestationalAgeByEcho ? (
+                      <span>
+                        <strong className="text-muted-foreground">EG Eco: </strong>
+                        <span className="font-mono font-semibold">
+                          {f.gestationalAgeByEcho}
+                        </span>
+                      </span>
+                    ) : null}
+                    {typeof f.fetalHeartRate === "number" ? (
+                      <span>
+                        <strong className="text-muted-foreground">F.C.F.: </strong>
+                        <span className="font-mono font-semibold">
+                          {f.fetalHeartRate} lpm
+                        </span>
+                      </span>
+                    ) : null}
+                    {f.fetalSex ? (
+                      <span>
+                        <strong className="text-muted-foreground">Sexo: </strong>
+                        {f.fetalSex}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {f.fetalAnatomySummary ? (
+                    <p>{f.fetalAnatomySummary}</p>
+                  ) : null}
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[10.5px]">
+                    {f.fetalHeartFourChambers ? (
+                      <div>
+                        <strong className="text-muted-foreground">Corazón: </strong>
+                        <span>{f.fetalHeartFourChambers}</span>
+                      </div>
+                    ) : null}
+                    {f.fetalAbdominalWall ? (
+                      <div>
+                        <strong className="text-muted-foreground">
+                          Pared Abdominal:{" "}
+                        </strong>
+                        <span>{f.fetalAbdominalWall}</span>
+                      </div>
+                    ) : null}
+                    {f.fetalKidneys ? (
+                      <div>
+                        <strong className="text-muted-foreground">Riñones: </strong>
+                        <span>{f.fetalKidneys}</span>
+                      </div>
+                    ) : null}
+                    {f.fetalSpine ? (
+                      <div>
+                        <strong className="text-muted-foreground">Columna: </strong>
+                        <span>{f.fetalSpine}</span>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                {/* Biometría Fetal */}
+                <div className="grid grid-cols-6 gap-2 rounded-lg border border-border bg-muted/25 p-2 text-center font-mono">
+                  <div>
+                    <span className="block text-[9px] text-muted-foreground">
+                      DBP
+                    </span>
+                    <strong>
+                      {typeof f.bpdMm === "number" ? `${f.bpdMm} mm` : "—"}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="block text-[9px] text-muted-foreground">
+                      CC
+                    </span>
+                    <strong>
+                      {typeof f.hcMm === "number" ? `${f.hcMm} mm` : "—"}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="block text-[9px] text-muted-foreground">
+                      CA
+                    </span>
+                    <strong>
+                      {typeof f.acMm === "number" ? `${f.acMm} mm` : "—"}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="block text-[9px] text-muted-foreground">
+                      LF
+                    </span>
+                    <strong>
+                      {typeof f.flMm === "number" ? `${f.flMm} mm` : "—"}
+                    </strong>
+                  </div>
+                  <div className="col-span-2 border-l border-border pl-2">
+                    <span className="block text-[9px] text-muted-foreground">
+                      Ponderado Fetal
+                    </span>
+                    <strong className="text-primary">
+                      {typeof f.estimatedFetalWeightGr === "number"
+                        ? `${f.estimatedFetalWeightGr} g`
+                        : "—"}
+                      {f.estimatedFetalWeightPercentile
+                        ? ` (${f.estimatedFetalWeightPercentile})`
+                        : ""}
                     </strong>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
-                  {f.placentaLocation ? (
-                    <div>
-                      <strong className="text-muted-foreground">
-                        Placenta / Corion:{" "}
-                      </strong>
-                      <span>{f.placentaLocation}</span>
+                {/* Perfil Biofísico + Placenta + Cordón + Líquido */}
+                <div className="grid grid-cols-12 gap-2">
+                  {bppTotal !== null ? (
+                    <div className="col-span-4 rounded border border-border bg-muted/15 p-2 text-[10px]">
+                      <div className="flex items-center justify-between border-b border-border pb-0.5 mb-1">
+                        <strong className="text-primary uppercase">
+                          Perfil Biofísico
+                        </strong>
+                        <strong className="font-mono">{bppTotal} / 8 pts</strong>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-2">
+                        <span>Mov. Corp.: {f.bppBodyMovements ?? "—"}</span>
+                        <span>Mov. Resp.: {f.bppBreathingMovements ?? "—"}</span>
+                        <span>Tono Musc.: {f.bppMuscleTone ?? "—"}</span>
+                        <span>Líq. Amn.: {f.bppAmnioticFluid ?? "—"}</span>
+                      </div>
                     </div>
                   ) : null}
-                  {f.amnioticFluidIndex ? (
-                    <div>
-                      <strong className="text-muted-foreground">
-                        Líquido Amniótico:{" "}
-                      </strong>
-                      <span>{f.amnioticFluidIndex}</span>
-                    </div>
-                  ) : null}
+
+                  <div
+                    className={
+                      bppTotal !== null
+                        ? "col-span-8 space-y-0.5 rounded border border-border bg-muted/15 p-2 text-[10.5px]"
+                        : "col-span-12 space-y-0.5 rounded border border-border bg-muted/15 p-2 text-[10.5px]"
+                    }
+                  >
+                    {f.placentaLocation || f.placentaGrade || f.placentaHematomas ? (
+                      <div>
+                        <strong className="text-muted-foreground">Placenta: </strong>
+                        <span>
+                          {[f.placentaLocation, f.placentaGrade, f.placentaHematomas]
+                            .filter(Boolean)
+                            .join(" • ")}
+                        </span>
+                      </div>
+                    ) : null}
+                    {f.umbilicalCord ? (
+                      <div>
+                        <strong className="text-muted-foreground">
+                          Cordón Umbilical:{" "}
+                        </strong>
+                        <span>{f.umbilicalCord}</span>
+                      </div>
+                    ) : null}
+                    {typeof f.amnioticFluidIlaMm === "number" ||
+                    f.amnioticFluidIndex ? (
+                      <div>
+                        <strong className="text-muted-foreground">
+                          Líquido Amniótico:{" "}
+                        </strong>
+                        <span>
+                          {[
+                            typeof f.amnioticFluidIlaMm === "number"
+                              ? `ILA: ${f.amnioticFluidIlaMm} mm`
+                              : "",
+                            f.amnioticFluidIndex || "",
+                          ]
+                            .filter(Boolean)
+                            .join(" • ")}
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
+
+                {/* Tabla Estudio Doppler Materno-Fetal */}
+                {showDopplerTable ? (
+                  <div className="overflow-hidden rounded border border-primary/25">
+                    <div className="bg-primary/10 px-2.5 py-1 text-[9.5px] font-bold tracking-wider text-primary uppercase">
+                      Estudio Doppler Materno-Fetal
+                    </div>
+                    <table className="w-full text-[10.5px]">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/30 text-left text-[9.5px] font-semibold text-muted-foreground">
+                          <th className="px-2.5 py-1">Vaso Evaluado</th>
+                          <th className="w-24 px-2 py-1 font-mono">IP</th>
+                          <th className="w-28 px-2 py-1 font-mono">Percentil</th>
+                          <th className="w-28 px-2.5 py-1">Interpretación</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {DOPPLER_VESSEL_META.map((vessel) => {
+                          const row = f.doppler?.[vessel.key];
+                          return (
+                            <tr key={vessel.key}>
+                              <td className="px-2.5 py-1 font-medium text-foreground">
+                                {vessel.label}
+                              </td>
+                              <td className="px-2 py-1 font-mono">
+                                {typeof row?.pi === "number" ? row.pi : "—"}
+                              </td>
+                              <td className="px-2 py-1 font-mono">
+                                {row?.percentile || "—"}
+                              </td>
+                              <td className="px-2.5 py-1 font-semibold">
+                                {row?.status || "—"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>

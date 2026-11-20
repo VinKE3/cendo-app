@@ -62,6 +62,7 @@ import {
   BIRADS_OPTIONS,
   calculateEllipsoidVolumeCc,
   ENDOMETRIUM_PATTERNS,
+  getUltrasoundModeFlags,
   SLIDING_SIGN_OPTIONS,
   ULTRASOUND_TYPE_LABELS,
   ULTRASOUND_TYPE_SHORT_LABELS,
@@ -361,6 +362,8 @@ export function ClinicalTemplatesManagerModal({
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [baseEcoFindings, setBaseEcoFindings] =
+    useState<UltrasoundFindingsRecord>({});
   const [ecoDraft, setEcoDraft] = useState<EcoFormDraft>(() =>
     buildEmptyEcoDraft("TRANSVAGINAL")
   );
@@ -404,6 +407,7 @@ export function ClinicalTemplatesManagerModal({
     setEditingId(null);
     setName("");
     setDescription("");
+    setBaseEcoFindings({});
     setEcoDraft(buildEmptyEcoDraft("TRANSVAGINAL"));
     setColpoDraft(buildDefaultColpoPayload());
     setProcDraft(buildDefaultProcPayload());
@@ -415,6 +419,7 @@ export function ClinicalTemplatesManagerModal({
     setName(item.name);
     setDescription(item.description);
     if (item.scope === "ULTRASOUND") {
+      setBaseEcoFindings(structuredClone(item.payload.findings ?? {}));
       setEcoDraft(ecoPayloadToDraft(item.payload));
     } else if (item.scope === "PROCEDURE") {
       setProcDraft(structuredClone(item.payload));
@@ -429,6 +434,7 @@ export function ClinicalTemplatesManagerModal({
     setName(`Copia de ${item.name}`.slice(0, 118));
     setDescription(item.description);
     if (item.scope === "ULTRASOUND") {
+      setBaseEcoFindings(structuredClone(item.payload.findings ?? {}));
       setEcoDraft(ecoPayloadToDraft(item.payload));
     } else if (item.scope === "PROCEDURE") {
       setProcDraft(structuredClone(item.payload));
@@ -447,16 +453,12 @@ export function ClinicalTemplatesManagerModal({
     }
 
     if (scope === "ULTRASOUND") {
-      const isGyn =
-        ecoDraft.ultrasoundType === "TRANSVAGINAL" ||
-        ecoDraft.ultrasoundType === "PELVICA" ||
-        ecoDraft.ultrasoundType === "DOPPLER";
-      const isBreast = ecoDraft.ultrasoundType === "MAMA_BILATERAL";
-      const isObst =
-        ecoDraft.ultrasoundType === "OBSTETRICA_1T" ||
-        ecoDraft.ultrasoundType === "OBSTETRICA_2T_3T";
+      const ecoFlags = getUltrasoundModeFlags(ecoDraft.ultrasoundType);
+      const isGyn = ecoFlags.isGynMode;
+      const isBreast = ecoFlags.isBreastMode;
+      const isObst = ecoFlags.isAnyObstetricMode;
 
-      const findings: UltrasoundFindingsRecord = {};
+      const findings: UltrasoundFindingsRecord = structuredClone(baseEcoFindings);
       if (isGyn) {
         findings.uterusPosition = ecoDraft.uterusPosition;
         if (ecoDraft.uterusDimensions.trim()) {
@@ -662,14 +664,10 @@ export function ClinicalTemplatesManagerModal({
     if (ok) setConfirmRestoreOpen(false);
   };
 
-  const isEcoGyn =
-    ecoDraft.ultrasoundType === "TRANSVAGINAL" ||
-    ecoDraft.ultrasoundType === "PELVICA" ||
-    ecoDraft.ultrasoundType === "DOPPLER";
-  const isEcoBreast = ecoDraft.ultrasoundType === "MAMA_BILATERAL";
-  const isEcoObst =
-    ecoDraft.ultrasoundType === "OBSTETRICA_1T" ||
-    ecoDraft.ultrasoundType === "OBSTETRICA_2T_3T";
+  const ecoFlags = getUltrasoundModeFlags(ecoDraft.ultrasoundType);
+  const isEcoGyn = ecoFlags.isGynMode;
+  const isEcoBreast = ecoFlags.isBreastMode;
+  const isEcoObst = ecoFlags.isAnyObstetricMode;
 
   return (
     <>
@@ -954,12 +952,13 @@ export function ClinicalTemplatesManagerModal({
                       <select
                         id="ct-eco-type"
                         value={ecoDraft.ultrasoundType}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          setBaseEcoFindings({});
                           setEcoDraft((prev) => ({
                             ...prev,
                             ultrasoundType: e.target.value as UltrasoundType,
-                          }))
-                        }
+                          }));
+                        }}
                         className={selectClassName}
                       >
                         {ULTRASOUND_TYPES.map((t) => (

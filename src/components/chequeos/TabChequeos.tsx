@@ -451,6 +451,17 @@ export function TabChequeos({
                               "number"
                                 ? ` • Endometrio: ${item.findings.endometriumThicknessMm} mm`
                                 : ""}
+                              {item.findings.gestationalAgeByEcho
+                                ? ` • EG: ${item.findings.gestationalAgeByEcho}`
+                                : ""}
+                              {typeof item.findings.nuchalTranslucencyMm ===
+                              "number"
+                                ? ` • TN: ${item.findings.nuchalTranslucencyMm} mm`
+                                : ""}
+                              {typeof item.findings.estimatedFetalWeightGr ===
+                              "number"
+                                ? ` • Ponderado: ${item.findings.estimatedFetalWeightGr} g`
+                                : ""}
                               {item.findings.slidingSign
                                 ? ` • Sliding: ${item.findings.slidingSign}`
                                 : ""}
@@ -1178,6 +1189,11 @@ export function TabChequeos({
         watchedBirads={eco.watchedBirads}
         watchedEndometrium={eco.watchedEndometrium}
         watchedVolume={eco.watchedVolume}
+        watchedRightOvaryVolume={eco.watchedRightOvaryVolume}
+        watchedLeftOvaryVolume={eco.watchedLeftOvaryVolume}
+        watchedBreastLesions={eco.watchedBreastLesions}
+        watchedIncludeDoppler={eco.watchedIncludeDoppler}
+        bppTotal={eco.bppTotal}
         templates={templateStore.ultrasoundTemplates}
         canEditTemplates={canEdit}
         isSavingTemplate={templateStore.isMutating}
@@ -1186,6 +1202,9 @@ export function TabChequeos({
         endometriumPatterns={eco.endometriumPatterns}
         slidingSignOptions={eco.slidingSignOptions}
         biradsOptions={eco.biradsOptions}
+        breastAcrTypes={eco.breastAcrTypes}
+        breastAcrLabels={eco.breastAcrLabels}
+        breastLesionTypes={eco.breastLesionTypes}
         onApplyTemplate={eco.applyTemplate}
         onBuildTemplatePayload={eco.buildTemplatePayloadFromForm}
         onSaveAsTemplate={async (name, description, payload) => {
@@ -1200,6 +1219,13 @@ export function TabChequeos({
         }}
         onOpenTemplatesManager={() => setTemplatesManagerScope("ULTRASOUND")}
         onAutoCalculateVolume={eco.autoCalculateVolume}
+        onAutoCalculateOvaryVolume={eco.autoCalculateOvaryVolume}
+        onAutoCalculateHadlock={eco.autoCalculateHadlockEfw}
+        onAutoCalculateDoppler={eco.autoCalculateDopplerIndices}
+        onAddBreastLesion={eco.addBreastLesion}
+        onUpdateBreastLesion={eco.updateBreastLesion}
+        onRemoveBreastLesion={eco.removeBreastLesion}
+        onFillStandardBreastComplement={eco.fillStandardBreastComplement}
         onUploadFiles={eco.handleUploadFiles}
         onUpdateImageCaption={eco.updateDraftImageCaption}
         onRemoveImage={eco.removeDraftImage}

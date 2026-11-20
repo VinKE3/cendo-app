@@ -48,30 +48,111 @@ export interface ColposcopyExtendedFindingsRecord {
   otherFindings?: string;
 }
 
+export interface UltrasoundBreastLesionRecord {
+  id: string;
+  breastSide: "Derecha" | "Izquierda" | "Bilateral";
+  lesionType: string;
+  clockHour?: string;
+  distanceFromNippleCm?: string;
+  depthFromSkinMm?: string;
+  dimensionsMm?: string;
+  shape?: string;
+  margins?: string;
+  orientation?: string;
+  echoPattern?: string;
+  posteriorAcoustic?: string;
+  notes?: string;
+}
+
+export interface UltrasoundDopplerVesselRecord {
+  pi?: number;
+  percentile?: string;
+  status?: "Normal" | "Alterado" | "No evaluado";
+}
+
+export interface UltrasoundDopplerRecord {
+  umbilicalArtery?: UltrasoundDopplerVesselRecord;
+  middleCerebralArtery?: UltrasoundDopplerVesselRecord;
+  cerebroplacentalRatio?: UltrasoundDopplerVesselRecord;
+  rightUterineArtery?: UltrasoundDopplerVesselRecord;
+  leftUterineArtery?: UltrasoundDopplerVesselRecord;
+  meanUterineArteries?: UltrasoundDopplerVesselRecord;
+  ductusVenosus?: UltrasoundDopplerVesselRecord;
+}
+
 export interface UltrasoundFindingsRecord {
+  // Común
+  referringDoctor?: string;
+  // Ginecológica / Pélvica-TV y compartidos con I Trimestre
   uterusPosition?: "AVF" | "RVF" | "Indiferente";
   uterusDimensions?: string;
   uterusVolumeCc?: number;
   myometriumStatus?: string;
   endometriumThicknessMm?: number;
   endometriumPattern?: "Trilaminar" | "Secretor" | "Atrófico" | "Engrosado irregular";
+  cervixLengthMm?: number;
+  cervixStatus?: string;
+  uterusEcopulsionPain?: string;
   rightOvaryDimensions?: string;
+  rightOvaryVolumeCc?: number;
   leftOvaryDimensions?: string;
+  leftOvaryVolumeCc?: number;
+  ovaryEcopulsionPain?: string;
+  periOvarianFluid?: string;
   ovariesNotes?: string;
   douglasPouch?: string;
   endometriosisFoci?: string;
   slidingSign?: "Positivo" | "Negativo" | "Parcial";
   uterosacralLigaments?: string;
+  // Mama bilateral (BI-RADS y lesiones estructuradas)
+  breastAcrType?: "Tipo A" | "Tipo B" | "Tipo C" | "Tipo D";
   breastPattern?: string;
   rightBreastFindings?: string;
   leftBreastFindings?: string;
+  breastLesions?: UltrasoundBreastLesionRecord[];
+  breastComplement?: string;
   biradsCategory?: string;
+  // Obstétrica I Trimestre y Genética 11-14 ss
   gestationalSacsCount?: number;
+  gestationalSacMm?: number;
+  yolkSacMm?: number;
   embryoCrownRumpLengthMm?: number;
   gestationalAgeByEcho?: string;
   fetalHeartRate?: number;
+  choriodecidualReaction?: string;
+  nuchalTranslucencyMm?: number;
+  nasalBone?: "Presente" | "Ausente" | "Hipoplásico" | "No evaluable";
+  ductusVenosusWave?: "Onda A (+)" | "Onda A ausente" | "Onda A reversa" | "No evaluado";
+  ductusVenosusPi?: number;
+  uterineArteriesMeanPi?: number;
+  chromosomopathyRisk?: "Bajo riesgo" | "Riesgo intermedio" | "Alto riesgo";
+  preeclampsiaRisk?: "Bajo riesgo" | "Riesgo intermedio" | "Alto riesgo";
+  // Obstétrica II-III Trimestre, Morfológica y Estudio Doppler
+  fetalStatic?: string;
+  fetalSex?: "Masculino" | "Femenino" | "No determinado";
+  fetalAnatomySummary?: string;
+  fetalHeartFourChambers?: string;
+  fetalAbdominalWall?: string;
+  fetalKidneys?: string;
+  fetalSpine?: string;
+  bpdMm?: number;
+  hcMm?: number;
+  acMm?: number;
+  flMm?: number;
+  estimatedFetalWeightGr?: number;
+  estimatedFetalWeightPercentile?: string;
+  bppBodyMovements?: number;
+  bppBreathingMovements?: number;
+  bppMuscleTone?: number;
+  bppAmnioticFluid?: number;
   placentaLocation?: string;
+  placentaGrade?: string;
+  placentaHematomas?: string;
+  umbilicalCord?: string;
   amnioticFluidIndex?: string;
+  amnioticFluidIlaMm?: number;
+  includeDoppler?: boolean;
+  doppler?: UltrasoundDopplerRecord;
 }
 
 export type ProcedurePathologyStatus = "NO_APLICA" | "PENDIENTE" | "RECIBIDO";
