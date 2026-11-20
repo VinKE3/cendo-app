@@ -18,6 +18,7 @@ import {
   listLabTemplates,
 } from "@/features/laboratorio/services/laboratorio.service";
 import { getPatientDetail } from "@/features/pacientes/services/pacientes.service";
+import { getPrenatalCardByPatient } from "@/features/prenatal/services/prenatal.service";
 import { listMinorProceduresByPatient } from "@/features/procedimientos/services/procedimientos.service";
 import { listPrescriptionsByPatient } from "@/features/recetas/services/recetas.service";
 import { listTariffs } from "@/features/tarifario/services/tarifario.service";
@@ -69,10 +70,10 @@ export default async function PacienteDetailPage({
     listPatientDocumentsByPatient(doctor.tenantId, parsedId.data),
     listTariffs(doctor.tenantId),
   ]);
-  const minorProcedures = await listMinorProceduresByPatient(
-    doctor.tenantId,
-    parsedId.data
-  );
+  const [minorProcedures, prenatalCard] = await Promise.all([
+    listMinorProceduresByPatient(doctor.tenantId, parsedId.data),
+    getPrenatalCardByPatient(doctor.tenantId, parsedId.data),
+  ]);
 
   const canEdit = doctor.role === "admin" || doctor.role === "moderator";
   const canDelete = doctor.role === "admin";
@@ -98,6 +99,7 @@ export default async function PacienteDetailPage({
         initialCheckups={checkups}
         initialPatientDocuments={patientDocuments}
         initialProcedures={minorProcedures}
+        initialPrenatalCard={prenatalCard}
         initialClinicalTemplates={clinicalTemplates}
         initialTariffs={tariffs}
         consultationFormContext={consultationFormContext}

@@ -47,6 +47,7 @@ import type {
   PatientBackgroundItem,
   PatientDirectoryItem,
 } from "@/features/pacientes/pacientes.schema";
+import type { PrenatalCardItem } from "@/features/prenatal/prenatal.schema";
 import type { MinorProcedureItem } from "@/features/procedimientos/procedimientos.schema";
 import { useRecetas } from "@/features/recetas/hooks/use-recetas";
 import type { MedicalPrescriptionItem } from "@/features/recetas/recetas.schema";
@@ -58,6 +59,7 @@ import { PrescriptionPrintModal } from "./PrescriptionPrintModal";
 export interface TabRecetasHandle {
   openFromConsultation: (consultation: MedicalConsultationItem) => void;
   openFromProcedure: (procedure: MinorProcedureItem) => void;
+  openFromPrenatal: (card: PrenatalCardItem) => void;
   openPrintPreview: (prescription: MedicalPrescriptionItem) => void;
   openEdit: (prescription: MedicalPrescriptionItem) => void;
 }
@@ -114,6 +116,7 @@ export function TabRecetas({
     openDuplicateModal,
     openFromConsultation,
     openFromProcedure,
+    openFromPrenatal,
     selectVademecumMedication,
     applyDosagePreset,
     saveBuilderItem,
@@ -147,10 +150,17 @@ export function TabRecetas({
     () => ({
       openFromConsultation,
       openFromProcedure,
+      openFromPrenatal,
       openPrintPreview: setPrintingItem,
       openEdit: openEditModal,
     }),
-    [openFromConsultation, openFromProcedure, openEditModal, setPrintingItem]
+    [
+      openFromConsultation,
+      openFromProcedure,
+      openFromPrenatal,
+      openEditModal,
+      setPrintingItem,
+    ]
   );
 
   return (

@@ -12,6 +12,10 @@ import type {
 } from "@/features/consultas/consultas.schema";
 import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
 import {
+  calculateGestationalAge,
+  type PrenatalCardItem,
+} from "@/features/prenatal/prenatal.schema";
+import {
   PROCEDURE_TYPE_LABELS,
   type MinorProcedureItem,
 } from "@/features/procedimientos/procedimientos.schema";
@@ -302,6 +306,73 @@ export function useRecetas({
     setDialogOpen(true);
   };
 
+  const openFromPrenatal = (card: PrenatalCardItem) => {
+    const ga = calculateGestationalAge(card.baseline.fum, todayStr);
+    const lastVisit =
+      card.visits.length > 0 ? card.visits[card.visits.length - 1] : null;
+    const prenatalItems: PrescriptionItemRecord[] = [];
+
+    if (ga.weeks < 14) {
+      prenatalItems.push({
+        id: `rx-prenatal-fa-${Date.now()}`,
+        medicationName: "Ácido Fólico 0.5 mg (500 mcg)",
+        presentation: "Tabletas 0.5 mg",
+        route: "Vía Oral",
+        dosage: "1 tableta",
+        frequency: "Cada 24 horas (después del desayuno)",
+        duration: "Por 30 días continuos",
+        quantity: "30 tabletas",
+        instructions:
+          "Suplementación preventiva del primer trimestre gestacional.",
+      });
+    } else {
+      prenatalItems.push({
+        id: `rx-prenatal-fe-${Date.now()}-1`,
+        medicationName: "Sulfato Ferroso 300 mg + Ácido Fólico 400 mcg",
+        presentation: "Tabletas recubiertas",
+        route: "Vía Oral",
+        dosage: "1 tableta",
+        frequency: "Cada 24 horas con jugo cítrico (alejado de lácteos)",
+        duration: "Por 30 días continuos",
+        quantity: "30 tabletas",
+        instructions: "Suplementación prenatal MINSA (≥ 14 semanas).",
+      });
+    }
+
+    if (ga.weeks >= 20) {
+      prenatalItems.push({
+        id: `rx-prenatal-ca-${Date.now()}-2`,
+        medicationName: "Carbonato de Calcio 500 mg + Vitamina D3",
+        presentation: "Tabletas 500 mg",
+        route: "Vía Oral",
+        dosage: "1 tableta",
+        frequency: "Cada 12 horas con alimentos (separado 2h del hierro)",
+        duration: "Por 30 días continuos",
+        quantity: "60 tabletas",
+        instructions: "Suplementación cálcica gestacional MINSA (≥ 20 semanas).",
+      });
+    }
+
+    setEditingItem(null);
+    setSourceConsultationLabel(
+      `Suplementación de Control Prenatal MINSA (${ga.formatted})`
+    );
+    setSaveAndPrintIntent(false);
+    resetBuilder();
+    setVademecumSearch("");
+    setDraftItems(prenatalItems);
+    form.reset({
+      consultationId: consultations[0]?.id ?? "",
+      prescriptionDate: todayStr,
+      diagnosis: `Supervisión de embarazo normal (${ga.formatted})`,
+      cie10Code: "Z34.9",
+      generalIndications:
+        "Dieta rica en proteínas, hierro hemínico y fibra. Hidratación 2 litros/día. Acudir a Emergencia ante signos de alarma obstétrica (sangrado, pérdida de líquido, cefalea intensa o disminución de movimientos fetales).",
+      nextAppointmentDate: lastVisit?.nextAppointmentDate || "",
+    });
+    setDialogOpen(true);
+  };
+
   const selectVademecumMedication = (
     med: ConsultationVademecumOption,
     brandIndex?: number
@@ -543,6 +614,7 @@ export function useRecetas({
     openDuplicateModal,
     openFromConsultation,
     openFromProcedure,
+    openFromPrenatal,
     selectVademecumMedication,
     applyDosagePreset,
     saveBuilderItem,

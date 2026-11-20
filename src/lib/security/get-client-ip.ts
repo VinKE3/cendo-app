@@ -1,7 +1,12 @@
 import { headers } from "next/headers";
 
 export async function getClientIp(): Promise<string> {
-  const headerStore = await headers();
+  let headerStore: Awaited<ReturnType<typeof headers>>;
+  try {
+    headerStore = await headers();
+  } catch {
+    return "127.0.0.1";
+  }
 
   // 1. Cloudflare (inyectado en el borde, no falsificable por cliente)
   const cfIp = headerStore.get("cf-connecting-ip");

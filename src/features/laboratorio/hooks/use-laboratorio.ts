@@ -16,6 +16,10 @@ import type {
   PatientDirectoryItem,
 } from "@/features/pacientes/pacientes.schema";
 import {
+  calculateGestationalAge,
+  type PrenatalCardItem,
+} from "@/features/prenatal/prenatal.schema";
+import {
   PROCEDURE_TYPE_LABELS,
   type MinorProcedureItem,
 } from "@/features/procedimientos/procedimientos.schema";
@@ -432,6 +436,88 @@ export function useLaboratorio({
     setDialogOpen(true);
   };
 
+  const openPrenatalBattery = (card: PrenatalCardItem) => {
+    const ga = calculateGestationalAge(card.baseline.fum, todayStr);
+    setEditingItem(null);
+    setSourceLabel(
+      `Batería Prenatal MINSA — ${ga.trimester}° Trimestre (${ga.formatted})`
+    );
+    setSaveAndPrintIntent(false);
+    setCatalogSearch("");
+    setCatalogCategory("Todas");
+    setManualTestName("");
+
+    const prenatalTests: LabOrderItemRecord[] = [
+      {
+        id: `lab-cpn-hb-${Date.now()}-1`,
+        category: "Hematología & Coagulación",
+        testName: "Hemograma Completo Automatizado + Hemoglobina y Hematocrito",
+        sampleType: "Sangre total (EDTA)",
+      },
+      {
+        id: `lab-cpn-grp-${Date.now()}-2`,
+        category: "Hematología & Coagulación",
+        testName: "Grupo Sanguíneo ABO y Factor Rh",
+        sampleType: "Sangre total (EDTA)",
+      },
+      {
+        id: `lab-cpn-glu-${Date.now()}-3`,
+        category: "Bioquímica & Perfil Metabólico",
+        testName: "Glucosa Basal en Ayunas",
+        sampleType: "Suero (Ayuno 8 horas)",
+      },
+      {
+        id: `lab-cpn-vdrl-${Date.now()}-4`,
+        category: "Inmunología, Serología & ITS",
+        testName: "VDRL / RPR Cuantitativo y Prueba Rápida de Sífilis",
+        sampleType: "Suero",
+      },
+      {
+        id: `lab-cpn-vih-${Date.now()}-5`,
+        category: "Inmunología, Serología & ITS",
+        testName: "Tamizaje VIH 1-2 (Prueba Rápida / ELISA 4ta Generación)",
+        sampleType: "Suero",
+      },
+      {
+        id: `lab-cpn-hbs-${Date.now()}-6`,
+        category: "Inmunología, Serología & ITS",
+        testName: "Antígeno de Superficie Hepatitis B (HBsAg)",
+        sampleType: "Suero",
+      },
+      {
+        id: `lab-cpn-ori-${Date.now()}-7`,
+        category: "Microbiología, Orina & Cultivos",
+        testName: "Examen Completo de Orina con Sedimento",
+        sampleType: "Orina 1er chorro medio matutino",
+      },
+      {
+        id: `lab-cpn-uro-${Date.now()}-8`,
+        category: "Microbiología, Orina & Cultivos",
+        testName: "Urocultivo Cuantitativo y Antibiograma",
+        sampleType: "Orina chorro medio estéril",
+      },
+    ];
+
+    setSelectedTests(prenatalTests);
+
+    form.reset({
+      consultationId: consultations[0]?.id ?? "",
+      orderDate: todayStr,
+      diagnosis: `Control prenatal de rutina — ${ga.trimester}° Trimestre (${ga.formatted})`,
+      cie10Code: "Z34.9",
+      urgency: "Rutina",
+      customTests: "",
+      patientInstructions:
+        "Acudir en ayunas de 8 horas para glicemia basal. Llevar primera orina de la mañana (chorro medio previa higiene genital) en frasco estéril para examen completo de orina y urocultivo.",
+      templateType: "GENERAL",
+      templateTitle: `Batería de Control Prenatal MINSA (${ga.trimester}° Trimestre)`,
+      ...defaultSpecimenValues,
+      furDate: card.baseline.fum || defaultSpecimenValues.furDate,
+    });
+
+    setDialogOpen(true);
+  };
+
   const applyTemplate = (tmpl: LabOrderTemplateItem) => {
     form.setValue("templateType", tmpl.templateType, { shouldDirty: true });
     form.setValue("templateTitle", tmpl.title, { shouldDirty: true });
@@ -776,6 +862,7 @@ export function useLaboratorio({
     openFromConsultation,
     openBiopsyFromColposcopy,
     openPathologyFromProcedure,
+    openPrenatalBattery,
     applyTemplate,
     resetToGeneralOrder,
     applyPresetPack,

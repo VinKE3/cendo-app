@@ -50,6 +50,7 @@ import type {
   LabOrderTemplateItem,
 } from "@/features/laboratorio/laboratorio.schema";
 import type { PatientDetailData } from "@/features/pacientes/pacientes.schema";
+import type { PrenatalCardItem } from "@/features/prenatal/prenatal.schema";
 import type { MinorProcedureItem } from "@/features/procedimientos/procedimientos.schema";
 import type { MedicalPrescriptionItem } from "@/features/recetas/recetas.schema";
 import type { ProcedureTariffItem } from "@/features/tarifario/tarifario.schema";
@@ -60,6 +61,7 @@ import {
   TabLaboratorioCotizaciones,
   type TabLabCotizHandle,
 } from "../laboratorio/TabLaboratorioCotizaciones";
+import { TabControlPrenatal } from "../prenatal/TabControlPrenatal";
 import { TabProcedimientos } from "../procedimientos/TabProcedimientos";
 import { TabRecetas, type TabRecetasHandle } from "../recetas/TabRecetas";
 import { PatientBackgroundModal } from "./PatientBackgroundModal";
@@ -78,6 +80,7 @@ interface PatientDetailViewProps {
   initialCheckups: ClinicalCheckupItem[];
   initialPatientDocuments: PatientDocumentItem[];
   initialProcedures: MinorProcedureItem[];
+  initialPrenatalCard: PrenatalCardItem | null;
   initialClinicalTemplates: ClinicalTemplateItem[];
   initialTariffs: ProcedureTariffItem[];
   consultationFormContext: ConsultationFormContext;
@@ -117,6 +120,7 @@ export function PatientDetailView({
   initialCheckups,
   initialPatientDocuments,
   initialProcedures,
+  initialPrenatalCard,
   initialClinicalTemplates,
   initialTariffs,
   consultationFormContext,
@@ -145,6 +149,8 @@ export function PatientDetailView({
     useState<PatientDocumentItem[]>(initialPatientDocuments);
   const [proceduresList, setProceduresList] =
     useState<MinorProcedureItem[]>(initialProcedures);
+  const [prenatalCardState, setPrenatalCardState] =
+    useState<PrenatalCardItem | null>(initialPrenatalCard);
 
   const {
     patient,
@@ -274,6 +280,22 @@ export function PatientDetailView({
     );
   };
 
+  const handleFurSyncedFromPrenatal = (newFur: string) => {
+    setBackground((prev) =>
+      prev ? { ...prev, lastMenstrualPeriod: newFur } : prev
+    );
+  };
+
+  const handleEmitPrenatalPrescription = (card: PrenatalCardItem) => {
+    setActiveTab("recetas");
+    recetasRef.current?.openFromPrenatal(card);
+  };
+
+  const handleEmitPrenatalLabOrder = (card: PrenatalCardItem) => {
+    setActiveTab("laboratorio");
+    labCotizRef.current?.openPrenatalBattery(card);
+  };
+
   const liveCounts = {
     ...counts,
     consultations: consultationsList.length,
@@ -281,6 +303,7 @@ export function PatientDetailView({
     colposcopies: colposcopiesList.length,
     checkups: checkupsList.length,
     procedures: proceduresList.length,
+    prenatalCards: prenatalCardState ? 1 : 0,
     documents: documentsList.length,
     prescriptions: prescriptionsList.length,
     labOrders: labOrdersList.length,
@@ -919,6 +942,22 @@ export function PatientDetailView({
         />
       </div>
 
+      <div className={activeTab === "prenatal" ? "block" : "hidden"}>
+        <TabControlPrenatal
+          patient={patient}
+          background={background}
+          prenatalCard={prenatalCardState}
+          onPrenatalCardChange={setPrenatalCardState}
+          consultations={consultationsList}
+          ultrasounds={ultrasoundsList}
+          canEdit={canEdit}
+          canDelete={canDelete}
+          onFurSynced={handleFurSyncedFromPrenatal}
+          onEmitPrenatalPrescription={handleEmitPrenatalPrescription}
+          onEmitPrenatalLabOrder={handleEmitPrenatalLabOrder}
+        />
+      </div>
+
       <div className={activeTab === "recetas" ? "block" : "hidden"}>
         <TabRecetas
           ref={recetasRef}
@@ -955,6 +994,7 @@ export function PatientDetailView({
       activeTab !== "consultas" &&
       activeTab !== "chequeos" &&
       activeTab !== "procedimientos" &&
+      activeTab !== "prenatal" &&
       activeTab !== "recetas" &&
       activeTab !== "laboratorio" ? (
         <Card className="border border-border bg-card">
