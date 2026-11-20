@@ -60,6 +60,9 @@ interface PrescriptionModalProps {
   patient: PatientDirectoryItem;
   background?: PatientBackgroundItem | null;
   editingItem: MedicalPrescriptionItem | null;
+  draftMode?: boolean;
+  editingDraftIndex?: number | null;
+  lockedConsultationLabel?: string | null;
   sourceConsultationLabel: string | null;
   form: UseFormReturn<PrescriptionModalFormValues>;
   isSubmitting: boolean;
@@ -108,6 +111,9 @@ export function PrescriptionModal({
   patient,
   background,
   editingItem,
+  draftMode = false,
+  editingDraftIndex = null,
+  lockedConsultationLabel = null,
   sourceConsultationLabel,
   form,
   isSubmitting,
@@ -223,22 +229,31 @@ export function PrescriptionModal({
                   className="flex items-center gap-1.5 text-xs font-medium"
                 >
                   <Link2 className="size-3.5 text-primary" />
-                  Vincular con Consulta Médica (Opcional)
+                  {lockedConsultationLabel
+                    ? "Consulta Vinculada"
+                    : "Vincular con Consulta Médica (Opcional)"}
                 </label>
-                <select
-                  id="rx-consultation"
-                  value={watchedConsultationId}
-                  onChange={(e) => onSelectConsultationLink(e.target.value)}
-                  className={selectClassName}
-                >
-                  <option value="">Receta independiente (sin vínculo directo)</option>
-                  {consultations.map((cons) => (
-                    <option key={cons.id} value={cons.id}>
-                      {formatPeruDateDisplay(cons.consultationDate)} — {cons.diagnosis}{" "}
-                      {cons.cie10Code ? `(${cons.cie10Code})` : ""}
-                    </option>
-                  ))}
-                </select>
+                {lockedConsultationLabel ? (
+                  <div className="flex min-h-8 items-center gap-2 rounded-lg border border-primary/25 bg-primary/5 px-2.5 py-1.5 text-xs font-medium text-primary">
+                    <Link2 className="size-3.5 shrink-0" />
+                    <span className="truncate">{lockedConsultationLabel}</span>
+                  </div>
+                ) : (
+                  <select
+                    id="rx-consultation"
+                    value={watchedConsultationId}
+                    onChange={(e) => onSelectConsultationLink(e.target.value)}
+                    className={selectClassName}
+                  >
+                    <option value="">Receta independiente (sin vínculo directo)</option>
+                    {consultations.map((cons) => (
+                      <option key={cons.id} value={cons.id}>
+                        {formatPeruDateDisplay(cons.consultationDate)} — {cons.diagnosis}{" "}
+                        {cons.cie10Code ? `(${cons.cie10Code})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 
@@ -695,15 +710,17 @@ export function PrescriptionModal({
               >
                 Cancelar
               </Button>
-              <Button
-                type="submit"
-                variant="outline"
-                disabled={isSubmitting}
-                onClick={() => onSaveAndPrintIntent(true)}
-              >
-                <Printer className="size-4" />
-                Guardar e Imprimir
-              </Button>
+              {!draftMode ? (
+                <Button
+                  type="submit"
+                  variant="outline"
+                  disabled={isSubmitting}
+                  onClick={() => onSaveAndPrintIntent(true)}
+                >
+                  <Printer className="size-4" />
+                  Guardar e Imprimir
+                </Button>
+              ) : null}
               <Button
                 type="submit"
                 disabled={isSubmitting}
@@ -712,9 +729,13 @@ export function PrescriptionModal({
                 <CheckCircle2 className="size-4" />
                 {isSubmitting
                   ? "Guardando..."
-                  : editingItem
-                    ? "Guardar Cambios"
-                    : "Emitir Receta"}
+                  : draftMode
+                    ? editingDraftIndex !== null
+                      ? "Actualizar Receta en Consulta"
+                      : "Asociar Receta a Consulta"
+                    : editingItem
+                      ? "Guardar Cambios"
+                      : "Emitir Receta"}
               </Button>
             </div>
           </DialogFooter>

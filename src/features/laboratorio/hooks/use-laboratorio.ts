@@ -10,7 +10,10 @@ import type {
   LabSpecimenDetailsRecord,
 } from "@/db/schema/clinical";
 import type { ColposcopyReportItem } from "@/features/colposcopia/colposcopia.schema";
-import type { MedicalConsultationItem } from "@/features/consultas/consultas.schema";
+import type {
+  DraftLabOrderForConsultation,
+  MedicalConsultationItem,
+} from "@/features/consultas/consultas.schema";
 import type {
   PatientBackgroundItem,
   PatientDirectoryItem,
@@ -95,6 +98,10 @@ export interface UseLaboratorioParams {
   labTemplates: LabOrderTemplateItem[];
   onLabTemplatesChange: (next: LabOrderTemplateItem[]) => void;
   consultations: MedicalConsultationItem[];
+  onDraftSubmit?: (
+    draft: DraftLabOrderForConsultation,
+    editingDraftIndex: number | null
+  ) => void;
 }
 
 export function useLaboratorio({
@@ -105,12 +112,18 @@ export function useLaboratorio({
   labTemplates,
   onLabTemplatesChange,
   consultations,
+  onDraftSubmit,
 }: UseLaboratorioParams) {
   const todayStr = useMemo(() => getPeruDateString(), []);
 
   const [search, setSearchState] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<LabOrderItem | null>(null);
+  const [draftMode, setDraftMode] = useState(false);
+  const [editingDraftIndex, setEditingDraftIndex] = useState<number | null>(null);
+  const [lockedConsultationLabel, setLockedConsultationLabel] = useState<
+    string | null
+  >(null);
   const [sourceLabel, setSourceLabel] = useState<string | null>(null);
   const [saveAndPrintIntent, setSaveAndPrintIntent] = useState(false);
 
@@ -220,7 +233,14 @@ export function useLaboratorio({
     pagination.setCurrentPage(1);
   };
 
+  const resetConsultModeFlags = (lockedLabel: string | null = null) => {
+    setDraftMode(false);
+    setEditingDraftIndex(null);
+    setLockedConsultationLabel(lockedLabel);
+  };
+
   const openCreateModal = () => {
+    resetConsultModeFlags(null);
     setEditingItem(null);
     setSourceLabel(null);
     setSaveAndPrintIntent(false);
@@ -243,7 +263,8 @@ export function useLaboratorio({
     setDialogOpen(true);
   };
 
-  const openEditModal = (item: LabOrderItem) => {
+  const openEditModal = (item: LabOrderItem, lockedLabel?: string) => {
+    resetConsultModeFlags(lockedLabel ?? null);
     setEditingItem(item);
     setSourceLabel(null);
     setSaveAndPrintIntent(false);
@@ -282,6 +303,7 @@ export function useLaboratorio({
   };
 
   const openFromConsultation = (consultation: MedicalConsultationItem) => {
+    resetConsultModeFlags(null);
     const parsedTests = parseConsultationAuxExamsToLabItems(
       consultation.auxiliaryExams
     );
@@ -309,7 +331,117 @@ export function useLaboratorio({
     setDialogOpen(true);
   };
 
+  const openDraftCreate = (prefill: {
+    orderDate: string;
+    diagnosis: string;
+    cie10Code: string;
+    sourceLabel?: string;
+  }) => {
+    setDraftMode(true);
+    setEditingDraftIndex(null);
+    setLockedConsultationLabel(
+      prefill.sourceLabel ?? "Nueva consulta en curso (se emitirá al guardar)"
+    );
+    setEditingItem(null);
+    setSourceLabel(null);
+    setSaveAndPrintIntent(false);
+    setSelectedTests([]);
+    setCatalogSearch("");
+    setCatalogCategory("Todas");
+    setManualTestName("");
+    form.reset({
+      consultationId: "",
+      orderDate: prefill.orderDate || todayStr,
+      diagnosis: prefill.diagnosis,
+      cie10Code: prefill.cie10Code,
+      urgency: "Rutina",
+      customTests: "",
+      patientInstructions: getDefaultInstructionsForTemplateType("GENERAL"),
+      templateType: "GENERAL",
+      templateTitle: "",
+      ...defaultSpecimenValues,
+    });
+    setDialogOpen(true);
+  };
+
+  const openDraftEdit = (
+    draft: DraftLabOrderForConsultation,
+    index: number,
+    sourceLabel?: string
+  ) => {
+    setDraftMode(true);
+    setEditingDraftIndex(index);
+    setLockedConsultationLabel(
+      sourceLabel ?? "Nueva consulta en curso (se emitirá al guardar)"
+    );
+    setEditingItem(null);
+    setSourceLabel(null);
+    setSaveAndPrintIntent(false);
+    setSelectedTests(draft.items.map((it) => ({ ...it })));
+    setCatalogSearch("");
+    setCatalogCategory("Todas");
+    setManualTestName("");
+    const sp = draft.specimenDetails ?? null;
+    form.reset({
+      consultationId: "",
+      orderDate: draft.orderDate || todayStr,
+      diagnosis: draft.diagnosis,
+      cie10Code: draft.cie10Code,
+      urgency: draft.urgency,
+      customTests: draft.customTests,
+      patientInstructions:
+        draft.patientInstructions ||
+        getDefaultInstructionsForTemplateType(draft.templateType),
+      templateType: draft.templateType,
+      templateTitle: draft.templateTitle,
+      anatomicalSite: sp?.anatomicalSite ?? "",
+      sampleMethod: sp?.sampleMethod ?? "",
+      fixative: sp?.fixative ?? defaultSpecimenValues.fixative,
+      containerCount: sp?.containerCount ?? 1,
+      cervixAspect: sp?.cervixAspect ?? "",
+      furDate: sp?.furDate ?? defaultSpecimenValues.furDate,
+      obstetricParity:
+        sp?.obstetricParity ?? defaultSpecimenValues.obstetricParity,
+      contraceptiveMethod:
+        sp?.contraceptiveMethod ?? defaultSpecimenValues.contraceptiveMethod,
+      clinicalFindings: sp?.clinicalFindings ?? "",
+      sampleObtainedAt:
+        sp?.sampleObtainedAt ?? draft.orderDate ?? todayStr,
+      procedureOrigin:
+        sp?.procedureOrigin ?? defaultSpecimenValues.procedureOrigin,
+    });
+    setDialogOpen(true);
+  };
+
+  const openForExistingConsultation = (
+    consultation: MedicalConsultationItem
+  ) => {
+    const label = `Consulta del ${formatPeruDateDisplay(consultation.consultationDate)} — ${consultation.diagnosis}`;
+    resetConsultModeFlags(label);
+    setEditingItem(null);
+    setSourceLabel(null);
+    setSaveAndPrintIntent(false);
+    setSelectedTests([]);
+    setCatalogSearch("");
+    setCatalogCategory("Todas");
+    setManualTestName("");
+    form.reset({
+      consultationId: consultation.id,
+      orderDate: consultation.consultationDate || todayStr,
+      diagnosis: consultation.diagnosis,
+      cie10Code: consultation.cie10Code,
+      urgency: "Rutina",
+      customTests: "",
+      patientInstructions: getDefaultInstructionsForTemplateType("GENERAL"),
+      templateType: "GENERAL",
+      templateTitle: "",
+      ...defaultSpecimenValues,
+    });
+    setDialogOpen(true);
+  };
+
   const openBiopsyFromColposcopy = (colpo: ColposcopyReportItem) => {
+    resetConsultModeFlags(null);
     setEditingItem(null);
     setSourceLabel(
       `Colposcopía IFCPC del ${formatPeruDateDisplay(colpo.reportDate)}`
@@ -371,6 +503,7 @@ export function useLaboratorio({
   };
 
   const openPathologyFromProcedure = (proc: MinorProcedureItem) => {
+    resetConsultModeFlags(null);
     setEditingItem(null);
     setSourceLabel(
       `Procedimiento: ${PROCEDURE_TYPE_LABELS[proc.procedureType] || proc.procedureType} (${formatPeruDateDisplay(proc.procedureDate)})`
@@ -437,6 +570,7 @@ export function useLaboratorio({
   };
 
   const openPrenatalBattery = (card: PrenatalCardItem) => {
+    resetConsultModeFlags(null);
     const ga = calculateGestationalAge(card.baseline.fum, todayStr);
     setEditingItem(null);
     setSourceLabel(
@@ -698,6 +832,35 @@ export function useLaboratorio({
             procedureOrigin: values.procedureOrigin || undefined,
           };
 
+    if (draftMode && onDraftSubmit) {
+      onDraftSubmit(
+        {
+          orderDate: values.orderDate,
+          diagnosis: values.diagnosis,
+          cie10Code: values.cie10Code,
+          urgency: values.urgency,
+          items: selectedTests,
+          customTests: values.customTests,
+          patientInstructions: values.patientInstructions,
+          templateType: values.templateType,
+          templateTitle:
+            values.templateType === "GENERAL" ? "" : values.templateTitle,
+          specimenDetails,
+        },
+        editingDraftIndex
+      );
+      setDialogOpen(false);
+      setDraftMode(false);
+      setEditingDraftIndex(null);
+      setLockedConsultationLabel(null);
+      toast.success(
+        editingDraftIndex !== null
+          ? "Orden borrador actualizada en la consulta."
+          : "Orden de laboratorio asociada a la consulta (se emitirá al guardar)."
+      );
+      return;
+    }
+
     const payload = {
       patientId: patient.id,
       consultationId: validConsultationId,
@@ -839,6 +1002,9 @@ export function useLaboratorio({
     dialogOpen,
     setDialogOpen,
     editingItem,
+    draftMode,
+    editingDraftIndex,
+    lockedConsultationLabel,
     sourceLabel,
     form,
     isSubmitting: form.formState.isSubmitting,
@@ -860,6 +1026,9 @@ export function useLaboratorio({
     openCreateModal,
     openEditModal,
     openFromConsultation,
+    openDraftCreate,
+    openDraftEdit,
+    openForExistingConsultation,
     openBiopsyFromColposcopy,
     openPathologyFromProcedure,
     openPrenatalBattery,

@@ -178,28 +178,51 @@ export function ConsultationPrintView({
               <div className="grid grid-cols-2 gap-1.5 font-mono text-[11px]">
                 <div>
                   <span className="block text-[9px] text-muted-foreground">P.A.</span>
-                  <strong>{consultation.vitalSigns.bloodPressure} mmHg</strong>
+                  <strong>
+                    {consultation.vitalSigns.bloodPressure
+                      ? `${consultation.vitalSigns.bloodPressure} mmHg`
+                      : "—"}
+                  </strong>
                 </div>
                 <div>
                   <span className="block text-[9px] text-muted-foreground">F.C.</span>
-                  <strong>{consultation.vitalSigns.heartRate} lpm</strong>
+                  <strong>
+                    {consultation.vitalSigns.heartRate !== undefined
+                      ? `${consultation.vitalSigns.heartRate} lpm`
+                      : "—"}
+                  </strong>
                 </div>
                 <div>
                   <span className="block text-[9px] text-muted-foreground">F.R.</span>
-                  <strong>{consultation.vitalSigns.respiratoryRate ?? 18} rpm</strong>
+                  <strong>
+                    {consultation.vitalSigns.respiratoryRate !== undefined
+                      ? `${consultation.vitalSigns.respiratoryRate} rpm`
+                      : "—"}
+                  </strong>
                 </div>
                 <div>
                   <span className="block text-[9px] text-muted-foreground">SatO2</span>
-                  <strong>{consultation.vitalSigns.oxygenSaturation ?? 98}%</strong>
+                  <strong>
+                    {consultation.vitalSigns.oxygenSaturation !== undefined
+                      ? `${consultation.vitalSigns.oxygenSaturation}%`
+                      : "—"}
+                  </strong>
                 </div>
                 <div>
                   <span className="block text-[9px] text-muted-foreground">Temp.</span>
-                  <strong>{consultation.vitalSigns.temperature} °C</strong>
+                  <strong>
+                    {consultation.vitalSigns.temperature !== undefined
+                      ? `${consultation.vitalSigns.temperature} °C`
+                      : "—"}
+                  </strong>
                 </div>
                 <div>
                   <span className="block text-[9px] text-muted-foreground">IMC</span>
                   <strong className="text-primary">
-                    {consultation.vitalSigns.bmi} kg/m²
+                    {consultation.vitalSigns.bmi !== undefined &&
+                    consultation.vitalSigns.bmi > 0
+                      ? `${consultation.vitalSigns.bmi} kg/m²`
+                      : "—"}
                   </strong>
                 </div>
                 <div className="col-span-2 border-t border-border pt-1">
@@ -207,8 +230,16 @@ export function ConsultationPrintView({
                     Peso / Talla:{" "}
                   </span>
                   <strong>
-                    {consultation.vitalSigns.weightKg} kg •{" "}
-                    {consultation.vitalSigns.heightCm} cm
+                    {[
+                      consultation.vitalSigns.weightKg !== undefined
+                        ? `${consultation.vitalSigns.weightKg} kg`
+                        : null,
+                      consultation.vitalSigns.heightCm !== undefined
+                        ? `${consultation.vitalSigns.heightCm} cm`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" • ") || "—"}
                   </strong>
                 </div>
               </div>
@@ -220,34 +251,54 @@ export function ConsultationPrintView({
             <h2 className="text-[10px] font-bold tracking-wider text-primary uppercase">
               3. Examen Físico Ginecológico Dirigido
             </h2>
-            <div className="grid grid-cols-2 gap-2 text-[11px]">
-              <div>
-                <span className="font-semibold text-muted-foreground">General: </span>
-                <span>{consultation.physicalExam.generalExam || "Normal"}</span>
+            {consultation.physicalExam.generalExam ||
+            consultation.physicalExam.breastsExam ||
+            consultation.physicalExam.externalGenitalia ||
+            consultation.physicalExam.speculoscopy ||
+            consultation.physicalExam.bimanualPalpation ? (
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                {consultation.physicalExam.generalExam ? (
+                  <div>
+                    <span className="font-semibold text-muted-foreground">General: </span>
+                    <span>{consultation.physicalExam.generalExam}</span>
+                  </div>
+                ) : null}
+                {consultation.physicalExam.breastsExam ? (
+                  <div>
+                    <span className="font-semibold text-muted-foreground">Mamas: </span>
+                    <span>{consultation.physicalExam.breastsExam}</span>
+                  </div>
+                ) : null}
+                {consultation.physicalExam.externalGenitalia ? (
+                  <div>
+                    <span className="font-semibold text-muted-foreground">
+                      Genitales Externos:{" "}
+                    </span>
+                    <span>{consultation.physicalExam.externalGenitalia}</span>
+                  </div>
+                ) : null}
+                {consultation.physicalExam.speculoscopy ? (
+                  <div>
+                    <span className="font-semibold text-muted-foreground">
+                      Especuloscopía:{" "}
+                    </span>
+                    <span>{consultation.physicalExam.speculoscopy}</span>
+                  </div>
+                ) : null}
+                {consultation.physicalExam.bimanualPalpation ? (
+                  <div className="col-span-2">
+                    <span className="font-semibold text-muted-foreground">
+                      Tacto Bimanual:{" "}
+                    </span>
+                    <span>{consultation.physicalExam.bimanualPalpation}</span>
+                  </div>
+                ) : null}
               </div>
-              <div>
-                <span className="font-semibold text-muted-foreground">Mamas: </span>
-                <span>{consultation.physicalExam.breastsExam || "Normal"}</span>
-              </div>
-              <div>
-                <span className="font-semibold text-muted-foreground">
-                  Genitales Externos:{" "}
-                </span>
-                <span>{consultation.physicalExam.externalGenitalia || "Normal"}</span>
-              </div>
-              <div>
-                <span className="font-semibold text-muted-foreground">
-                  Especuloscopía:{" "}
-                </span>
-                <span>{consultation.physicalExam.speculoscopy || "Normal"}</span>
-              </div>
-              <div className="col-span-2">
-                <span className="font-semibold text-muted-foreground">
-                  Tacto Bimanual:{" "}
-                </span>
-                <span>{consultation.physicalExam.bimanualPalpation || "Normal"}</span>
-              </div>
-            </div>
+            ) : (
+              <p className="text-[11px] italic text-muted-foreground">
+                No consignado en esta atención.
+              </p>
+            )}
           </div>
 
           {/* 5. Diagnóstico y Plan Terapéutico */}

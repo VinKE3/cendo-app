@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import type { PrescriptionItemRecord } from "@/db/schema/clinical";
 import type {
   ConsultationVademecumOption,
+  DraftPrescriptionForConsultation,
   MedicalConsultationItem,
 } from "@/features/consultas/consultas.schema";
 import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
@@ -20,7 +21,7 @@ import {
   type MinorProcedureItem,
 } from "@/features/procedimientos/procedimientos.schema";
 import { usePagination } from "@/hooks/use-pagination";
-import { getPeruDateString } from "@/lib/utils";
+import { formatPeruDateDisplay, getPeruDateString } from "@/lib/utils";
 import {
   createPrescriptionAction,
   deletePrescriptionAction,
@@ -95,6 +96,10 @@ export interface UseRecetasParams {
   onPrescriptionsChange: (next: MedicalPrescriptionItem[]) => void;
   vademecumOptions: ConsultationVademecumOption[];
   consultations: MedicalConsultationItem[];
+  onDraftSubmit?: (
+    draft: DraftPrescriptionForConsultation,
+    editingDraftIndex: number | null
+  ) => void;
 }
 
 export function useRecetas({
@@ -103,6 +108,7 @@ export function useRecetas({
   onPrescriptionsChange,
   vademecumOptions,
   consultations,
+  onDraftSubmit,
 }: UseRecetasParams) {
   const todayStr = useMemo(() => getPeruDateString(), []);
 
@@ -111,6 +117,11 @@ export function useRecetas({
   const [editingItem, setEditingItem] = useState<MedicalPrescriptionItem | null>(
     null
   );
+  const [draftMode, setDraftMode] = useState(false);
+  const [editingDraftIndex, setEditingDraftIndex] = useState<number | null>(null);
+  const [lockedConsultationLabel, setLockedConsultationLabel] = useState<
+    string | null
+  >(null);
   const [sourceConsultationLabel, setSourceConsultationLabel] = useState<
     string | null
   >(null);
@@ -194,7 +205,14 @@ export function useRecetas({
     pagination.setCurrentPage(1);
   };
 
+  const resetConsultModeFlags = (lockedLabel: string | null = null) => {
+    setDraftMode(false);
+    setEditingDraftIndex(null);
+    setLockedConsultationLabel(lockedLabel);
+  };
+
   const openCreateModal = () => {
+    resetConsultModeFlags(null);
     setEditingItem(null);
     setSourceConsultationLabel(null);
     setSaveAndPrintIntent(false);
@@ -212,7 +230,11 @@ export function useRecetas({
     setDialogOpen(true);
   };
 
-  const openEditModal = (item: MedicalPrescriptionItem) => {
+  const openEditModal = (
+    item: MedicalPrescriptionItem,
+    lockedLabel?: string
+  ) => {
+    resetConsultModeFlags(lockedLabel ?? null);
     setEditingItem(item);
     setSourceConsultationLabel(null);
     setSaveAndPrintIntent(false);
@@ -231,6 +253,7 @@ export function useRecetas({
   };
 
   const openDuplicateModal = (item: MedicalPrescriptionItem) => {
+    resetConsultModeFlags(null);
     setEditingItem(null);
     setSourceConsultationLabel(
       `Renovación basada en receta del ${item.prescriptionDate}`
@@ -256,6 +279,7 @@ export function useRecetas({
   };
 
   const openFromConsultation = (consultation: MedicalConsultationItem) => {
+    resetConsultModeFlags(null);
     const parsedDrafts = parseConsultationRxNotesToDraftItems(
       consultation.prescriptionNotes,
       vademecumOptions
@@ -279,7 +303,87 @@ export function useRecetas({
     setDialogOpen(true);
   };
 
+  const openDraftCreate = (prefill: {
+    prescriptionDate: string;
+    diagnosis: string;
+    cie10Code: string;
+    nextAppointmentDate: string;
+    sourceLabel?: string;
+  }) => {
+    setDraftMode(true);
+    setEditingDraftIndex(null);
+    setLockedConsultationLabel(
+      prefill.sourceLabel ?? "Nueva consulta en curso (se emitirá al guardar)"
+    );
+    setEditingItem(null);
+    setSourceConsultationLabel(null);
+    setSaveAndPrintIntent(false);
+    resetBuilder();
+    setVademecumSearch("");
+    setDraftItems([]);
+    form.reset({
+      consultationId: "",
+      prescriptionDate: prefill.prescriptionDate || todayStr,
+      diagnosis: prefill.diagnosis,
+      cie10Code: prefill.cie10Code,
+      generalIndications: DEFAULT_GENERAL_INDICATIONS,
+      nextAppointmentDate: prefill.nextAppointmentDate,
+    });
+    setDialogOpen(true);
+  };
+
+  const openDraftEdit = (
+    draft: DraftPrescriptionForConsultation,
+    index: number,
+    sourceLabel?: string
+  ) => {
+    setDraftMode(true);
+    setEditingDraftIndex(index);
+    setLockedConsultationLabel(
+      sourceLabel ?? "Nueva consulta en curso (se emitirá al guardar)"
+    );
+    setEditingItem(null);
+    setSourceConsultationLabel(null);
+    setSaveAndPrintIntent(false);
+    resetBuilder();
+    setVademecumSearch("");
+    setDraftItems(draft.items.map((it) => ({ ...it })));
+    form.reset({
+      consultationId: "",
+      prescriptionDate: draft.prescriptionDate || todayStr,
+      diagnosis: draft.diagnosis,
+      cie10Code: draft.cie10Code,
+      generalIndications:
+        draft.generalIndications || DEFAULT_GENERAL_INDICATIONS,
+      nextAppointmentDate: draft.nextAppointmentDate,
+    });
+    setDialogOpen(true);
+  };
+
+  const openForExistingConsultation = (
+    consultation: MedicalConsultationItem
+  ) => {
+    const label = `Consulta del ${formatPeruDateDisplay(consultation.consultationDate)} — ${consultation.diagnosis}`;
+    resetConsultModeFlags(label);
+    setEditingItem(null);
+    setSourceConsultationLabel(null);
+    setSaveAndPrintIntent(false);
+    resetBuilder();
+    setVademecumSearch("");
+    setDraftItems([]);
+    form.reset({
+      consultationId: consultation.id,
+      prescriptionDate: consultation.consultationDate || todayStr,
+      diagnosis: consultation.diagnosis,
+      cie10Code: consultation.cie10Code,
+      generalIndications: DEFAULT_GENERAL_INDICATIONS,
+      nextAppointmentDate: consultation.nextAppointmentDate,
+    });
+    setDialogOpen(true);
+  };
+
   const openFromProcedure = (procedure: MinorProcedureItem) => {
+    resetConsultModeFlags(null);
     const parsedDrafts = parseConsultationRxNotesToDraftItems(
       procedure.medicationsPrescribed || "",
       vademecumOptions
@@ -307,6 +411,7 @@ export function useRecetas({
   };
 
   const openFromPrenatal = (card: PrenatalCardItem) => {
+    resetConsultModeFlags(null);
     const ga = calculateGestationalAge(card.baseline.fum, todayStr);
     const lastVisit =
       card.visits.length > 0 ? card.visits[card.visits.length - 1] : null;
@@ -513,6 +618,30 @@ export function useRecetas({
       return;
     }
 
+    if (draftMode && onDraftSubmit) {
+      onDraftSubmit(
+        {
+          prescriptionDate: values.prescriptionDate,
+          diagnosis: values.diagnosis,
+          cie10Code: values.cie10Code,
+          items: draftItems,
+          generalIndications: values.generalIndications,
+          nextAppointmentDate: values.nextAppointmentDate,
+        },
+        editingDraftIndex
+      );
+      setDialogOpen(false);
+      setDraftMode(false);
+      setEditingDraftIndex(null);
+      setLockedConsultationLabel(null);
+      toast.success(
+        editingDraftIndex !== null
+          ? "Receta borrador actualizada en la consulta."
+          : "Receta médica asociada a la consulta (se emitirá al guardar)."
+      );
+      return;
+    }
+
     const validConsultationId =
       values.consultationId && pgUuidRegex.test(values.consultationId)
         ? values.consultationId
@@ -595,6 +724,9 @@ export function useRecetas({
     dialogOpen,
     setDialogOpen,
     editingItem,
+    draftMode,
+    editingDraftIndex,
+    lockedConsultationLabel,
     sourceConsultationLabel,
     form,
     isSubmitting: form.formState.isSubmitting,
@@ -613,6 +745,9 @@ export function useRecetas({
     openEditModal,
     openDuplicateModal,
     openFromConsultation,
+    openDraftCreate,
+    openDraftEdit,
+    openForExistingConsultation,
     openFromProcedure,
     openFromPrenatal,
     selectVademecumMedication,

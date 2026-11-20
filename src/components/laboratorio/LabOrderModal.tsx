@@ -1,9 +1,11 @@
 "use client";
 
-import type { BaseSyntheticEvent } from "react";
+import { useState, type BaseSyntheticEvent } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import {
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   FlaskConical,
   Link2,
   Microscope,
@@ -49,6 +51,9 @@ interface LabOrderModalProps {
   onOpenChange: (open: boolean) => void;
   patient: PatientDirectoryItem;
   editingItem: LabOrderItem | null;
+  draftMode?: boolean;
+  editingDraftIndex?: number | null;
+  lockedConsultationLabel?: string | null;
   sourceLabel: string | null;
   form: UseFormReturn<LabOrderModalFormValues>;
   isSubmitting: boolean;
@@ -90,6 +95,9 @@ export function LabOrderModal({
   onOpenChange,
   patient,
   editingItem,
+  draftMode = false,
+  editingDraftIndex = null,
+  lockedConsultationLabel = null,
   sourceLabel,
   form,
   isSubmitting,
@@ -128,10 +136,19 @@ export function LabOrderModal({
     formState: { errors },
   } = form;
 
+  const [showTemplates, setShowTemplates] = useState(false);
+
+  const handleDialogOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      setShowTemplates(false);
+    }
+    onOpenChange(nextOpen);
+  };
+
   const isPathologyTemplate = watchedTemplateType !== "GENERAL";
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-5xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -198,22 +215,31 @@ export function LabOrderModal({
                   className="flex items-center gap-1.5 text-xs font-medium"
                 >
                   <Link2 className="size-3.5 text-primary" />
-                  Vincular con Consulta (Opcional)
+                  {lockedConsultationLabel
+                    ? "Consulta Vinculada"
+                    : "Vincular con Consulta (Opcional)"}
                 </label>
-                <select
-                  id="lab-cons"
-                  value={watchedConsultationId}
-                  onChange={(e) => onSelectConsultationLink(e.target.value)}
-                  className={selectClassName}
-                >
-                  <option value="">Orden independiente (sin vínculo directo)</option>
-                  {consultations.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {formatPeruDateDisplay(c.consultationDate)} — {c.diagnosis}{" "}
-                      {c.cie10Code ? `(${c.cie10Code})` : ""}
-                    </option>
-                  ))}
-                </select>
+                {lockedConsultationLabel ? (
+                  <div className="flex min-h-8 items-center gap-2 rounded-lg border border-primary/25 bg-primary/5 px-2.5 py-1.5 text-xs font-medium text-primary">
+                    <Link2 className="size-3.5 shrink-0" />
+                    <span className="truncate">{lockedConsultationLabel}</span>
+                  </div>
+                ) : (
+                  <select
+                    id="lab-cons"
+                    value={watchedConsultationId}
+                    onChange={(e) => onSelectConsultationLink(e.target.value)}
+                    className={selectClassName}
+                  >
+                    <option value="">Orden independiente (sin vínculo directo)</option>
+                    {consultations.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {formatPeruDateDisplay(c.consultationDate)} — {c.diagnosis}{" "}
+                        {c.cie10Code ? `(${c.cie10Code})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 
@@ -235,14 +261,28 @@ export function LabOrderModal({
             />
           </div>
 
-          {/* Bloque 2: Plantillas de Patología/Remisión + Perfiles Rápidos */}
-          <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
+          {/* Bloque 2: Toggle compacto de Modalidad y Plantillas CENDO (colapsado por defecto) */}
+          <div className="rounded-xl border border-border bg-muted/20 px-3.5 py-2.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Microscope className="size-4 text-primary" />
-                <span className="text-xs font-semibold text-foreground uppercase">
-                  Modalidad y Plantillas CENDO
-                </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  aria-expanded={showTemplates}
+                  onClick={() => setShowTemplates((prev) => !prev)}
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                >
+                  <Microscope className="size-3.5 text-primary" />
+                  <span>Plantillas y Perfiles</span>
+                  <span className="font-mono text-[11px] text-muted-foreground">
+                    ({labTemplates.length + presetPacks.length})
+                  </span>
+                  {showTemplates ? (
+                    <ChevronUp className="size-3.5 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="size-3.5 text-muted-foreground" />
+                  )}
+                </button>
+
                 {isPathologyTemplate ? (
                   <Badge variant="secondary" className="text-[10.5px]">
                     Modo Remisión: {watchedTemplateTitle || watchedTemplateType}
@@ -254,73 +294,83 @@ export function LabOrderModal({
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center gap-1.5">
-                {isPathologyTemplate ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="xs"
-                    onClick={onResetToGeneral}
-                  >
-                    Cambiar a Orden General
-                  </Button>
-                ) : null}
+              {isPathologyTemplate ? (
                 <Button
                   type="button"
                   variant="outline"
                   size="xs"
-                  onClick={onOpenManageTemplates}
+                  onClick={onResetToGeneral}
                 >
-                  <Settings className="size-3" />
-                  Gestionar Plantillas
+                  Cambiar a Orden General
                 </Button>
-              </div>
+              ) : null}
             </div>
 
-            {/* Plantillas de Patología */}
-            <div className="space-y-1">
-              <span className="block text-[11px] font-medium text-muted-foreground">
-                Plantillas de Remisión / Muestras Especializadas (activa cadena
-                de custodia):
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {labTemplates.map((tmpl) => (
-                  <button
-                    key={tmpl.id}
-                    type="button"
-                    onClick={() => onApplyTemplate(tmpl)}
-                    className={cn(
-                      "cursor-pointer rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors",
-                      watchedTemplateTitle === tmpl.title
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
-                    )}
-                  >
-                    {tmpl.title}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {showTemplates ? (
+              <div className="mt-3 space-y-3 border-t border-border pt-3">
+                {/* Plantillas de Patología */}
+                <div className="space-y-1.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="block text-[11px] font-medium text-muted-foreground">
+                      Plantillas de Remisión / Muestras Especializadas (activa
+                      cadena de custodia):
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      onClick={onOpenManageTemplates}
+                    >
+                      <Settings className="size-3" />
+                      Gestionar Plantillas
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {labTemplates.map((tmpl) => (
+                      <button
+                        key={tmpl.id}
+                        type="button"
+                        onClick={() => {
+                          onApplyTemplate(tmpl);
+                          setShowTemplates(false);
+                        }}
+                        className={cn(
+                          "cursor-pointer rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors",
+                          watchedTemplateTitle === tmpl.title
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+                        )}
+                      >
+                        {tmpl.title}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-            {/* Perfiles Clínicos Rápidos */}
-            <div className="space-y-1 border-t border-border pt-2">
-              <span className="block text-[11px] font-medium text-muted-foreground">
-                Perfiles Diagnósticos CENDO (1 clic para sumar análisis):
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {presetPacks.map((pack) => (
-                  <button
-                    key={pack.id}
-                    type="button"
-                    onClick={() => onApplyPresetPack(pack)}
-                    title={pack.description}
-                    className="cursor-pointer rounded-md border border-border bg-card px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
-                  >
-                    + {pack.name}
-                  </button>
-                ))}
+                {/* Perfiles Clínicos Rápidos */}
+                <div className="space-y-1 border-t border-border pt-2">
+                  <span className="block text-[11px] font-medium text-muted-foreground">
+                    Perfiles Diagnósticos CENDO (1 clic para sumar análisis):
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {presetPacks.map((pack) => (
+                      <button
+                        key={pack.id}
+                        type="button"
+                        onClick={() => {
+                          onApplyPresetPack(pack);
+                          setShowTemplates(false);
+                        }}
+                        title={pack.description}
+                        className="cursor-pointer rounded-md border border-border bg-card px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                      >
+                        + {pack.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : null}
           </div>
 
           {/* Bloque 2.5: Metadatos de Muestra (Solo cuando templateType !== GENERAL) */}
@@ -579,20 +629,26 @@ export function LabOrderModal({
 
           {/* Bloque 4: Indicaciones para la paciente */}
           <div className="space-y-2 rounded-xl border border-border bg-muted/20 p-4">
-            <label htmlFor="lab-instr" className="block text-xs font-medium">
-              Indicaciones de Preparación / Remisión
-            </label>
-            <div className="flex flex-wrap gap-1.5">
-              {LAB_INSTRUCTION_PRESETS.map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  onClick={() => onAppendInstruction(preset)}
-                  className="cursor-pointer rounded-md border border-border bg-card px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
-                >
-                  + {preset}
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label htmlFor="lab-instr" className="block text-xs font-medium">
+                Indicaciones de Preparación / Remisión
+              </label>
+              <select
+                aria-label="Insertar indicación rápida"
+                value=""
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val) onAppendInstruction(val);
+                }}
+                className="h-7 max-w-[260px] rounded-md border border-input bg-card px-2 text-xs text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+              >
+                <option value="">+ Insertar indicación rápida...</option>
+                {LAB_INSTRUCTION_PRESETS.map((preset) => (
+                  <option key={preset} value={preset}>
+                    {preset}
+                  </option>
+                ))}
+              </select>
             </div>
             <Textarea
               id="lab-instr"
@@ -605,20 +661,22 @@ export function LabOrderModal({
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => handleDialogOpenChange(false)}
               disabled={isSubmitting}
             >
               Cancelar
             </Button>
-            <Button
-              type="submit"
-              variant="outline"
-              disabled={isSubmitting}
-              onClick={() => onSaveAndPrintIntent(true)}
-            >
-              <Printer className="size-4" />
-              Guardar e Imprimir A4
-            </Button>
+            {!draftMode ? (
+              <Button
+                type="submit"
+                variant="outline"
+                disabled={isSubmitting}
+                onClick={() => onSaveAndPrintIntent(true)}
+              >
+                <Printer className="size-4" />
+                Guardar e Imprimir A4
+              </Button>
+            ) : null}
             <Button
               type="submit"
               disabled={isSubmitting}
@@ -627,9 +685,13 @@ export function LabOrderModal({
               <CheckCircle2 className="size-4" />
               {isSubmitting
                 ? "Guardando..."
-                : editingItem
-                  ? "Guardar Cambios"
-                  : "Emitir Orden"}
+                : draftMode
+                  ? editingDraftIndex !== null
+                    ? "Actualizar Orden en Consulta"
+                    : "Asociar Orden a Consulta"
+                  : editingItem
+                    ? "Guardar Cambios"
+                    : "Emitir Orden"}
             </Button>
           </DialogFooter>
         </form>

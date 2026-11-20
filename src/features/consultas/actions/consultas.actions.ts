@@ -77,9 +77,9 @@ export async function updateConsultationAction(rawData: unknown) {
       }
       const actor = await getSessionDoctorProfile(ctx.userId, ctx.tenantId);
       const actorName = actor ? `${actor.doctorTitle} ${actor.fullName}` : ctx.userId;
-      const updated = await updateConsultation(ctx, actorName, input);
-      revalidateConsultationRoutes(updated.patientId);
-      return updated;
+      const result = await updateConsultation(ctx, actorName, input);
+      revalidateConsultationRoutes(result.consultation.patientId);
+      return result;
     },
   });
   return runner(rawData);

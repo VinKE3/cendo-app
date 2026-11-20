@@ -885,9 +885,13 @@ export function PatientDetailView({
           formContext={consultationFormContext}
           prescriptions={prescriptionsList}
           labOrders={labOrdersList}
+          labTemplates={labTemplatesList}
           canEdit={canEdit}
           canDelete={canDelete}
           onConsultationsChange={setConsultationsList}
+          onPrescriptionsChange={setPrescriptionsList}
+          onLabOrdersChange={setLabOrdersList}
+          onLabTemplatesChange={setLabTemplatesList}
           onPrescriptionCreated={handlePrescriptionCreatedFromConsultation}
           onLabOrderCreated={handleLabOrderCreatedFromConsultation}
           onEmitPrescriptionFromConsultation={

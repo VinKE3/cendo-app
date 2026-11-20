@@ -14,6 +14,7 @@ import type { ConsultationVitalSignsRecord } from "@/db/schema/clinical";
 import { recordAuditLog } from "@/lib/audit/audit-log";
 import { DomainError, type SessionPayload } from "@/lib/security/action-guard";
 import { getPeruDateString } from "@/lib/utils";
+import { assertNoScheduleConflict } from "@/features/agenda/services/agenda.service";
 import {
   parseConsultationAuxExamsToLabItems,
   type LabOrderItem,
@@ -26,9 +27,13 @@ import {
 import { mapPrescriptionRow } from "@/features/recetas/services/recetas.service";
 import {
   calculateBmi,
+  type ConsultationActiveAppointment,
   type ConsultationFormContext,
   type CreateConsultationInput,
+  type DraftLabOrderForConsultation,
+  type DraftPrescriptionForConsultation,
   type MedicalConsultationItem,
+  type NextAppointmentScheduleInput,
   type UpdateConsultationInput,
 } from "../consultas.schema";
 
@@ -60,19 +65,133 @@ function mapConsultationRow(
   };
 }
 
+type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 function buildNormalizedVitals(
   raw: CreateConsultationInput["vitalSigns"]
 ): ConsultationVitalSignsRecord {
-  const bmi = calculateBmi(raw.weightKg, raw.heightCm);
+  const normalized: ConsultationVitalSignsRecord = {};
+  const bp = raw.bloodPressure?.trim();
+  if (bp) normalized.bloodPressure = bp;
+  if (typeof raw.heartRate === "number" && Number.isFinite(raw.heartRate)) {
+    normalized.heartRate = raw.heartRate;
+  }
+  if (
+    typeof raw.respiratoryRate === "number" &&
+    Number.isFinite(raw.respiratoryRate)
+  ) {
+    normalized.respiratoryRate = raw.respiratoryRate;
+  }
+  if (typeof raw.temperature === "number" && Number.isFinite(raw.temperature)) {
+    normalized.temperature = Number(raw.temperature.toFixed(1));
+  }
+  if (
+    typeof raw.oxygenSaturation === "number" &&
+    Number.isFinite(raw.oxygenSaturation)
+  ) {
+    normalized.oxygenSaturation = raw.oxygenSaturation;
+  }
+  if (typeof raw.weightKg === "number" && Number.isFinite(raw.weightKg)) {
+    normalized.weightKg = Number(raw.weightKg.toFixed(2));
+  }
+  if (typeof raw.heightCm === "number" && Number.isFinite(raw.heightCm)) {
+    normalized.heightCm = Number(raw.heightCm.toFixed(1));
+  }
+  if (normalized.weightKg && normalized.heightCm) {
+    const bmi = calculateBmi(normalized.weightKg, normalized.heightCm);
+    if (bmi > 0) normalized.bmi = bmi;
+  }
+  return normalized;
+}
+
+function buildAuxiliaryExamsSummaryFromDrafts(
+  drafts: DraftLabOrderForConsultation[]
+): string {
+  if (drafts.length === 0) return "";
+  const lines: string[] = [];
+  for (const draft of drafts) {
+    const testNames = draft.items.map((item) => item.testName.trim()).filter(Boolean);
+    const custom = draft.customTests.trim();
+    const parts = [...testNames];
+    if (custom) parts.push(custom);
+    if (parts.length > 0) {
+      const prefix =
+        draft.templateTitle && draft.templateType !== "GENERAL"
+          ? `[${draft.templateTitle}] `
+          : "";
+      lines.push(`${prefix}${parts.join(" • ")}`);
+    }
+  }
+  return lines.join("\n").slice(0, 1950);
+}
+
+function buildPrescriptionNotesSummaryFromDrafts(
+  drafts: DraftPrescriptionForConsultation[]
+): string {
+  if (drafts.length === 0) return "";
+  let lineNo = 1;
+  const lines: string[] = [];
+  for (const draft of drafts) {
+    for (const item of draft.items) {
+      lines.push(
+        `${lineNo}. ${item.medicationName} — ${item.dosage} — ${item.frequency} — ${item.duration}`
+      );
+      lineNo += 1;
+    }
+  }
+  return lines.join("\n").slice(0, 1950);
+}
+
+async function scheduleFollowUpAppointmentInTx(params: {
+  tx: DbTx;
+  ctx: SessionPayload;
+  tenantId: string;
+  patientId: string;
+  doctorId: string;
+  doctorDisplayName: string;
+  appointmentDate: string;
+  schedule: NextAppointmentScheduleInput;
+}): Promise<ConsultationActiveAppointment> {
+  await assertNoScheduleConflict({
+    executor: params.tx,
+    tenantId: params.tenantId,
+    doctorId: params.doctorId,
+    doctorDisplayName: params.doctorDisplayName,
+    patientId: params.patientId,
+    appointmentDate: params.appointmentDate,
+    appointmentTime: params.schedule.appointmentTime,
+    durationMinutes: params.schedule.durationMinutes,
+    status: "CONFIRMADA",
+  });
+
+  const [apptRow] = await params.tx
+    .insert(medicalAppointments)
+    .values({
+      tenantId: params.tenantId,
+      patientId: params.patientId,
+      doctorId: params.doctorId,
+      doctorName: params.doctorDisplayName,
+      appointmentDate: params.appointmentDate,
+      appointmentTime: params.schedule.appointmentTime,
+      durationMinutes: params.schedule.durationMinutes,
+      appointmentType: params.schedule.appointmentType,
+      reason: params.schedule.reason,
+      status: "CONFIRMADA",
+      notes: "Programada directamente desde Consulta Médica.",
+      reminderSent: false,
+      createdBy: params.ctx.userId,
+      updatedBy: params.ctx.userId,
+    })
+    .returning();
+
   return {
-    bloodPressure: raw.bloodPressure.trim(),
-    heartRate: raw.heartRate,
-    respiratoryRate: raw.respiratoryRate,
-    temperature: Number(raw.temperature.toFixed(1)),
-    oxygenSaturation: raw.oxygenSaturation,
-    weightKg: Number(raw.weightKg.toFixed(2)),
-    heightCm: Number(raw.heightCm.toFixed(1)),
-    bmi,
+    id: apptRow.id,
+    appointmentDate: apptRow.appointmentDate,
+    appointmentTime: String(apptRow.appointmentTime).slice(0, 5),
+    appointmentType: apptRow.appointmentType,
+    reason: apptRow.reason,
+    status: apptRow.status,
+    doctorName: apptRow.doctorName,
   };
 }
 
@@ -192,9 +311,12 @@ export async function createConsultation(
   consultation: MedicalConsultationItem;
   createdPrescriptionId: string | null;
   createdPrescription: MedicalPrescriptionItem | null;
+  createdPrescriptions: MedicalPrescriptionItem[];
   createdLabOrderId: string | null;
   createdLabOrder: LabOrderItem | null;
+  createdLabOrders: LabOrderItem[];
   attendedAppointmentId: string | null;
+  scheduledNextAppointment: ConsultationActiveAppointment | null;
 }> {
   if (!ctx.tenantId) throw new DomainError("Sesión sin sede asociada.");
   const tenantId = ctx.tenantId;
@@ -244,6 +366,13 @@ export async function createConsultation(
   const doctorRne = doctor.rne?.trim() || null;
   const normalizedVitals = buildNormalizedVitals(input.vitalSigns);
 
+  const effectiveAuxiliaryExams =
+    input.auxiliaryExams.trim() ||
+    buildAuxiliaryExamsSummaryFromDrafts(input.draftLabOrders);
+  const effectivePrescriptionNotes =
+    input.prescriptionNotes.trim() ||
+    buildPrescriptionNotesSummaryFromDrafts(input.draftPrescriptions);
+
   const txResult = await db.transaction(async (tx) => {
     let validAppointmentId: string | null = null;
     if (input.appointmentId) {
@@ -287,8 +416,8 @@ export async function createConsultation(
         diagnosis: input.diagnosis,
         cie10Code: input.cie10Code || null,
         treatmentPlan: input.treatmentPlan,
-        auxiliaryExams: input.auxiliaryExams || null,
-        prescriptionNotes: input.prescriptionNotes || null,
+        auxiliaryExams: effectiveAuxiliaryExams || null,
+        prescriptionNotes: effectivePrescriptionNotes || null,
         nextAppointmentDate: input.nextAppointmentDate || null,
         createdBy: ctx.userId,
         updatedBy: ctx.userId,
@@ -314,9 +443,35 @@ export async function createConsultation(
       attendedAppointmentId = validAppointmentId;
     }
 
-    let createdPrescriptionId: string | null = null;
-    let createdPrescription: MedicalPrescriptionItem | null = null;
-    if (input.generatePrescription && input.prescriptionNotes.trim()) {
+    const createdPrescriptions: MedicalPrescriptionItem[] = [];
+    if (input.draftPrescriptions.length > 0) {
+      for (const draftRx of input.draftPrescriptions) {
+        const [rx] = await tx
+          .insert(medicalPrescriptions)
+          .values({
+            tenantId,
+            patientId: input.patientId,
+            consultationId: inserted.id,
+            doctorId: doctor.id,
+            doctorName: doctorDisplayName,
+            doctorCmp,
+            doctorRne,
+            prescriptionDate: draftRx.prescriptionDate,
+            diagnosis: draftRx.diagnosis,
+            cie10Code: draftRx.cie10Code || null,
+            items: draftRx.items,
+            generalIndications:
+              draftRx.generalIndications ||
+              "Cumplir estrictamente la pauta médica indicada en consulta.",
+            nextAppointmentDate:
+              draftRx.nextAppointmentDate || input.nextAppointmentDate || null,
+            createdBy: ctx.userId,
+            updatedBy: ctx.userId,
+          })
+          .returning();
+        createdPrescriptions.push(mapPrescriptionRow(rx));
+      }
+    } else if (input.generatePrescription && input.prescriptionNotes.trim()) {
       const rxItems = parseConsultationRxNotesToDraftItems(
         input.prescriptionNotes,
         []
@@ -344,14 +499,49 @@ export async function createConsultation(
           })
           .returning();
 
-        createdPrescriptionId = rx.id;
-        createdPrescription = mapPrescriptionRow(rx);
+        createdPrescriptions.push(mapPrescriptionRow(rx));
       }
     }
 
-    let createdLabOrderId: string | null = null;
-    let createdLabOrder: LabOrderItem | null = null;
-    if (input.generateLabOrder && input.auxiliaryExams.trim()) {
+    const createdLabOrders: LabOrderItem[] = [];
+    if (input.draftLabOrders.length > 0) {
+      for (const draftLab of input.draftLabOrders) {
+        const sanitizedSpecimen =
+          draftLab.templateType === "GENERAL"
+            ? null
+            : (draftLab.specimenDetails ?? null);
+        const [lab] = await tx
+          .insert(labOrders)
+          .values({
+            tenantId,
+            patientId: input.patientId,
+            consultationId: inserted.id,
+            doctorId: doctor.id,
+            doctorName: doctorDisplayName,
+            doctorCmp,
+            doctorRne,
+            orderDate: draftLab.orderDate,
+            diagnosis: draftLab.diagnosis,
+            cie10Code: draftLab.cie10Code || null,
+            urgency: draftLab.urgency,
+            items: draftLab.items,
+            customTests: draftLab.customTests || null,
+            patientInstructions:
+              draftLab.patientInstructions ||
+              "Acudir en ayunas o seguir las indicaciones específicas del laboratorio.",
+            templateType: draftLab.templateType,
+            templateTitle:
+              draftLab.templateType === "GENERAL"
+                ? null
+                : draftLab.templateTitle || null,
+            specimenDetails: sanitizedSpecimen,
+            createdBy: ctx.userId,
+            updatedBy: ctx.userId,
+          })
+          .returning();
+        createdLabOrders.push(mapLabOrderRow(lab));
+      }
+    } else if (input.generateLabOrder && input.auxiliaryExams.trim()) {
       const labItems = parseConsultationAuxExamsToLabItems(
         input.auxiliaryExams
       ).map((item) => ({
@@ -384,18 +574,37 @@ export async function createConsultation(
           })
           .returning();
 
-        createdLabOrderId = lab.id;
-        createdLabOrder = mapLabOrderRow(lab);
+        createdLabOrders.push(mapLabOrderRow(lab));
       }
     }
 
+    let scheduledNextAppointment: ConsultationActiveAppointment | null = null;
+    if (input.nextAppointmentDate && input.nextAppointmentSchedule) {
+      scheduledNextAppointment = await scheduleFollowUpAppointmentInTx({
+        tx,
+        ctx,
+        tenantId,
+        patientId: input.patientId,
+        doctorId: doctor.id,
+        doctorDisplayName,
+        appointmentDate: input.nextAppointmentDate,
+        schedule: input.nextAppointmentSchedule,
+      });
+    }
+
+    const createdPrescription = createdPrescriptions[0] ?? null;
+    const createdLabOrder = createdLabOrders[0] ?? null;
+
     return {
       consultation: mapConsultationRow(inserted),
-      createdPrescriptionId,
+      createdPrescriptionId: createdPrescription?.id ?? null,
       createdPrescription,
-      createdLabOrderId,
+      createdPrescriptions,
+      createdLabOrderId: createdLabOrder?.id ?? null,
       createdLabOrder,
+      createdLabOrders,
       attendedAppointmentId,
+      scheduledNextAppointment,
     };
   });
 
@@ -410,12 +619,30 @@ export async function createConsultation(
       patientName: patient.fullName,
       diagnosis: txResult.consultation.diagnosis,
       cie10Code: txResult.consultation.cie10Code,
-      bmi: txResult.consultation.vitalSigns.bmi,
+      bmi: txResult.consultation.vitalSigns.bmi ?? null,
       attendedAppointmentId: txResult.attendedAppointmentId,
-      createdPrescriptionId: txResult.createdPrescriptionId,
-      createdLabOrderId: txResult.createdLabOrderId,
+      createdPrescriptionsCount: txResult.createdPrescriptions.length,
+      createdLabOrdersCount: txResult.createdLabOrders.length,
+      scheduledNextAppointmentId: txResult.scheduledNextAppointment?.id ?? null,
     },
   });
+
+  if (txResult.scheduledNextAppointment) {
+    await recordAuditLog({
+      ctx,
+      actorName,
+      action: "CREATE",
+      entityType: "medical_appointments",
+      entityId: txResult.scheduledNextAppointment.id,
+      changesSummary: {
+        patientId: input.patientId,
+        source: "consulta_medica",
+        appointmentDate: txResult.scheduledNextAppointment.appointmentDate,
+        appointmentTime: txResult.scheduledNextAppointment.appointmentTime,
+        appointmentType: txResult.scheduledNextAppointment.appointmentType,
+      },
+    });
+  }
 
   return txResult;
 }
@@ -424,12 +651,20 @@ export async function updateConsultation(
   ctx: SessionPayload,
   actorName: string,
   input: UpdateConsultationInput
-): Promise<MedicalConsultationItem> {
+): Promise<{
+  consultation: MedicalConsultationItem;
+  scheduledNextAppointment: ConsultationActiveAppointment | null;
+}> {
   if (!ctx.tenantId) throw new DomainError("Sesión sin sede asociada.");
   const tenantId = ctx.tenantId;
 
   const [existing] = await db
-    .select({ id: medicalConsultations.id, patientId: medicalConsultations.patientId })
+    .select({
+      id: medicalConsultations.id,
+      patientId: medicalConsultations.patientId,
+      doctorId: medicalConsultations.doctorId,
+      doctorName: medicalConsultations.doctorName,
+    })
     .from(medicalConsultations)
     .where(
       and(
@@ -466,57 +701,129 @@ export async function updateConsultation(
     validAppointmentId = appt.id;
   }
 
-  const normalizedVitals = buildNormalizedVitals(input.vitalSigns);
+  let scheduleDoctor: { id: string; displayName: string } | null = null;
+  if (input.nextAppointmentDate && input.nextAppointmentSchedule) {
+    if (existing.doctorId) {
+      scheduleDoctor = {
+        id: existing.doctorId,
+        displayName: existing.doctorName || actorName,
+      };
+    } else {
+      const [doctor] = await db
+        .select({
+          id: profiles.id,
+          fullName: profiles.fullName,
+          doctorTitle: profiles.doctorTitle,
+        })
+        .from(profiles)
+        .where(
+          and(
+            eq(profiles.id, ctx.userId),
+            eq(profiles.tenantId, tenantId),
+            eq(profiles.isActive, true),
+            isNull(profiles.deletedAt)
+          )
+        )
+        .limit(1);
 
-  const [updated] = await db
-    .update(medicalConsultations)
-    .set({
-      appointmentId: validAppointmentId,
-      consultationDate: input.consultationDate,
-      reasonForVisit: input.reasonForVisit,
-      illnessTime: input.illnessTime || null,
-      symptoms: input.symptoms || null,
-      vitalSigns: normalizedVitals,
-      physicalExam: input.physicalExam,
-      diagnosis: input.diagnosis,
-      cie10Code: input.cie10Code || null,
-      treatmentPlan: input.treatmentPlan,
-      auxiliaryExams: input.auxiliaryExams || null,
-      prescriptionNotes: input.prescriptionNotes || null,
-      nextAppointmentDate: input.nextAppointmentDate || null,
-      updatedBy: ctx.userId,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(medicalConsultations.id, input.id),
-        eq(medicalConsultations.tenantId, tenantId),
-        isNull(medicalConsultations.deletedAt)
-      )
-    )
-    .returning();
-
-  if (!updated) {
-    throw new DomainError("No se pudo actualizar la consulta médica.");
+      if (!doctor) {
+        throw new DomainError("Médico autenticado no encontrado o inactivo en la sede.");
+      }
+      scheduleDoctor = {
+        id: doctor.id,
+        displayName: `${doctor.doctorTitle} ${doctor.fullName}`.trim(),
+      };
+    }
   }
 
-  const mapped = mapConsultationRow(updated);
+  const normalizedVitals = buildNormalizedVitals(input.vitalSigns);
+
+  const txResult = await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(medicalConsultations)
+      .set({
+        appointmentId: validAppointmentId,
+        consultationDate: input.consultationDate,
+        reasonForVisit: input.reasonForVisit,
+        illnessTime: input.illnessTime || null,
+        symptoms: input.symptoms || null,
+        vitalSigns: normalizedVitals,
+        physicalExam: input.physicalExam,
+        diagnosis: input.diagnosis,
+        cie10Code: input.cie10Code || null,
+        treatmentPlan: input.treatmentPlan,
+        auxiliaryExams: input.auxiliaryExams || null,
+        prescriptionNotes: input.prescriptionNotes || null,
+        nextAppointmentDate: input.nextAppointmentDate || null,
+        updatedBy: ctx.userId,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(medicalConsultations.id, input.id),
+          eq(medicalConsultations.tenantId, tenantId),
+          isNull(medicalConsultations.deletedAt)
+        )
+      )
+      .returning();
+
+    if (!updated) {
+      throw new DomainError("No se pudo actualizar la consulta médica.");
+    }
+
+    let scheduledNextAppointment: ConsultationActiveAppointment | null = null;
+    if (input.nextAppointmentDate && input.nextAppointmentSchedule && scheduleDoctor) {
+      scheduledNextAppointment = await scheduleFollowUpAppointmentInTx({
+        tx,
+        ctx,
+        tenantId,
+        patientId: input.patientId,
+        doctorId: scheduleDoctor.id,
+        doctorDisplayName: scheduleDoctor.displayName,
+        appointmentDate: input.nextAppointmentDate,
+        schedule: input.nextAppointmentSchedule,
+      });
+    }
+
+    return {
+      consultation: mapConsultationRow(updated),
+      scheduledNextAppointment,
+    };
+  });
 
   await recordAuditLog({
     ctx,
     actorName,
     action: "UPDATE",
     entityType: "medical_consultations",
-    entityId: mapped.id,
+    entityId: txResult.consultation.id,
     changesSummary: {
-      patientId: mapped.patientId,
-      diagnosis: mapped.diagnosis,
-      cie10Code: mapped.cie10Code,
-      bmi: mapped.vitalSigns.bmi,
+      patientId: txResult.consultation.patientId,
+      diagnosis: txResult.consultation.diagnosis,
+      cie10Code: txResult.consultation.cie10Code,
+      bmi: txResult.consultation.vitalSigns.bmi ?? null,
+      scheduledNextAppointmentId: txResult.scheduledNextAppointment?.id ?? null,
     },
   });
 
-  return mapped;
+  if (txResult.scheduledNextAppointment) {
+    await recordAuditLog({
+      ctx,
+      actorName,
+      action: "CREATE",
+      entityType: "medical_appointments",
+      entityId: txResult.scheduledNextAppointment.id,
+      changesSummary: {
+        patientId: txResult.consultation.patientId,
+        source: "consulta_medica_edicion",
+        appointmentDate: txResult.scheduledNextAppointment.appointmentDate,
+        appointmentTime: txResult.scheduledNextAppointment.appointmentTime,
+        appointmentType: txResult.scheduledNextAppointment.appointmentType,
+      },
+    });
+  }
+
+  return txResult;
 }
 
 export async function softDeleteConsultation(

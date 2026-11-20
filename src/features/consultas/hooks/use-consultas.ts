@@ -20,6 +20,8 @@ import {
   NORMAL_PHYSICAL_EXAM_PRESET,
   parseBloodPressure,
   type ConsultationFormContext,
+  type DraftLabOrderForConsultation,
+  type DraftPrescriptionForConsultation,
   type MedicalConsultationItem,
 } from "../consultas.schema";
 import {
@@ -30,6 +32,36 @@ import {
 
 const pgUuidRegex =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function addOffsetToIsoDate(
+  baseIso: string,
+  offset: { days?: number; months?: number }
+): string {
+  const clean = /^\d{4}-\d{2}-\d{2}$/.test(baseIso) ? baseIso : getPeruDateString();
+  const [y, m, d] = clean.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (offset.days) {
+    dt.setUTCDate(dt.getUTCDate() + offset.days);
+  }
+  if (offset.months) {
+    const targetMonth = dt.getUTCMonth() + offset.months;
+    const origDay = dt.getUTCDate();
+    dt.setUTCDate(1);
+    dt.setUTCMonth(targetMonth);
+    const lastDayOfMonth = new Date(
+      Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 0)
+    ).getUTCDate();
+    dt.setUTCDate(Math.min(origDay, lastDayOfMonth));
+  }
+  return dt.toISOString().slice(0, 10);
+}
+
+function toOptionalPositiveNumber(raw: string): number | undefined {
+  const clean = raw.trim();
+  if (!clean) return undefined;
+  const num = Number(clean);
+  return Number.isFinite(num) ? num : undefined;
+}
 
 const consultationModalFormSchema = z
   .object({
@@ -46,37 +78,13 @@ const consultationModalFormSchema = z
       .max(300),
     illnessTime: z.string().trim().max(120),
     symptoms: z.string().trim().max(2000),
-    bloodPressure: z
-      .string()
-      .trim()
-      .regex(/^\d{2,3}\/\d{2,3}$/, "Presión arterial inválida (ej. 110/70)."),
-    heartRate: z.coerce
-      .number({ error: "F.C. inválida." })
-      .int()
-      .min(30, "F.C. mínima: 30.")
-      .max(220, "F.C. máxima: 220."),
-    respiratoryRate: z.coerce
-      .number({ error: "F.R. inválida." })
-      .int()
-      .min(8, "F.R. mínima: 8.")
-      .max(60, "F.R. máxima: 60."),
-    temperature: z.coerce
-      .number({ error: "Temp. inválida." })
-      .min(34, "Mínimo 34 °C.")
-      .max(43, "Máximo 43 °C."),
-    oxygenSaturation: z.coerce
-      .number({ error: "SatO2 inválida." })
-      .int()
-      .min(50, "Mínimo 50%.")
-      .max(100, "Máximo 100%."),
-    weightKg: z.coerce
-      .number({ error: "Peso inválido." })
-      .min(20, "Mínimo 20 kg.")
-      .max(300, "Máximo 300 kg."),
-    heightCm: z.coerce
-      .number({ error: "Talla inválida." })
-      .min(80, "Mínimo 80 cm.")
-      .max(240, "Máximo 240 cm."),
+    bloodPressure: z.string().trim().max(15),
+    heartRate: z.string().trim(),
+    respiratoryRate: z.string().trim(),
+    temperature: z.string().trim(),
+    oxygenSaturation: z.string().trim(),
+    weightKg: z.string().trim(),
+    heightCm: z.string().trim(),
     generalExam: z.string().trim().max(1000),
     breastsExam: z.string().trim().max(1000),
     externalGenitalia: z.string().trim().max(1000),
@@ -101,24 +109,103 @@ const consultationModalFormSchema = z
       .refine((v) => v === "" || /^\d{4}-\d{2}-\d{2}$/.test(v), {
         message: "Fecha inválida.",
       }),
+    scheduleNextAppointment: z.boolean(),
+    nextAppointmentTime: z.string().trim(),
+    nextAppointmentDuration: z.coerce.number().int().min(10).max(240),
+    nextAppointmentType: z.string().trim().max(80),
+    nextAppointmentReason: z.string().trim().max(300),
     generatePrescription: z.boolean(),
     generateLabOrder: z.boolean(),
   })
   .superRefine((data, ctx) => {
-    const parsedBp = parseBloodPressure(data.bloodPressure);
-    if (!parsedBp) return;
-    if (
-      parsedBp.systolic < 60 ||
-      parsedBp.systolic > 260 ||
-      parsedBp.diastolic < 30 ||
-      parsedBp.diastolic > 160 ||
-      parsedBp.systolic <= parsedBp.diastolic
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["bloodPressure"],
-        message: "Sistólica (60-260) debe ser mayor que diastólica (30-160).",
-      });
+    if (data.bloodPressure !== "") {
+      if (!/^\d{2,3}\/\d{2,3}$/.test(data.bloodPressure)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["bloodPressure"],
+          message: "Presión arterial inválida (ej. 110/70).",
+        });
+      } else {
+        const parsedBp = parseBloodPressure(data.bloodPressure);
+        if (
+          parsedBp &&
+          (parsedBp.systolic < 60 ||
+            parsedBp.systolic > 260 ||
+            parsedBp.diastolic < 30 ||
+            parsedBp.diastolic > 160 ||
+            parsedBp.systolic <= parsedBp.diastolic)
+        ) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["bloodPressure"],
+            message: "Sistólica (60-260) debe ser mayor que diastólica (30-160).",
+          });
+        }
+      }
+    }
+
+    const validateNumRange = (
+      raw: string,
+      path:
+        | "heartRate"
+        | "respiratoryRate"
+        | "temperature"
+        | "oxygenSaturation"
+        | "weightKg"
+        | "heightCm",
+      min: number,
+      max: number,
+      isInt: boolean,
+      label: string
+    ) => {
+      if (raw === "") return;
+      const num = Number(raw);
+      if (!Number.isFinite(num) || (isInt && !Number.isInteger(num))) {
+        ctx.addIssue({
+          code: "custom",
+          path: [path],
+          message: `${label} inválida.`,
+        });
+        return;
+      }
+      if (num < min || num > max) {
+        ctx.addIssue({
+          code: "custom",
+          path: [path],
+          message: `${label}: rango válido ${min}–${max}.`,
+        });
+      }
+    };
+
+    validateNumRange(data.heartRate, "heartRate", 30, 220, true, "F.C.");
+    validateNumRange(data.respiratoryRate, "respiratoryRate", 8, 60, true, "F.R.");
+    validateNumRange(data.temperature, "temperature", 34, 43, false, "Temperatura");
+    validateNumRange(data.oxygenSaturation, "oxygenSaturation", 50, 100, true, "SatO2");
+    validateNumRange(data.weightKg, "weightKg", 20, 300, false, "Peso");
+    validateNumRange(data.heightCm, "heightCm", 80, 240, false, "Talla");
+
+    if (data.scheduleNextAppointment) {
+      if (!data.nextAppointmentDate.trim()) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["nextAppointmentDate"],
+          message: "Seleccione la fecha de próxima cita para agendar en Agenda.",
+        });
+      }
+      if (!/^([01]\d|2[0-3]):([0-5]\d)$/.test(data.nextAppointmentTime)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["nextAppointmentTime"],
+          message: "Hora inválida (HH:mm).",
+        });
+      }
+      if (data.nextAppointmentReason.trim().length < 3) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["nextAppointmentReason"],
+          message: "Indique el motivo de la cita de control (mínimo 3 caracteres).",
+        });
+      }
     }
   });
 
@@ -141,6 +228,8 @@ export interface UseConsultasParams {
   onConsultationsChange?: (items: MedicalConsultationItem[]) => void;
   onPrescriptionCreated?: (prescription: MedicalPrescriptionItem) => void;
   onLabOrderCreated?: (labOrder: LabOrderItem) => void;
+  onPrescriptionsCreated?: (prescriptions: MedicalPrescriptionItem[]) => void;
+  onLabOrdersCreated?: (labOrders: LabOrderItem[]) => void;
 }
 
 export function useConsultas({
@@ -152,6 +241,8 @@ export function useConsultas({
   onConsultationsChange,
   onPrescriptionCreated,
   onLabOrderCreated,
+  onPrescriptionsCreated,
+  onLabOrdersCreated,
 }: UseConsultasParams) {
   const searchParams = useSearchParams();
   const todayStr = useMemo(() => getPeruDateString(), []);
@@ -172,6 +263,12 @@ export function useConsultas({
   const [editingItem, setEditingItem] =
     useState<MedicalConsultationItem | null>(null);
   const [saveAndPrintIntent, setSaveAndPrintIntent] = useState(false);
+  const [draftLabOrders, setDraftLabOrders] = useState<
+    DraftLabOrderForConsultation[]
+  >([]);
+  const [draftPrescriptions, setDraftPrescriptions] = useState<
+    DraftPrescriptionForConsultation[]
+  >([]);
 
   const [printingItem, setPrintingItem] =
     useState<MedicalConsultationItem | null>(null);
@@ -193,13 +290,31 @@ export function useConsultas({
         reasonForVisit: item.reasonForVisit,
         illnessTime: item.illnessTime,
         symptoms: item.symptoms,
-        bloodPressure: item.vitalSigns.bloodPressure || "110/70",
-        heartRate: item.vitalSigns.heartRate || 72,
-        respiratoryRate: item.vitalSigns.respiratoryRate ?? 18,
-        temperature: item.vitalSigns.temperature || 36.5,
-        oxygenSaturation: item.vitalSigns.oxygenSaturation ?? 98,
-        weightKg: item.vitalSigns.weightKg || 58,
-        heightCm: item.vitalSigns.heightCm || 162,
+        bloodPressure: item.vitalSigns.bloodPressure ?? "",
+        heartRate:
+          item.vitalSigns.heartRate !== undefined
+            ? String(item.vitalSigns.heartRate)
+            : "",
+        respiratoryRate:
+          item.vitalSigns.respiratoryRate !== undefined
+            ? String(item.vitalSigns.respiratoryRate)
+            : "",
+        temperature:
+          item.vitalSigns.temperature !== undefined
+            ? String(item.vitalSigns.temperature)
+            : "",
+        oxygenSaturation:
+          item.vitalSigns.oxygenSaturation !== undefined
+            ? String(item.vitalSigns.oxygenSaturation)
+            : "",
+        weightKg:
+          item.vitalSigns.weightKg !== undefined
+            ? String(item.vitalSigns.weightKg)
+            : "",
+        heightCm:
+          item.vitalSigns.heightCm !== undefined
+            ? String(item.vitalSigns.heightCm)
+            : "",
         generalExam: item.physicalExam.generalExam || "",
         breastsExam: item.physicalExam.breastsExam || "",
         externalGenitalia: item.physicalExam.externalGenitalia || "",
@@ -211,6 +326,11 @@ export function useConsultas({
         auxiliaryExams: item.auxiliaryExams,
         prescriptionNotes: item.prescriptionNotes,
         nextAppointmentDate: item.nextAppointmentDate,
+        scheduleNextAppointment: false,
+        nextAppointmentTime: "09:00",
+        nextAppointmentDuration: 30,
+        nextAppointmentType: "CONTROL_GINECOLOGICO",
+        nextAppointmentReason: "",
         generatePrescription: false,
         generateLabOrder: false,
       };
@@ -227,25 +347,29 @@ export function useConsultas({
       reasonForVisit: linkedAppt?.reason ?? "",
       illnessTime: "",
       symptoms: "",
-      bloodPressure: "110/70",
-      heartRate: 72,
-      respiratoryRate: 18,
-      temperature: 36.5,
-      oxygenSaturation: 98,
-      weightKg: 58,
-      heightCm: 162,
-      generalExam: NORMAL_PHYSICAL_EXAM_PRESET.generalExam,
-      breastsExam: NORMAL_PHYSICAL_EXAM_PRESET.breastsExam,
-      externalGenitalia: NORMAL_PHYSICAL_EXAM_PRESET.externalGenitalia,
-      speculoscopy: NORMAL_PHYSICAL_EXAM_PRESET.speculoscopy,
-      bimanualPalpation: NORMAL_PHYSICAL_EXAM_PRESET.bimanualPalpation,
+      bloodPressure: "",
+      heartRate: "",
+      respiratoryRate: "",
+      temperature: "",
+      oxygenSaturation: "",
+      weightKg: "",
+      heightCm: "",
+      generalExam: "",
+      breastsExam: "",
+      externalGenitalia: "",
+      speculoscopy: "",
+      bimanualPalpation: "",
       diagnosis: "",
       cie10Code: "",
-      treatmentPlan:
-        "1. Indicaciones generales de estilo de vida y control clínico.\n2. Acudir a evaluación con resultados según programación.",
+      treatmentPlan: "",
       auxiliaryExams: "",
       prescriptionNotes: "",
       nextAppointmentDate: "",
+      scheduleNextAppointment: false,
+      nextAppointmentTime: "09:00",
+      nextAppointmentDuration: 30,
+      nextAppointmentType: "CONTROL_GINECOLOGICO",
+      nextAppointmentReason: "",
       generatePrescription: false,
       generateLabOrder: false,
     };
@@ -302,6 +426,14 @@ export function useConsultas({
     control: form.control,
     name: "prescriptionNotes",
   });
+  const watchedNextDate = useWatch({
+    control: form.control,
+    name: "nextAppointmentDate",
+  });
+  const watchedScheduleNext = useWatch({
+    control: form.control,
+    name: "scheduleNextAppointment",
+  });
 
   const liveBmi = useMemo(
     () => calculateBmi(Number(watchedWeight) || 0, Number(watchedHeight) || 0),
@@ -313,13 +445,13 @@ export function useConsultas({
   const vitalAlerts = useMemo(
     () =>
       getVitalSignAlerts({
-        bloodPressure: watchedBp || "110/70",
-        heartRate: Number(watchedHr) || 72,
-        temperature: Number(watchedTemp) || 36.5,
-        oxygenSaturation: Number(watchedSpo2) || 98,
-        weightKg: Number(watchedWeight) || 58,
-        heightCm: Number(watchedHeight) || 162,
-        bmi: liveBmi,
+        bloodPressure: watchedBp.trim() || undefined,
+        heartRate: Number(watchedHr) || undefined,
+        temperature: Number(watchedTemp) || undefined,
+        oxygenSaturation: Number(watchedSpo2) || undefined,
+        weightKg: Number(watchedWeight) || undefined,
+        heightCm: Number(watchedHeight) || undefined,
+        bmi: liveBmi > 0 ? liveBmi : undefined,
       }),
     [watchedBp, watchedHr, watchedTemp, watchedSpo2, watchedWeight, watchedHeight, liveBmi]
   );
@@ -347,6 +479,8 @@ export function useConsultas({
   const openCreateModal = () => {
     setEditingItem(null);
     setSaveAndPrintIntent(false);
+    setDraftLabOrders([]);
+    setDraftPrescriptions([]);
     form.reset(buildDefaults());
     setDialogOpen(true);
   };
@@ -354,8 +488,88 @@ export function useConsultas({
   const openEditModal = (item: MedicalConsultationItem) => {
     setEditingItem(item);
     setSaveAndPrintIntent(false);
+    setDraftLabOrders([]);
+    setDraftPrescriptions([]);
     form.reset(buildDefaults(item));
     setDialogOpen(true);
+  };
+
+  const upsertDraftLabOrder = (
+    draft: DraftLabOrderForConsultation,
+    editingIdx: number | null
+  ) => {
+    setDraftLabOrders((prev) =>
+      editingIdx !== null
+        ? prev.map((d, idx) => (idx === editingIdx ? draft : d))
+        : [...prev, draft]
+    );
+    if (!form.getValues("diagnosis").trim() && draft.diagnosis.trim()) {
+      form.setValue("diagnosis", draft.diagnosis.trim(), { shouldValidate: true });
+      form.setValue("cie10Code", draft.cie10Code.trim(), { shouldValidate: true });
+    }
+  };
+
+  const removeDraftLabOrder = (index: number) => {
+    setDraftLabOrders((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const upsertDraftPrescription = (
+    draft: DraftPrescriptionForConsultation,
+    editingIdx: number | null
+  ) => {
+    setDraftPrescriptions((prev) =>
+      editingIdx !== null
+        ? prev.map((d, idx) => (idx === editingIdx ? draft : d))
+        : [...prev, draft]
+    );
+    if (!form.getValues("diagnosis").trim() && draft.diagnosis.trim()) {
+      form.setValue("diagnosis", draft.diagnosis.trim(), { shouldValidate: true });
+      form.setValue("cie10Code", draft.cie10Code.trim(), { shouldValidate: true });
+    }
+    if (
+      !form.getValues("nextAppointmentDate").trim() &&
+      draft.nextAppointmentDate.trim()
+    ) {
+      form.setValue("nextAppointmentDate", draft.nextAppointmentDate.trim(), {
+        shouldValidate: true,
+      });
+    }
+  };
+
+  const removeDraftPrescription = (index: number) => {
+    setDraftPrescriptions((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const applyQuickNextDate = (
+    offset: { days?: number; months?: number } | null
+  ) => {
+    if (!offset) {
+      form.setValue("nextAppointmentDate", "", { shouldValidate: true });
+      form.setValue("scheduleNextAppointment", false);
+      return;
+    }
+    const baseDate = form.getValues("consultationDate") || todayStr;
+    const computed = addOffsetToIsoDate(baseDate, offset);
+    form.setValue("nextAppointmentDate", computed, {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+  };
+
+  const toggleScheduleNextAppointment = (checked: boolean) => {
+    form.setValue("scheduleNextAppointment", checked, { shouldValidate: true });
+    if (checked && !form.getValues("nextAppointmentReason").trim()) {
+      const diag = form.getValues("diagnosis").trim();
+      const reason = form.getValues("reasonForVisit").trim();
+      const suggestion = diag
+        ? `Control: ${diag}`
+        : reason
+          ? `Control: ${reason}`
+          : "Control ginecológico";
+      form.setValue("nextAppointmentReason", suggestion.slice(0, 300), {
+        shouldValidate: true,
+      });
+    }
   };
 
   const fillNormalPhysicalExam = () => {
@@ -415,13 +629,13 @@ export function useConsultas({
       illnessTime: values.illnessTime,
       symptoms: values.symptoms,
       vitalSigns: {
-        bloodPressure: values.bloodPressure,
-        heartRate: Number(values.heartRate),
-        respiratoryRate: Number(values.respiratoryRate),
-        temperature: Number(values.temperature),
-        oxygenSaturation: Number(values.oxygenSaturation),
-        weightKg: Number(values.weightKg),
-        heightCm: Number(values.heightCm),
+        bloodPressure: values.bloodPressure.trim() || undefined,
+        heartRate: toOptionalPositiveNumber(values.heartRate),
+        respiratoryRate: toOptionalPositiveNumber(values.respiratoryRate),
+        temperature: toOptionalPositiveNumber(values.temperature),
+        oxygenSaturation: toOptionalPositiveNumber(values.oxygenSaturation),
+        weightKg: toOptionalPositiveNumber(values.weightKg),
+        heightCm: toOptionalPositiveNumber(values.heightCm),
       },
       physicalExam: {
         generalExam: values.generalExam,
@@ -438,24 +652,43 @@ export function useConsultas({
       nextAppointmentDate: values.nextAppointmentDate,
     };
 
+    const nextAppointmentSchedule =
+      values.scheduleNextAppointment && values.nextAppointmentDate.trim()
+        ? {
+            appointmentTime: values.nextAppointmentTime,
+            durationMinutes: Number(values.nextAppointmentDuration) || 30,
+            appointmentType:
+              values.nextAppointmentType.trim() || "CONTROL_GINECOLOGICO",
+            reason: values.nextAppointmentReason.trim(),
+          }
+        : null;
+
     if (editingItem) {
       const res = await updateConsultationAction({
         id: editingItem.id,
         ...commonPayload,
+        nextAppointmentSchedule,
       });
       if (!res.success || !res.data) {
         toast.error(res.error || "No se pudo actualizar la consulta médica.");
         return;
       }
 
-      const saved = res.data;
+      const { consultation: saved, scheduledNextAppointment } = res.data;
       const nextItems = items.map((row) => (row.id === saved.id ? saved : row));
       setItems(nextItems);
       onConsultationsChange?.(nextItems);
       reasonManager.syncUsageCounts(nextItems.map((i) => i.reasonForVisit));
+      if (scheduledNextAppointment) {
+        setActiveAppointments((prev) => [...prev, scheduledNextAppointment]);
+      }
       setDialogOpen(false);
       setEditingItem(null);
-      toast.success("Consulta médica actualizada.");
+      toast.success(
+        scheduledNextAppointment
+          ? "Consulta actualizada y próxima cita agendada en Agenda Médica."
+          : "Consulta médica actualizada."
+      );
       if (saveAndPrintIntent) {
         setPrintingItem(saved);
       }
@@ -466,11 +699,18 @@ export function useConsultas({
       ...commonPayload,
       markAppointmentAttended: Boolean(validApptId && values.markAppointmentAttended),
       generatePrescription: Boolean(
-        values.generatePrescription && values.prescriptionNotes.trim()
+        draftPrescriptions.length === 0 &&
+          values.generatePrescription &&
+          values.prescriptionNotes.trim()
       ),
       generateLabOrder: Boolean(
-        values.generateLabOrder && values.auxiliaryExams.trim()
+        draftLabOrders.length === 0 &&
+          values.generateLabOrder &&
+          values.auxiliaryExams.trim()
       ),
+      draftLabOrders,
+      draftPrescriptions,
+      nextAppointmentSchedule,
     });
 
     if (!res.success || !res.data) {
@@ -481,41 +721,69 @@ export function useConsultas({
     const {
       consultation,
       createdPrescriptionId,
-      createdPrescription,
+      createdPrescriptions,
       createdLabOrderId,
-      createdLabOrder,
+      createdLabOrders,
       attendedAppointmentId,
+      scheduledNextAppointment,
     } = res.data;
 
     const nextItems = [consultation, ...items];
     setItems(nextItems);
     onConsultationsChange?.(nextItems);
-    if (createdPrescription) {
-      onPrescriptionCreated?.(createdPrescription);
+    if (createdPrescriptions.length > 0) {
+      if (onPrescriptionsCreated) {
+        onPrescriptionsCreated(createdPrescriptions);
+      } else {
+        createdPrescriptions.forEach((rx) => onPrescriptionCreated?.(rx));
+      }
     }
-    if (createdLabOrder) {
-      onLabOrderCreated?.(createdLabOrder);
+    if (createdLabOrders.length > 0) {
+      if (onLabOrdersCreated) {
+        onLabOrdersCreated(createdLabOrders);
+      } else {
+        createdLabOrders.forEach((ord) => onLabOrderCreated?.(ord));
+      }
     }
     reasonManager.syncUsageCounts(nextItems.map((i) => i.reasonForVisit));
 
-    if (attendedAppointmentId) {
-      setActiveAppointments((prev) =>
-        prev.map((a) =>
-          a.id === attendedAppointmentId ? { ...a, status: "ATENDIDA" } : a
-        )
-      );
+    if (attendedAppointmentId || scheduledNextAppointment) {
+      setActiveAppointments((prev) => {
+        const updated = attendedAppointmentId
+          ? prev.map((a) =>
+              a.id === attendedAppointmentId ? { ...a, status: "ATENDIDA" } : a
+            )
+          : prev;
+        return scheduledNextAppointment
+          ? [...updated, scheduledNextAppointment]
+          : updated;
+      });
     }
+
+    const rxDelta =
+      createdPrescriptions.length > 0
+        ? createdPrescriptions.length
+        : createdPrescriptionId
+          ? 1
+          : 0;
+    const labDelta =
+      createdLabOrders.length > 0
+        ? createdLabOrders.length
+        : createdLabOrderId
+          ? 1
+          : 0;
 
     onCountsChange?.({
       consultationsDelta: 1,
-      prescriptionsDelta: createdPrescriptionId ? 1 : 0,
-      labOrdersDelta: createdLabOrderId ? 1 : 0,
+      prescriptionsDelta: rxDelta,
+      labOrdersDelta: labDelta,
     });
 
     const extras: string[] = [];
     if (attendedAppointmentId) extras.push("cita marcada como ATENDIDA");
-    if (createdPrescriptionId) extras.push("receta creada");
-    if (createdLabOrderId) extras.push("orden de laboratorio creada");
+    if (rxDelta > 0) extras.push(`${rxDelta} receta(s) emitida(s)`);
+    if (labDelta > 0) extras.push(`${labDelta} orden(es) de laboratorio`);
+    if (scheduledNextAppointment) extras.push("próxima cita agendada");
 
     toast.success(
       extras.length > 0
@@ -523,6 +791,8 @@ export function useConsultas({
         : "Consulta médica registrada."
     );
 
+    setDraftLabOrders([]);
+    setDraftPrescriptions([]);
     setDialogOpen(false);
     if (saveAndPrintIntent) {
       setPrintingItem(consultation);
@@ -556,6 +826,7 @@ export function useConsultas({
 
   return {
     items: pagination.paginatedItems,
+    allConsultations: items,
     totalCount: items.length,
     filteredCount: filteredItems.length,
     lastConsultation: items[0] ?? null,
@@ -582,6 +853,10 @@ export function useConsultas({
     watchedAppointmentId,
     watchedAuxExams,
     watchedRxNotes,
+    watchedNextDate,
+    watchedScheduleNext,
+    draftLabOrders,
+    draftPrescriptions,
     setSaveAndPrintIntent,
     openCreateModal,
     openEditModal,
@@ -589,6 +864,12 @@ export function useConsultas({
     selectReasonPreset,
     appendLabTemplate,
     appendVademecumMedication,
+    upsertDraftLabOrder,
+    removeDraftLabOrder,
+    upsertDraftPrescription,
+    removeDraftPrescription,
+    applyQuickNextDate,
+    toggleScheduleNextAppointment,
     onSubmit,
     // Impresión & Borrado
     printingItem,

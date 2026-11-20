@@ -21,14 +21,14 @@ export const labUrgencyEnum = pgEnum("lab_urgency", [
 ]);
 
 export interface ConsultationVitalSignsRecord {
-  bloodPressure: string;
-  heartRate: number;
+  bloodPressure?: string;
+  heartRate?: number;
   respiratoryRate?: number;
-  temperature: number;
+  temperature?: number;
   oxygenSaturation?: number;
-  weightKg: number;
-  heightCm: number;
-  bmi: number;
+  weightKg?: number;
+  heightCm?: number;
+  bmi?: number;
 }
 
 export interface ConsultationPhysicalExamRecord {

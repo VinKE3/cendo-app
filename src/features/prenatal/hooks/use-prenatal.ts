@@ -145,8 +145,8 @@ export function usePrenatal({
       latestConsultation;
 
     const estimatedWeight =
-      todayCons && todayCons.vitalSigns.weightKg > 0
-        ? todayCons.vitalSigns.weightKg
+      todayCons && (todayCons.vitalSigns.weightKg ?? 0) > 0
+        ? (todayCons.vitalSigns.weightKg as number)
         : lastVisit && lastVisit.maternalWeightKg > 0
           ? Number((lastVisit.maternalWeightKg + 0.8).toFixed(1))
           : Number((base.usualWeightKg + Math.max(0.5, ga.weeks * 0.25)).toFixed(1));
@@ -157,13 +157,13 @@ export function usePrenatal({
         : lastVisit?.bloodPressure || "110/70";
 
     const defaultPulse =
-      todayCons && todayCons.vitalSigns.heartRate > 0
-        ? todayCons.vitalSigns.heartRate
+      todayCons && (todayCons.vitalSigns.heartRate ?? 0) > 0
+        ? (todayCons.vitalSigns.heartRate as number)
         : lastVisit?.maternalPulse || 78;
 
     const defaultTemp =
-      todayCons && todayCons.vitalSigns.temperature > 0
-        ? todayCons.vitalSigns.temperature
+      todayCons && (todayCons.vitalSigns.temperature ?? 0) > 0
+        ? (todayCons.vitalSigns.temperature as number)
         : 36.6;
 
     const defaultFcf =
@@ -376,14 +376,16 @@ export function usePrenatal({
       gestationalAgeWeeks: ga.weeks,
       gestationalAgeDays: ga.days,
       maternalWeightKg:
-        cons.vitalSigns.weightKg > 0
+        (cons.vitalSigns.weightKg ?? 0) > 0
           ? cons.vitalSigns.weightKg
           : undefined,
       bloodPressure: cons.vitalSigns.bloodPressure || "110/70",
       maternalPulse:
-        cons.vitalSigns.heartRate > 0 ? cons.vitalSigns.heartRate : 78,
+        (cons.vitalSigns.heartRate ?? 0) > 0 ? cons.vitalSigns.heartRate : 78,
       temperature:
-        cons.vitalSigns.temperature > 0 ? cons.vitalSigns.temperature : 36.6,
+        (cons.vitalSigns.temperature ?? 0) > 0
+          ? cons.vitalSigns.temperature
+          : 36.6,
       nextAppointmentDate:
         cons.nextAppointmentDate ||
         addDaysToDateStr(cons.consultationDate, 28),

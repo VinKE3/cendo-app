@@ -276,7 +276,7 @@ async function resolveActiveDoctor(
   };
 }
 
-async function assertNoScheduleConflict(params: {
+export async function assertNoScheduleConflict(params: {
   executor: DbExecutor;
   tenantId: string;
   doctorId: string;

@@ -56,14 +56,24 @@ import {
 } from "@/features/consultas/hooks/use-consultas";
 import type { ColposcopyReportItem } from "@/features/colposcopia/colposcopia.schema";
 import type { UltrasoundReportItem } from "@/features/ecografias/ecografias.schema";
-import type { LabOrderItem } from "@/features/laboratorio/laboratorio.schema";
+import { useLaboratorio } from "@/features/laboratorio/hooks/use-laboratorio";
+import type {
+  LabOrderItem,
+  LabOrderTemplateItem,
+} from "@/features/laboratorio/laboratorio.schema";
 import type {
   PatientBackgroundItem,
   PatientDirectoryItem,
 } from "@/features/pacientes/pacientes.schema";
+import { useRecetas } from "@/features/recetas/hooks/use-recetas";
 import type { MedicalPrescriptionItem } from "@/features/recetas/recetas.schema";
 import { formatPeruDateDisplay } from "@/lib/utils";
 import { generateConsultationWhatsAppUrl } from "@/lib/whatsapp-share";
+import { LabOrderModal } from "@/components/laboratorio/LabOrderModal";
+import { LabOrderPrintModal } from "@/components/laboratorio/LabOrderPrintModal";
+import { LabTemplatesManagerModal } from "@/components/laboratorio/LabTemplatesManagerModal";
+import { PrescriptionModal } from "@/components/recetas/PrescriptionModal";
+import { PrescriptionPrintModal } from "@/components/recetas/PrescriptionPrintModal";
 import { ConsultationModal } from "./ConsultationModal";
 import { ConsultationPrintModal } from "./ConsultationPrintModal";
 
@@ -77,10 +87,14 @@ interface TabConsultasProps {
   formContext: ConsultationFormContext;
   prescriptions: MedicalPrescriptionItem[];
   labOrders: LabOrderItem[];
+  labTemplates: LabOrderTemplateItem[];
   canEdit: boolean;
   canDelete: boolean;
   onCountsChange?: (delta: ConsultationCountsDelta) => void;
   onConsultationsChange?: (items: MedicalConsultationItem[]) => void;
+  onPrescriptionsChange: (next: MedicalPrescriptionItem[]) => void;
+  onLabOrdersChange: (next: LabOrderItem[]) => void;
+  onLabTemplatesChange: (next: LabOrderTemplateItem[]) => void;
   onPrescriptionCreated?: (prescription: MedicalPrescriptionItem) => void;
   onLabOrderCreated?: (labOrder: LabOrderItem) => void;
   onEmitPrescriptionFromConsultation?: (cons: MedicalConsultationItem) => void;
@@ -102,22 +116,25 @@ export function TabConsultas({
   formContext,
   prescriptions,
   labOrders,
+  labTemplates: initialManagedLabTemplates,
   canEdit,
   canDelete,
   onCountsChange,
   onConsultationsChange,
+  onPrescriptionsChange,
+  onLabOrdersChange,
+  onLabTemplatesChange,
   onPrescriptionCreated,
   onLabOrderCreated,
   onEmitPrescriptionFromConsultation,
   onOpenLinkedPrescription,
-  onEditLinkedPrescription,
   onEmitLabOrderFromConsultation,
   onOpenLinkedLabOrder,
-  onEditLinkedLabOrder,
   onEmitQuoteFromConsultation,
 }: TabConsultasProps) {
   const {
     items,
+    allConsultations,
     totalCount,
     filteredCount,
     lastConsultation,
@@ -133,7 +150,6 @@ export function TabConsultas({
     isSubmitting,
     activeAppointments,
     vademecumOptions,
-    labTemplates,
     liveBmi,
     bmiMeta,
     vitalAlerts,
@@ -142,13 +158,21 @@ export function TabConsultas({
     watchedAppointmentId,
     watchedAuxExams,
     watchedRxNotes,
+    watchedNextDate,
+    watchedScheduleNext,
+    draftLabOrders,
+    draftPrescriptions,
     setSaveAndPrintIntent,
     openCreateModal,
     openEditModal,
     fillNormalPhysicalExam,
     selectReasonPreset,
-    appendLabTemplate,
-    appendVademecumMedication,
+    upsertDraftLabOrder,
+    removeDraftLabOrder,
+    upsertDraftPrescription,
+    removeDraftPrescription,
+    applyQuickNextDate,
+    toggleScheduleNextAppointment,
     onSubmit,
     printingItem,
     setPrintingItem,
@@ -168,6 +192,36 @@ export function TabConsultas({
     onConsultationsChange,
     onPrescriptionCreated,
     onLabOrderCreated,
+    onPrescriptionsCreated: (created) => {
+      if (created.length > 0) {
+        onPrescriptionsChange([...created, ...prescriptions]);
+      }
+    },
+    onLabOrdersCreated: (created) => {
+      if (created.length > 0) {
+        onLabOrdersChange([...created, ...labOrders]);
+      }
+    },
+  });
+
+  const inlineLab = useLaboratorio({
+    patient,
+    background,
+    labOrders,
+    onLabOrdersChange,
+    labTemplates: initialManagedLabTemplates,
+    onLabTemplatesChange,
+    consultations: allConsultations,
+    onDraftSubmit: upsertDraftLabOrder,
+  });
+
+  const inlineRx = useRecetas({
+    patient,
+    prescriptions,
+    onPrescriptionsChange,
+    vademecumOptions,
+    consultations: allConsultations,
+    onDraftSubmit: upsertDraftPrescription,
   });
 
   return (
@@ -323,17 +377,66 @@ export function TabConsultas({
 
                         <TableCell className="align-top">
                           <div className="space-y-1 font-mono text-[11px]">
-                            <p className="text-foreground">
-                              PA <strong>{cons.vitalSigns.bloodPressure}</strong> • FC{" "}
-                              <strong>{cons.vitalSigns.heartRate}</strong>
-                            </p>
-                            <p className="text-muted-foreground">
-                              {cons.vitalSigns.weightKg}kg • {cons.vitalSigns.heightCm}
-                              cm •{" "}
-                              <strong className="text-primary">
-                                IMC {cons.vitalSigns.bmi}
-                              </strong>
-                            </p>
+                            {cons.vitalSigns.bloodPressure ||
+                            cons.vitalSigns.heartRate !== undefined ? (
+                              <p className="text-foreground">
+                                {cons.vitalSigns.bloodPressure ? (
+                                  <>
+                                    PA <strong>{cons.vitalSigns.bloodPressure}</strong>
+                                  </>
+                                ) : null}
+                                {cons.vitalSigns.bloodPressure &&
+                                cons.vitalSigns.heartRate !== undefined
+                                  ? " • "
+                                  : null}
+                                {cons.vitalSigns.heartRate !== undefined ? (
+                                  <>
+                                    FC <strong>{cons.vitalSigns.heartRate}</strong>
+                                  </>
+                                ) : null}
+                              </p>
+                            ) : null}
+
+                            {cons.vitalSigns.weightKg !== undefined ||
+                            cons.vitalSigns.heightCm !== undefined ||
+                            (cons.vitalSigns.bmi !== undefined &&
+                              cons.vitalSigns.bmi > 0) ? (
+                              <p className="text-muted-foreground">
+                                {[
+                                  cons.vitalSigns.weightKg !== undefined
+                                    ? `${cons.vitalSigns.weightKg}kg`
+                                    : null,
+                                  cons.vitalSigns.heightCm !== undefined
+                                    ? `${cons.vitalSigns.heightCm}cm`
+                                    : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" • ")}
+                                {(cons.vitalSigns.weightKg !== undefined ||
+                                  cons.vitalSigns.heightCm !== undefined) &&
+                                cons.vitalSigns.bmi !== undefined &&
+                                cons.vitalSigns.bmi > 0
+                                  ? " • "
+                                  : null}
+                                {cons.vitalSigns.bmi !== undefined &&
+                                cons.vitalSigns.bmi > 0 ? (
+                                  <strong className="text-primary">
+                                    IMC {cons.vitalSigns.bmi}
+                                  </strong>
+                                ) : null}
+                              </p>
+                            ) : null}
+
+                            {!cons.vitalSigns.bloodPressure &&
+                            cons.vitalSigns.heartRate === undefined &&
+                            cons.vitalSigns.weightKg === undefined &&
+                            cons.vitalSigns.heightCm === undefined &&
+                            rowAlerts.length === 0 ? (
+                              <p className="font-sans text-[11px] italic text-muted-foreground">
+                                Sin signos registrados
+                              </p>
+                            ) : null}
+
                             {rowAlerts.length > 0 ? (
                               <div className="flex flex-wrap gap-1 pt-0.5">
                                 {rowAlerts.map((al) => (
@@ -545,8 +648,6 @@ export function TabConsultas({
         onOpenManageReasons={
           canEdit ? () => reasonManager.setOpen(true) : undefined
         }
-        vademecumOptions={vademecumOptions}
-        labTemplates={labTemplates}
         liveBmi={liveBmi}
         bmiMeta={bmiMeta}
         vitalAlerts={vitalAlerts}
@@ -555,35 +656,211 @@ export function TabConsultas({
         watchedAppointmentId={watchedAppointmentId}
         watchedAuxExams={watchedAuxExams}
         watchedRxNotes={watchedRxNotes}
+        watchedNextDate={watchedNextDate}
+        watchedScheduleNext={watchedScheduleNext}
+        draftLabOrders={draftLabOrders}
+        draftPrescriptions={draftPrescriptions}
         onSelectReasonPreset={selectReasonPreset}
         onFillNormalPhysicalExam={fillNormalPhysicalExam}
-        onAppendLabTemplate={appendLabTemplate}
-        onAppendMedication={appendVademecumMedication}
+        onOpenAddLabOrderModal={() => {
+          const current = form.getValues();
+          if (editingItem) {
+            inlineLab.openForExistingConsultation({
+              ...editingItem,
+              consultationDate:
+                current.consultationDate || editingItem.consultationDate,
+              diagnosis: current.diagnosis.trim() || editingItem.diagnosis,
+              cie10Code: current.cie10Code.trim() || editingItem.cie10Code,
+            });
+          } else {
+            inlineLab.openDraftCreate({
+              orderDate: current.consultationDate,
+              diagnosis: current.diagnosis,
+              cie10Code: current.cie10Code,
+            });
+          }
+        }}
+        onOpenEditDraftLabOrder={(draft, index) =>
+          inlineLab.openDraftEdit(draft, index)
+        }
+        onRemoveDraftLabOrder={removeDraftLabOrder}
+        onOpenAddPrescriptionModal={() => {
+          const current = form.getValues();
+          if (editingItem) {
+            inlineRx.openForExistingConsultation({
+              ...editingItem,
+              consultationDate:
+                current.consultationDate || editingItem.consultationDate,
+              diagnosis: current.diagnosis.trim() || editingItem.diagnosis,
+              cie10Code: current.cie10Code.trim() || editingItem.cie10Code,
+              nextAppointmentDate: current.nextAppointmentDate,
+            });
+          } else {
+            inlineRx.openDraftCreate({
+              prescriptionDate: current.consultationDate,
+              diagnosis: current.diagnosis,
+              cie10Code: current.cie10Code,
+              nextAppointmentDate: current.nextAppointmentDate,
+            });
+          }
+        }}
+        onOpenEditDraftPrescription={(draft, index) =>
+          inlineRx.openDraftEdit(draft, index)
+        }
+        onRemoveDraftPrescription={removeDraftPrescription}
+        onApplyQuickNextDate={applyQuickNextDate}
+        onToggleScheduleNextAppointment={toggleScheduleNextAppointment}
         linkedLabOrders={
           editingItem
             ? labOrders.filter((ord) => ord.consultationId === editingItem.id)
             : []
         }
-        onViewLinkedLabOrder={onOpenLinkedLabOrder}
-        onEditLinkedLabOrder={canEdit ? onEditLinkedLabOrder : undefined}
-        onEmitLabOrderFromConsultation={
-          canEdit ? onEmitLabOrderFromConsultation : undefined
+        onViewLinkedLabOrder={(ord) => inlineLab.setPrintingItem(ord)}
+        onEditLinkedLabOrder={
+          canEdit
+            ? (ord) =>
+                inlineLab.openEditModal(
+                  ord,
+                  editingItem
+                    ? `Consulta del ${formatPeruDateDisplay(editingItem.consultationDate)} — ${editingItem.diagnosis}`
+                    : undefined
+                )
+            : undefined
         }
         linkedPrescriptions={
           editingItem
-            ? prescriptions.filter((rx) => rx.consultationId === editingItem.id)
+            ? prescriptions
+                .filter((rx) => rx.consultationId === editingItem.id)
                 .filter(Boolean)
             : []
         }
-        onViewLinkedPrescription={onOpenLinkedPrescription}
+        onViewLinkedPrescription={(rx) => inlineRx.setPrintingItem(rx)}
         onEditLinkedPrescription={
-          canEdit ? onEditLinkedPrescription : undefined
-        }
-        onEmitPrescriptionFromConsultation={
-          canEdit ? onEmitPrescriptionFromConsultation : undefined
+          canEdit
+            ? (rx) =>
+                inlineRx.openEditModal(
+                  rx,
+                  editingItem
+                    ? `Consulta del ${formatPeruDateDisplay(editingItem.consultationDate)} — ${editingItem.diagnosis}`
+                    : undefined
+                )
+            : undefined
         }
         onSaveAndPrintIntent={setSaveAndPrintIntent}
         onSubmit={onSubmit}
+      />
+
+      {/* Modales apilables sobre Consulta Médica sin abandonar el formulario */}
+      <LabOrderModal
+        open={inlineLab.dialogOpen}
+        onOpenChange={inlineLab.setDialogOpen}
+        patient={patient}
+        editingItem={inlineLab.editingItem}
+        draftMode={inlineLab.draftMode}
+        editingDraftIndex={inlineLab.editingDraftIndex}
+        lockedConsultationLabel={inlineLab.lockedConsultationLabel}
+        sourceLabel={inlineLab.sourceLabel}
+        form={inlineLab.form}
+        isSubmitting={inlineLab.isSubmitting}
+        consultations={allConsultations}
+        labTemplates={initialManagedLabTemplates}
+        categories={inlineLab.categories}
+        presetPacks={inlineLab.presetPacks}
+        watchedDiagnosis={inlineLab.watchedDiagnosis}
+        watchedCie10={inlineLab.watchedCie10}
+        watchedConsultationId={inlineLab.watchedConsultationId}
+        watchedTemplateType={inlineLab.watchedTemplateType}
+        watchedTemplateTitle={inlineLab.watchedTemplateTitle}
+        selectedTests={inlineLab.selectedTests}
+        catalogSearch={inlineLab.catalogSearch}
+        onCatalogSearchChange={inlineLab.setCatalogSearch}
+        catalogCategory={inlineLab.catalogCategory}
+        onCatalogCategoryChange={inlineLab.setCatalogCategory}
+        filteredCatalog={inlineLab.filteredCatalog}
+        manualTestName={inlineLab.manualTestName}
+        onManualTestNameChange={inlineLab.setManualTestName}
+        onApplyTemplate={inlineLab.applyTemplate}
+        onResetToGeneral={inlineLab.resetToGeneralOrder}
+        onOpenManageTemplates={() => inlineLab.setTemplateManagerOpen(true)}
+        onApplyPresetPack={inlineLab.applyPresetPack}
+        onToggleCatalogTest={inlineLab.addCatalogTest}
+        onAddManualTest={inlineLab.addManualTest}
+        onRemoveSelectedTest={inlineLab.removeSelectedTest}
+        onAppendInstruction={inlineLab.appendInstruction}
+        onSelectConsultationLink={inlineLab.handleSelectConsultationLink}
+        onSaveAndPrintIntent={inlineLab.setSaveAndPrintIntent}
+        onSubmit={inlineLab.onSubmit}
+      />
+
+      <LabTemplatesManagerModal
+        open={inlineLab.templateManagerOpen}
+        onOpenChange={inlineLab.setTemplateManagerOpen}
+        templates={initialManagedLabTemplates}
+        onSelectTemplate={
+          inlineLab.dialogOpen ? inlineLab.applyTemplate : undefined
+        }
+        onCreateTemplate={inlineLab.handleCreateTemplate}
+        onUpdateTemplate={inlineLab.handleUpdateTemplate}
+        onDeleteTemplate={inlineLab.handleDeleteTemplate}
+      />
+
+      <LabOrderPrintModal
+        labOrder={inlineLab.printingItem}
+        patient={patient}
+        showCoverPage={inlineLab.showCoverPage}
+        onShowCoverPageChange={inlineLab.setShowCoverPage}
+        canEdit={canEdit}
+        onEdit={(ord) => inlineLab.openEditModal(ord)}
+        onClose={() => inlineLab.setPrintingItem(null)}
+      />
+
+      <PrescriptionModal
+        open={inlineRx.dialogOpen}
+        onOpenChange={inlineRx.setDialogOpen}
+        patient={patient}
+        background={background}
+        editingItem={inlineRx.editingItem}
+        draftMode={inlineRx.draftMode}
+        editingDraftIndex={inlineRx.editingDraftIndex}
+        lockedConsultationLabel={inlineRx.lockedConsultationLabel}
+        sourceConsultationLabel={inlineRx.sourceConsultationLabel}
+        form={inlineRx.form}
+        isSubmitting={inlineRx.isSubmitting}
+        consultations={allConsultations}
+        watchedDiagnosis={inlineRx.watchedDiagnosis}
+        watchedCie10={inlineRx.watchedCie10}
+        watchedConsultationId={inlineRx.watchedConsultationId}
+        draftItems={inlineRx.draftItems}
+        builder={inlineRx.builder}
+        onBuilderChange={inlineRx.setBuilder}
+        editingItemIndex={inlineRx.editingItemIndex}
+        vademecumSearch={inlineRx.vademecumSearch}
+        onVademecumSearchChange={inlineRx.setVademecumSearch}
+        filteredVademecum={inlineRx.filteredVademecum}
+        dosagePresets={inlineRx.dosagePresets}
+        onSelectVademecum={inlineRx.selectVademecumMedication}
+        onApplyDosagePreset={inlineRx.applyDosagePreset}
+        onSaveBuilderItem={inlineRx.saveBuilderItem}
+        onEditDraftItem={inlineRx.startEditDraftItem}
+        onCancelEditDraftItem={inlineRx.cancelEditDraftItem}
+        onRemoveDraftItem={inlineRx.removeDraftItem}
+        onAppendIndication={inlineRx.appendGeneralIndication}
+        onSelectConsultationLink={inlineRx.handleSelectConsultationLink}
+        onSaveAndPrintIntent={inlineRx.setSaveAndPrintIntent}
+        onSubmit={inlineRx.onSubmit}
+      />
+
+      <PrescriptionPrintModal
+        prescription={inlineRx.printingItem}
+        patient={patient}
+        patientAllergies={patient.medicalAllergies}
+        showCoverPage={inlineRx.showCoverPage}
+        onShowCoverPageChange={inlineRx.setShowCoverPage}
+        paperFormat={inlineRx.paperFormat}
+        onPaperFormatChange={inlineRx.setPaperFormat}
+        canEdit={canEdit}
+        onEdit={(rx) => inlineRx.openEditModal(rx)}
+        onClose={() => inlineRx.setPrintingItem(null)}
       />
 
       <ConsultationPrintModal
