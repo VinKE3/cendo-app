@@ -190,6 +190,23 @@ export function TabConsultas({
     formContext,
     onCountsChange,
     onConsultationsChange,
+    onConsultationUpdated: (updated) => {
+      if (
+        prescriptions.some(
+          (rx) =>
+            rx.consultationId === updated.id &&
+            rx.nextAppointmentDate !== updated.nextAppointmentDate
+        )
+      ) {
+        onPrescriptionsChange(
+          prescriptions.map((rx) =>
+            rx.consultationId === updated.id
+              ? { ...rx, nextAppointmentDate: updated.nextAppointmentDate }
+              : rx
+          )
+        );
+      }
+    },
     onPrescriptionCreated,
     onLabOrderCreated,
     onPrescriptionsCreated: (created) => {
@@ -700,7 +717,7 @@ export function TabConsultas({
               prescriptionDate: current.consultationDate,
               diagnosis: current.diagnosis,
               cie10Code: current.cie10Code,
-              nextAppointmentDate: current.nextAppointmentDate,
+              nextAppointmentDate: "",
             });
           }
         }}

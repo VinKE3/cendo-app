@@ -464,7 +464,7 @@ export async function createConsultation(
               draftRx.generalIndications ||
               "Cumplir estrictamente la pauta médica indicada en consulta.",
             nextAppointmentDate:
-              draftRx.nextAppointmentDate || input.nextAppointmentDate || null,
+              input.nextAppointmentDate || draftRx.nextAppointmentDate || null,
             createdBy: ctx.userId,
             updatedBy: ctx.userId,
           })
@@ -770,6 +770,21 @@ export async function updateConsultation(
     if (!updated) {
       throw new DomainError("No se pudo actualizar la consulta médica.");
     }
+
+    await tx
+      .update(medicalPrescriptions)
+      .set({
+        nextAppointmentDate: input.nextAppointmentDate || null,
+        updatedBy: ctx.userId,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(medicalPrescriptions.consultationId, input.id),
+          eq(medicalPrescriptions.tenantId, tenantId),
+          isNull(medicalPrescriptions.deletedAt)
+        )
+      );
 
     let scheduledNextAppointment: ConsultationActiveAppointment | null = null;
     if (input.nextAppointmentDate && input.nextAppointmentSchedule && scheduleDoctor) {

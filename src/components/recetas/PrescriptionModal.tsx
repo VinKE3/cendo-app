@@ -358,34 +358,35 @@ export function PrescriptionModal({
                     ? `Editando Medicamento #${editingItemIndex + 1}`
                     : "Agregar Medicamento al Rp/"}
                 </h3>
-                {editingItemIndex !== null ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="xs"
-                    onClick={onCancelEditDraftItem}
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    aria-label="Cargar pauta ginecológica rápida"
+                    value=""
+                    onChange={(e) => {
+                      const preset = dosagePresets.find(
+                        (p) => p.id === e.target.value
+                      );
+                      if (preset) onApplyDosagePreset(preset);
+                    }}
+                    className="h-7 max-w-[230px] rounded-md border border-input bg-card px-2 text-xs text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
                   >
-                    Cancelar edición
-                  </Button>
-                ) : null}
-              </div>
-
-              {/* Posologías frecuentes */}
-              <div className="space-y-1">
-                <span className="block text-[11px] font-medium text-muted-foreground">
-                  Pautas Ginecológicas Rápidas (1 clic):
-                </span>
-                <div className="flex flex-wrap gap-1">
-                  {dosagePresets.map((preset) => (
-                    <button
-                      key={preset.id}
+                    <option value="">+ Pauta rápida (1 clic)...</option>
+                    {dosagePresets.map((preset) => (
+                      <option key={preset.id} value={preset.id}>
+                        {preset.label}
+                      </option>
+                    ))}
+                  </select>
+                  {editingItemIndex !== null ? (
+                    <Button
                       type="button"
-                      onClick={() => onApplyDosagePreset(preset)}
-                      className="cursor-pointer rounded-md border border-border bg-muted/40 px-2 py-1 text-[10.5px] font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+                      variant="ghost"
+                      size="xs"
+                      onClick={onCancelEditDraftItem}
                     >
-                      {preset.label}
-                    </button>
-                  ))}
+                      Cancelar edición
+                    </Button>
+                  ) : null}
                 </div>
               </div>
 
@@ -630,21 +631,27 @@ export function PrescriptionModal({
 
           {/* Bloque 3: Indicaciones Generales y Próximo Control */}
           <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
-            <div className="space-y-1.5">
-              <label htmlFor="rx-general" className="block text-xs font-medium">
-                Indicaciones Generales y Cuidados
-              </label>
-              <div className="flex flex-wrap gap-1.5">
-                {QUICK_GENERAL_INDICATIONS.map((ind) => (
-                  <button
-                    key={ind}
-                    type="button"
-                    onClick={() => onAppendIndication(ind)}
-                    className="cursor-pointer rounded-md border border-border bg-card px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
-                  >
-                    + {ind}
-                  </button>
-                ))}
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label htmlFor="rx-general" className="block text-xs font-medium">
+                  Indicaciones Generales y Cuidados
+                </label>
+                <select
+                  aria-label="Insertar indicación general rápida"
+                  value=""
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val) onAppendIndication(val);
+                  }}
+                  className="h-7 max-w-[260px] rounded-md border border-input bg-card px-2 text-xs text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+                >
+                  <option value="">+ Insertar indicación rápida...</option>
+                  {QUICK_GENERAL_INDICATIONS.map((ind) => (
+                    <option key={ind} value={ind}>
+                      {ind}
+                    </option>
+                  ))}
+                </select>
               </div>
               <Textarea
                 id="rx-general"
@@ -654,22 +661,24 @@ export function PrescriptionModal({
               />
             </div>
 
-            <div className="space-y-1.5">
-              <label htmlFor="rx-next-date" className="block text-xs font-medium">
-                Próximo Control Ginecológico Sugerido
-              </label>
-              <Input
-                id="rx-next-date"
-                type="date"
-                className="w-full bg-card font-mono sm:w-60"
-                {...register("nextAppointmentDate")}
-              />
-              {errors.nextAppointmentDate ? (
-                <p className="text-xs text-destructive">
-                  {errors.nextAppointmentDate.message}
-                </p>
-              ) : null}
-            </div>
+            {!lockedConsultationLabel ? (
+              <div className="space-y-1.5">
+                <label htmlFor="rx-next-date" className="block text-xs font-medium">
+                  Próximo Control Ginecológico Sugerido
+                </label>
+                <Input
+                  id="rx-next-date"
+                  type="date"
+                  className="w-full bg-card font-mono sm:w-60"
+                  {...register("nextAppointmentDate")}
+                />
+                {errors.nextAppointmentDate ? (
+                  <p className="text-xs text-destructive">
+                    {errors.nextAppointmentDate.message}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
           <DialogFooter className="flex-wrap justify-between gap-2 sm:justify-between">

@@ -226,6 +226,7 @@ export interface UseConsultasParams {
   formContext: ConsultationFormContext;
   onCountsChange?: (delta: ConsultationCountsDelta) => void;
   onConsultationsChange?: (items: MedicalConsultationItem[]) => void;
+  onConsultationUpdated?: (consultation: MedicalConsultationItem) => void;
   onPrescriptionCreated?: (prescription: MedicalPrescriptionItem) => void;
   onLabOrderCreated?: (labOrder: LabOrderItem) => void;
   onPrescriptionsCreated?: (prescriptions: MedicalPrescriptionItem[]) => void;
@@ -239,6 +240,7 @@ export function useConsultas({
   formContext,
   onCountsChange,
   onConsultationsChange,
+  onConsultationUpdated,
   onPrescriptionCreated,
   onLabOrderCreated,
   onPrescriptionsCreated,
@@ -678,6 +680,7 @@ export function useConsultas({
       const nextItems = items.map((row) => (row.id === saved.id ? saved : row));
       setItems(nextItems);
       onConsultationsChange?.(nextItems);
+      onConsultationUpdated?.(saved);
       reasonManager.syncUsageCounts(nextItems.map((i) => i.reasonForVisit));
       if (scheduledNextAppointment) {
         setActiveAppointments((prev) => [...prev, scheduledNextAppointment]);
