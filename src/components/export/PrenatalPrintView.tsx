@@ -1814,33 +1814,22 @@ export function PrenatalPrintView({
 
         {/* Pie Página 1 */}
         <div className="shrink-0 space-y-1 pt-1">
-          <div className="flex items-end justify-between border-t border-slate-200 pt-1 text-[7.5px]">
-            <div className="text-slate-600">
-              <p className="font-bold text-slate-800">
-                CARNET DE ATENCIÓN MATERNO PERINATAL MINSA / CLAP (ANVERSO • PÁG. 1/2)
-              </p>
-              <p>
-                Clasificación actual:{" "}
-                <strong
-                  className={
-                    risks.isHighRisk ? "text-red-700" : "text-emerald-700"
-                  }
-                >
-                  {risks.riskCategory}
-                </strong>{" "}
-                ({risks.alertCount} alerta[s], {risks.continuousCount} seg.
-                continuo)
-              </p>
-            </div>
-            <CendoSignatureBlock
-              doctorName={`DR. ${doctorCleanName.toUpperCase()}`}
-              doctorSpecialty="GINECOLOGÍA Y OBSTETRICIA - MEDICINA MATERNO FETAL"
-              doctorCredentials={`CMP ${card.doctorCmp || "61693"} • RNE ${card.doctorRne || "38657"}`}
-              signatureSrc={resolvedSignatureSrc}
-              showDigitalSignature={resolvedShowDigitalSignature}
-              align="right"
-              compact
-            />
+          <div className="flex items-center justify-between gap-2 border-t border-slate-200 pt-1 text-[7.5px] text-slate-600">
+            <p className="font-bold text-slate-800">
+              CARNET DE ATENCIÓN MATERNO PERINATAL MINSA / CLAP (ANVERSO • PÁG. 1/2)
+            </p>
+            <p>
+              Clasificación actual:{" "}
+              <strong
+                className={
+                  risks.isHighRisk ? "text-red-700" : "text-emerald-700"
+                }
+              >
+                {risks.riskCategory}
+              </strong>{" "}
+              ({risks.alertCount} alerta[s], {risks.continuousCount} seg.
+              continuo)
+            </p>
           </div>
           <CendoFooterWave
             address={clinicAddress}
