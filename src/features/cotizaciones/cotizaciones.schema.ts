@@ -56,15 +56,21 @@ export function computeQuoteFinancials(
     category: string;
     regularPrice: number;
     discountPercent?: number;
+    selectedLabName?: string;
+    providerCost?: number;
   }>
 ): {
   items: QuoteItemRecord[];
   subtotal: number;
   discountTotal: number;
   total: number;
+  totalProviderCost: number;
+  netProfit: number;
+  netMarginPercent: number;
 } {
   let subtotal = 0;
   let total = 0;
+  let totalProviderCost = 0;
 
   const normalizedItems: QuoteItemRecord[] = items.map((item) => {
     const regularPrice = roundCurrency(Math.max(0, Number(item.regularPrice) || 0));
@@ -74,9 +80,20 @@ export function computeQuoteFinancials(
     const finalPrice = roundCurrency(
       regularPrice * (1 - discountPercent / 100)
     );
+    const cleanLabName = item.selectedLabName?.trim() || undefined;
+    const hasProviderCost =
+      item.providerCost !== undefined &&
+      item.providerCost !== null &&
+      Number.isFinite(Number(item.providerCost));
+    const providerCost = hasProviderCost
+      ? roundCurrency(Math.max(0, Number(item.providerCost)))
+      : undefined;
 
     subtotal = roundCurrency(subtotal + regularPrice);
     total = roundCurrency(total + finalPrice);
+    if (providerCost !== undefined) {
+      totalProviderCost = roundCurrency(totalProviderCost + providerCost);
+    }
 
     return {
       procedureId: item.procedureId.trim(),
@@ -86,16 +103,24 @@ export function computeQuoteFinancials(
       regularPrice,
       discountPercent,
       finalPrice,
+      ...(cleanLabName ? { selectedLabName: cleanLabName } : {}),
+      ...(providerCost !== undefined ? { providerCost } : {}),
     };
   });
 
   const discountTotal = roundCurrency(Math.max(0, subtotal - total));
+  const netProfit = roundCurrency(total - totalProviderCost);
+  const netMarginPercent =
+    total > 0 ? roundCurrency((netProfit / total) * 100) : 0;
 
   return {
     items: normalizedItems,
     subtotal,
     discountTotal,
     total,
+    totalProviderCost,
+    netProfit,
+    netMarginPercent,
   };
 }
 
@@ -124,6 +149,12 @@ export const quoteItemInputSchema = z
       .max(100, "Descuento máximo: 100%.")
       .default(0),
     finalPrice: z.coerce.number().optional(),
+    selectedLabName: z.string().trim().max(160).optional(),
+    providerCost: z.coerce
+      .number({ error: "Costo de laboratorio inválido." })
+      .min(0, "El costo de laboratorio no puede ser negativo.")
+      .max(100000, "Costo máximo excedido.")
+      .optional(),
   })
   .strict();
 

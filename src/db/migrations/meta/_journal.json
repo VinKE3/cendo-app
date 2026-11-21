@@ -36,6 +36,13 @@
       "when": 1795076221297,
       "tag": "0004_kind_thor",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795300137014,
+      "tag": "0005_hot_killer_shrike",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MessageCircle, Pencil, Printer } from "lucide-react";
+import { MessageCircle, Pencil, Printer, Receipt } from "lucide-react";
 import { CoverPageSwitch } from "@/components/export/CoverPageSwitch";
 import { LabOrderPrintView } from "@/components/export/LabOrderPrintView";
 import { SignatureToggleSwitch } from "@/components/export/SignatureToggleSwitch";
@@ -30,6 +30,7 @@ interface LabOrderPrintModalProps {
   onShowCoverPageChange: (value: boolean) => void;
   canEdit?: boolean;
   onEdit?: (item: LabOrderItem) => void;
+  onQuoteOrder?: (item: LabOrderItem) => void;
   onClose: () => void;
 }
 
@@ -40,6 +41,7 @@ export function LabOrderPrintModal({
   onShowCoverPageChange,
   canEdit = false,
   onEdit,
+  onQuoteOrder,
   onClose,
 }: LabOrderPrintModalProps) {
   const { getSignatureForDoctor } = useSignatureSettings();
@@ -121,6 +123,21 @@ export function LabOrderPrintModal({
                 <MessageCircle className="size-4 text-success" />
                 WhatsApp
               </Button>
+
+              {canEdit && onQuoteOrder ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    onClose();
+                    onQuoteOrder(labOrder);
+                  }}
+                >
+                  <Receipt className="size-3.5 text-primary" />
+                  Cotizar Exámenes
+                </Button>
+              ) : null}
 
               {canEdit && onEdit ? (
                 <Button

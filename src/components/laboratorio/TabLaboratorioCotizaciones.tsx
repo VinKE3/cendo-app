@@ -316,7 +316,7 @@ export function TabLaboratorioCotizaciones({
                     <TableHead>Indicación / Diagnóstico</TableHead>
                     <TableHead>Estudios Solicitados</TableHead>
                     <TableHead className="w-44">Médico</TableHead>
-                    <TableHead className="w-44 text-right">Acciones</TableHead>
+                    <TableHead className="w-56 text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -466,6 +466,19 @@ export function TabLaboratorioCotizaciones({
                                 <Printer className="size-3" />
                                 A4
                               </Button>
+
+                              {canEdit ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="xs"
+                                  onClick={() => cotiz.openFromLabOrder(ord)}
+                                  title="Generar cotización CENDO con los exámenes de esta orden"
+                                >
+                                  <Receipt className="size-3 text-primary" />
+                                  Cotizar
+                                </Button>
+                              ) : null}
 
                               {canEdit ? (
                                 <Button
@@ -794,6 +807,7 @@ export function TabLaboratorioCotizaciones({
         onShowCoverPageChange={lab.setShowCoverPage}
         canEdit={canEdit}
         onEdit={lab.openEditModal}
+        onQuoteOrder={cotiz.openFromLabOrder}
         onClose={() => lab.setPrintingItem(null)}
       />
 
@@ -857,11 +871,13 @@ export function TabLaboratorioCotizaciones({
         tariffSearch={cotiz.tariffSearch}
         onTariffSearchChange={cotiz.setTariffSearch}
         filteredTariffs={cotiz.filteredTariffs}
+        allTariffs={tariffs}
         customDraft={cotiz.customDraft}
         onCustomDraftChange={cotiz.setCustomDraft}
         onAddTariff={cotiz.addTariffItem}
         onAddCustom={cotiz.addCustomItem}
         onUpdateDiscount={cotiz.updateItemDiscount}
+        onUpdateProvider={cotiz.updateItemProvider}
         onRemoveItem={cotiz.removeDraftItem}
         onSaveAndPrintIntent={cotiz.setSaveAndPrintIntent}
         onSubmit={cotiz.onSubmit}

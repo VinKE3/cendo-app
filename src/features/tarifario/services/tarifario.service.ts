@@ -9,6 +9,20 @@ import type {
   UpdateTariffInput,
 } from "../tarifario.schema";
 
+function sanitizeProviderCosts(
+  providerCosts: TariffInput["providerCosts"] | undefined
+) {
+  if (!providerCosts || providerCosts.length === 0) return [];
+  return providerCosts
+    .map((entry) => {
+      const laboratoryName = entry.laboratoryName.trim();
+      const variant = entry.variant?.trim();
+      const cost = Number(Number(entry.cost).toFixed(2));
+      return variant ? { laboratoryName, variant, cost } : { laboratoryName, cost };
+    })
+    .filter((entry) => entry.laboratoryName.length > 0 && Number.isFinite(entry.cost));
+}
+
 function mapRow(row: typeof proceduresTariff.$inferSelect): ProcedureTariffItem {
   return {
     id: row.id,
@@ -17,6 +31,13 @@ function mapRow(row: typeof proceduresTariff.$inferSelect): ProcedureTariffItem 
     category: row.category.trim(),
     description: row.description ?? "",
     price: Number(row.price),
+    providerCosts: Array.isArray(row.providerCosts)
+      ? row.providerCosts.map((entry) => ({
+          laboratoryName: String(entry.laboratoryName ?? "").trim(),
+          ...(entry.variant?.trim() ? { variant: entry.variant.trim() } : {}),
+          cost: Number(entry.cost ?? 0),
+        }))
+      : [],
     active: row.active,
     createdAt: row.createdAt.toISOString(),
   };
@@ -94,6 +115,7 @@ export async function createTariff(
       category: input.category,
       description: input.description,
       price: input.price.toFixed(2),
+      providerCosts: sanitizeProviderCosts(input.providerCosts),
       active: input.active,
       createdBy: ctx.userId,
       updatedBy: ctx.userId,
@@ -129,6 +151,7 @@ export async function updateTariff(
       category: input.category,
       description: input.description,
       price: input.price.toFixed(2),
+      providerCosts: sanitizeProviderCosts(input.providerCosts),
       active: input.active,
       updatedBy: ctx.userId,
     })

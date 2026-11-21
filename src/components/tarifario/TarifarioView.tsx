@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import {
+  FlaskConical,
   MessageCircle,
   Pencil,
   Plus,
@@ -26,7 +27,11 @@ import {
 } from "@/components/ui/table";
 import type { CatalogCategoryItem } from "@/features/catalog-categories/catalog-categories.schema";
 import { useTarifario } from "@/features/tarifario/hooks/use-tarifario";
-import type { ProcedureTariffItem } from "@/features/tarifario/tarifario.schema";
+import {
+  computeTariffMarginSummary,
+  formatProviderOptionLabel,
+  type ProcedureTariffItem,
+} from "@/features/tarifario/tarifario.schema";
 import type { CalendarClinicInfo } from "@/lib/calendar-export";
 import { cn, formatCurrency } from "@/lib/utils";
 import { generateTariffWhatsAppUrl } from "@/lib/whatsapp-share";
@@ -35,6 +40,7 @@ import { TariffModal } from "./TariffModal";
 interface TarifarioViewProps {
   initialItems: ProcedureTariffItem[];
   initialCategories: CatalogCategoryItem[];
+  initialExternalLabs?: CatalogCategoryItem[];
   clinicInfo?: CalendarClinicInfo;
   canEdit: boolean;
   canDelete: boolean;
@@ -43,6 +49,7 @@ interface TarifarioViewProps {
 export function TarifarioView({
   initialItems,
   initialCategories,
+  initialExternalLabs = [],
   clinicInfo,
   canEdit,
   canDelete,
@@ -54,6 +61,8 @@ export function TarifarioView({
     pagination,
     categories,
     categoryManager,
+    externalLabs,
+    externalLabManager,
     search,
     setSearch,
     categoryFilter,
@@ -68,7 +77,7 @@ export function TarifarioView({
     openEditModal,
     onSubmit,
     handleDelete,
-  } = useTarifario(initialItems, initialCategories);
+  } = useTarifario(initialItems, initialCategories, initialExternalLabs);
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -133,6 +142,14 @@ export function TarifarioView({
 
         {canEdit ? (
           <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => externalLabManager.setOpen(true)}
+            >
+              <FlaskConical className="size-4" />
+              Laboratorios Externos
+            </Button>
             <Button
               type="button"
               variant="outline"
@@ -246,6 +263,7 @@ export function TarifarioView({
               <TableHead>Procedimiento / Servicio</TableHead>
               <TableHead className="w-36">Categoría</TableHead>
               <TableHead className="w-28 text-right">Precio (S/)</TableHead>
+              <TableHead className="w-48">Costo Lab / Margen</TableHead>
               <TableHead className="w-24">Estado</TableHead>
               <TableHead className="w-28 text-right">Acciones</TableHead>
             </TableRow>
@@ -286,6 +304,66 @@ export function TarifarioView({
                     </TableCell>
                     <TableCell className="text-right font-mono font-semibold text-foreground tabular-nums">
                       {formatCurrency(item.price)}
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const summary = computeTariffMarginSummary(
+                          item.price,
+                          item.providerCosts
+                        );
+                        if (!summary.hasProviders) {
+                          return (
+                            <span className="text-[11px] text-muted-foreground">
+                              Directo CENDO
+                            </span>
+                          );
+                        }
+                        if (item.providerCosts.length === 1) {
+                          const p = item.providerCosts[0]!;
+                          return (
+                            <div className="space-y-0.5 text-[11px]">
+                              <p className="font-medium text-foreground">
+                                {formatProviderOptionLabel(p)}:{" "}
+                                <span className="font-mono text-muted-foreground">
+                                  {formatCurrency(p.cost)}
+                                </span>
+                              </p>
+                              <p
+                                className={cn(
+                                  "font-mono font-semibold",
+                                  summary.minMargin >= 0
+                                    ? "text-success"
+                                    : "text-destructive"
+                                )}
+                              >
+                                Ganancia: {summary.minMargin >= 0 ? "+" : ""}
+                                {formatCurrency(summary.minMargin)}
+                              </p>
+                            </div>
+                          );
+                        }
+                        const tooltip = item.providerCosts
+                          .map(
+                            (p) =>
+                              `${formatProviderOptionLabel(p)}: ${formatCurrency(p.cost)}`
+                          )
+                          .join(" | ");
+                        return (
+                          <div className="space-y-0.5 text-[11px]" title={tooltip}>
+                            <p className="font-medium text-foreground">
+                              {item.providerCosts.length} opciones:{" "}
+                              <span className="font-mono text-muted-foreground">
+                                {formatCurrency(summary.minCost)}–
+                                {formatCurrency(summary.maxCost)}
+                              </span>
+                            </p>
+                            <p className="font-mono font-semibold text-success">
+                              Margen: {formatCurrency(summary.minMargin)}–
+                              {formatCurrency(summary.maxMargin)}
+                            </p>
+                          </div>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell>
                       <Badge
@@ -345,7 +423,7 @@ export function TarifarioView({
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={7}
+                  colSpan={8}
                   className="py-10 text-center text-sm text-muted-foreground"
                 >
                   No hay prestaciones que coincidan con el filtro actual.
@@ -370,9 +448,31 @@ export function TarifarioView({
         onOpenChange={setDialogOpen}
         editingItem={editingItem}
         categories={categories}
+        externalLabs={externalLabs}
         form={form}
         isSubmitting={isSubmitting}
         onSubmit={onSubmit}
+      />
+
+      <ManageCategoriesModal
+        open={externalLabManager.open}
+        onOpenChange={externalLabManager.setOpen}
+        title="Gestionar Laboratorios Externos"
+        description="Agregue o renombre los laboratorios externos vinculados a CENDO (ej. BIOLINK, BIOLAQ). Solo se pueden eliminar laboratorios sin costos asignados."
+        placeholder="Ej. Synlab / Roe / Suiza Lab"
+        categories={externalLabManager.categories}
+        newName={externalLabManager.newName}
+        onNewNameChange={externalLabManager.setNewName}
+        isCreating={externalLabManager.isCreating}
+        editingId={externalLabManager.editingId}
+        editingName={externalLabManager.editingName}
+        onEditingNameChange={externalLabManager.setEditingName}
+        busyId={externalLabManager.busyId}
+        onCreate={externalLabManager.handleCreate}
+        onStartEdit={externalLabManager.startEditing}
+        onCancelEdit={externalLabManager.cancelEditing}
+        onSaveRename={externalLabManager.handleRename}
+        onDelete={externalLabManager.handleDelete}
       />
 
       <ManageCategoriesModal

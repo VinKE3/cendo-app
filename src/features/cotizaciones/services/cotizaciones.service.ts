@@ -138,9 +138,9 @@ async function resolveAuthoritativeQuoteItems(
       rawItems
         .map((it) => it.procedureId.trim())
         .filter((pid) => {
-          if (snapshotMap.has(pid)) return false;
           if (pid.startsWith("custom-")) return false;
           if (!PG_UUID_REGEX.test(pid)) {
+            if (snapshotMap.has(pid)) return false;
             throw new DomainError(`Identificador de procedimiento inválido: "${pid}".`);
           }
           return true;
@@ -157,6 +157,7 @@ async function resolveAuthoritativeQuoteItems(
             name: proceduresTariff.name,
             category: proceduresTariff.category,
             price: proceduresTariff.price,
+            providerCosts: proceduresTariff.providerCosts,
             active: proceduresTariff.active,
           })
           .from(proceduresTariff)
@@ -171,6 +172,36 @@ async function resolveAuthoritativeQuoteItems(
 
   const tariffMap = new Map(tariffRows.map((t) => [t.id, t]));
 
+  function resolveProviderSelection(
+    providerCosts: typeof tariffRows[number]["providerCosts"] | undefined,
+    requestedLabName: string | undefined
+  ): { selectedLabName?: string; providerCost?: number } {
+    const entries = Array.isArray(providerCosts) ? providerCosts : [];
+    if (entries.length === 0) return {};
+
+    const cleanRequested = requestedLabName?.trim().toLowerCase();
+    const formatEntryLabel = (e: { laboratoryName: string; variant?: string }) =>
+      e.variant?.trim()
+        ? `${e.laboratoryName.trim()} (${e.variant.trim()})`
+        : e.laboratoryName.trim();
+
+    const matched = cleanRequested
+      ? entries.find(
+          (entry) =>
+            formatEntryLabel(entry).toLowerCase() === cleanRequested ||
+            entry.laboratoryName.trim().toLowerCase() === cleanRequested
+        )
+      : undefined;
+
+    const chosen = matched ?? entries[0];
+    if (!chosen) return {};
+
+    return {
+      selectedLabName: formatEntryLabel(chosen),
+      providerCost: Number(Number(chosen.cost ?? 0).toFixed(2)),
+    };
+  }
+
   const normalizedInputs = rawItems.map((it) => {
     const pid = it.procedureId.trim();
 
@@ -182,29 +213,23 @@ async function resolveAuthoritativeQuoteItems(
         category: it.category,
         regularPrice: it.regularPrice,
         discountPercent: it.discountPercent,
+        selectedLabName: it.selectedLabName,
+        providerCost: it.providerCost,
       };
     }
 
     const dbTariff = tariffMap.get(pid);
-    if (dbTariff) {
-      if (!dbTariff.active) {
-        throw new DomainError(
-          `El procedimiento "${dbTariff.name}" está inactivo en el tarifario.`
-        );
-      }
-      return {
-        procedureId: dbTariff.id,
-        code: dbTariff.code,
-        name: dbTariff.name,
-        category: dbTariff.category.trim(),
-        // Zero Trust: prevalece el precio oficial del tarifario en PostgreSQL
-        regularPrice: Number(dbTariff.price),
-        discountPercent: it.discountPercent,
-      };
-    }
-
     const snapped = snapshotMap.get(pid);
+
     if (snapped) {
+      const providerSelection = dbTariff
+        ? resolveProviderSelection(dbTariff.providerCosts, it.selectedLabName)
+        : snapped.selectedLabName || snapped.providerCost !== undefined
+          ? {
+              selectedLabName: snapped.selectedLabName,
+              providerCost: snapped.providerCost,
+            }
+          : {};
       return {
         procedureId: snapped.procedureId,
         code: snapped.code,
@@ -213,6 +238,29 @@ async function resolveAuthoritativeQuoteItems(
         // Preservar el snapshot histórico pactado al editar un presupuesto existente
         regularPrice: Number(snapped.regularPrice),
         discountPercent: it.discountPercent,
+        ...providerSelection,
+      };
+    }
+
+    if (dbTariff) {
+      if (!dbTariff.active) {
+        throw new DomainError(
+          `El procedimiento "${dbTariff.name}" está inactivo en el tarifario.`
+        );
+      }
+      const providerSelection = resolveProviderSelection(
+        dbTariff.providerCosts,
+        it.selectedLabName
+      );
+      return {
+        procedureId: dbTariff.id,
+        code: dbTariff.code,
+        name: dbTariff.name,
+        category: dbTariff.category.trim(),
+        // Zero Trust: prevalece el precio oficial del tarifario en PostgreSQL
+        regularPrice: Number(dbTariff.price),
+        discountPercent: it.discountPercent,
+        ...providerSelection,
       };
     }
 

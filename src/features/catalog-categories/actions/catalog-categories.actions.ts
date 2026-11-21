@@ -17,7 +17,7 @@ import {
 } from "../services/catalog-categories.service";
 
 function revalidateScopeRoute(scope: CategoryScope) {
-  if (scope === "tariff") {
+  if (scope === "tariff" || scope === "external_lab") {
     revalidatePath("/tarifario");
   } else if (scope === "vademecum") {
     revalidatePath("/vademecum");

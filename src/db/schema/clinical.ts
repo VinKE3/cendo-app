@@ -82,6 +82,8 @@ export interface QuoteItemRecord {
   regularPrice: number;
   discountPercent?: number;
   finalPrice: number;
+  selectedLabName?: string;
+  providerCost?: number;
 }
 
 export type CheckupDossierItemKind = "ULTRASOUND" | "COLPOSCOPY" | "DOCUMENT";

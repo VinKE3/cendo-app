@@ -4,7 +4,9 @@ import type { BaseSyntheticEvent } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import {
   CheckCircle2,
+  FlaskConical,
   Link2,
+  Lock,
   Plus,
   Printer,
   Receipt,
@@ -32,7 +34,10 @@ import type {
   QuoteModalFormValues,
 } from "@/features/cotizaciones/hooks/use-cotizaciones";
 import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
-import type { ProcedureTariffItem } from "@/features/tarifario/tarifario.schema";
+import {
+  formatProviderOptionLabel,
+  type ProcedureTariffItem,
+} from "@/features/tarifario/tarifario.schema";
 import { formatCurrency, formatPeruDateDisplay } from "@/lib/utils";
 
 interface QuoteModalProps {
@@ -52,10 +57,14 @@ interface QuoteModalProps {
     subtotal: number;
     discountTotal: number;
     total: number;
+    totalProviderCost?: number;
+    netProfit?: number;
+    netMarginPercent?: number;
   };
   tariffSearch: string;
   onTariffSearchChange: (val: string) => void;
   filteredTariffs: ProcedureTariffItem[];
+  allTariffs?: ProcedureTariffItem[];
   customDraft: CustomQuoteDraft;
   onCustomDraftChange: (
     updater: (prev: CustomQuoteDraft) => CustomQuoteDraft
@@ -63,6 +72,7 @@ interface QuoteModalProps {
   onAddTariff: (t: ProcedureTariffItem) => void;
   onAddCustom: () => void;
   onUpdateDiscount: (index: number, discountPercent: number) => void;
+  onUpdateProvider?: (index: number, selectedLabLabel: string) => void;
   onRemoveItem: (index: number) => void;
   onSaveAndPrintIntent: (printAfterSave: boolean) => void;
   onSubmit: (e?: BaseSyntheticEvent) => Promise<void>;
@@ -88,11 +98,13 @@ export function QuoteModal({
   tariffSearch,
   onTariffSearchChange,
   filteredTariffs,
+  allTariffs,
   customDraft,
   onCustomDraftChange,
   onAddTariff,
   onAddCustom,
   onUpdateDiscount,
+  onUpdateProvider,
   onRemoveItem,
   onSaveAndPrintIntent,
   onSubmit,
@@ -305,55 +317,121 @@ export function QuoteModal({
                 </div>
 
                 {draftItems.length > 0 ? (
-                  <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
-                    {draftItems.map((it, idx) => (
-                      <div
-                        key={`${it.procedureId}-${idx}`}
-                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/20 p-2.5 text-xs"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="font-semibold text-foreground">
-                            {it.name}
-                          </p>
-                          <p className="font-mono text-[10px] text-muted-foreground">
-                            {it.code} • Tarifa reg.:{" "}
-                            {formatCurrency(it.regularPrice)}
-                          </p>
+                  <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                    {draftItems.map((it, idx) => {
+                      const sourceTariff = (allTariffs ?? filteredTariffs).find(
+                        (t) => t.id === it.procedureId
+                      );
+                      const providerOptions = sourceTariff?.providerCosts ?? [];
+                      const itemMargin =
+                        it.providerCost !== undefined
+                          ? it.finalPrice - it.providerCost
+                          : null;
+
+                      return (
+                        <div
+                          key={`${it.procedureId}-${idx}`}
+                          className="space-y-2 rounded-lg border border-border bg-muted/20 p-2.5 text-xs"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold text-foreground">
+                                {it.name}
+                              </p>
+                              <p className="font-mono text-[10px] text-muted-foreground">
+                                {it.code} • Tarifa reg.:{" "}
+                                {formatCurrency(it.regularPrice)}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                                Desc %
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  max={100}
+                                  step="1"
+                                  value={it.discountPercent ?? 0}
+                                  onChange={(e) =>
+                                    onUpdateDiscount(idx, Number(e.target.value))
+                                  }
+                                  className="h-7 w-16 bg-card text-center font-mono text-xs"
+                                />
+                              </label>
+
+                              <span className="min-w-20 text-right font-mono font-bold text-primary">
+                                {formatCurrency(it.finalPrice)}
+                              </span>
+
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-xs"
+                                onClick={() => onRemoveItem(idx)}
+                                aria-label="Quitar ítem"
+                                className="text-muted-foreground hover:text-destructive"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          {providerOptions.length > 0 ||
+                          it.selectedLabName ||
+                          it.providerCost !== undefined ? (
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-1.5 text-[11px]">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="inline-flex items-center gap-1 font-medium text-muted-foreground">
+                                  <FlaskConical className="size-3 text-primary" />
+                                  Lab interno:
+                                </span>
+                                {providerOptions.length > 1 && onUpdateProvider ? (
+                                  <select
+                                    aria-label={`Laboratorio interno para ${it.name}`}
+                                    value={
+                                      it.selectedLabName ??
+                                      formatProviderOptionLabel(providerOptions[0]!)
+                                    }
+                                    onChange={(e) =>
+                                      onUpdateProvider(idx, e.target.value)
+                                    }
+                                    className="h-6 rounded border border-input bg-card px-1.5 text-[11px] font-medium text-foreground outline-none focus-visible:border-ring"
+                                  >
+                                    {providerOptions.map((opt) => {
+                                      const label = formatProviderOptionLabel(opt);
+                                      return (
+                                        <option key={label} value={label}>
+                                          {label} — {formatCurrency(opt.cost)}
+                                        </option>
+                                      );
+                                    })}
+                                  </select>
+                                ) : (
+                                  <span className="rounded bg-card px-1.5 py-0.5 font-mono text-[10px] font-medium text-foreground ring-1 ring-border">
+                                    {it.selectedLabName || "Externo"}:{" "}
+                                    {formatCurrency(it.providerCost ?? 0)}
+                                  </span>
+                                )}
+                              </div>
+
+                              {itemMargin !== null ? (
+                                <span
+                                  className={
+                                    itemMargin >= 0
+                                      ? "font-mono font-semibold text-success"
+                                      : "font-mono font-semibold text-destructive"
+                                  }
+                                >
+                                  Ganancia ítem: {itemMargin >= 0 ? "+" : ""}
+                                  {formatCurrency(itemMargin)}
+                                </span>
+                              ) : null}
+                            </div>
+                          ) : null}
                         </div>
-
-                        <div className="flex items-center gap-2">
-                          <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                            Desc %
-                            <Input
-                              type="number"
-                              min={0}
-                              max={100}
-                              step="1"
-                              value={it.discountPercent ?? 0}
-                              onChange={(e) =>
-                                onUpdateDiscount(idx, Number(e.target.value))
-                              }
-                              className="h-7 w-16 bg-card text-center font-mono text-xs"
-                            />
-                          </label>
-
-                          <span className="min-w-20 text-right font-mono font-bold text-primary">
-                            {formatCurrency(it.finalPrice)}
-                          </span>
-
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-xs"
-                            onClick={() => onRemoveItem(idx)}
-                            aria-label="Quitar ítem"
-                            className="text-muted-foreground hover:text-destructive"
-                          >
-                            <Trash2 className="size-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="rounded-lg border border-dashed border-border py-10 text-center text-xs text-muted-foreground">
@@ -385,6 +463,42 @@ export function QuoteModal({
                     {formatCurrency(financials.total)}
                   </span>
                 </div>
+
+                {draftItems.length > 0 &&
+                ((financials.totalProviderCost ?? 0) > 0 ||
+                  draftItems.some(
+                    (it) => it.providerCost !== undefined || it.selectedLabName
+                  )) ? (
+                  <div className="mt-2 space-y-1 rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-[11px]">
+                    <div className="flex items-center gap-1 font-semibold text-amber-800 dark:text-amber-300">
+                      <Lock className="size-3" />
+                      <span>
+                        Control Interno CENDO (NO se imprime ni envía a paciente)
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Costo laboratorios externos:</span>
+                      <span className="font-mono font-semibold text-foreground">
+                        - {formatCurrency(financials.totalProviderCost ?? 0)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between font-bold">
+                      <span className="text-foreground">
+                        Ganancia neta estimada:
+                      </span>
+                      <span
+                        className={
+                          (financials.netProfit ?? financials.total) >= 0
+                            ? "font-mono text-success"
+                            : "font-mono text-destructive"
+                        }
+                      >
+                        {formatCurrency(financials.netProfit ?? financials.total)}{" "}
+                        ({(financials.netMarginPercent ?? 0).toFixed(1)}%)
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>

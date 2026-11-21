@@ -21,6 +21,12 @@ export interface CommercialBrandRecord {
   referencePricePen: number;
 }
 
+export interface TariffProviderCostRecord {
+  laboratoryName: string;
+  variant?: string;
+  cost: number;
+}
+
 export const proceduresTariff = pgTable(
   "procedures_tariff",
   {
@@ -33,6 +39,10 @@ export const proceduresTariff = pgTable(
     category: text("category").notNull(),
     description: text("description"),
     price: numeric("price", { precision: 10, scale: 2 }).default("0.00").notNull(),
+    providerCosts: jsonb("provider_costs")
+      .$type<TariffProviderCostRecord[]>()
+      .default([])
+      .notNull(),
     active: boolean("active").default(true).notNull(),
     createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
     updatedBy: uuid("updated_by").references(() => profiles.id, { onDelete: "set null" }),

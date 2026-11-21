@@ -1,0 +1,1 @@
+ALTER TABLE "procedures_tariff" ADD COLUMN "provider_costs" jsonb DEFAULT '[]'::jsonb NOT NULL;

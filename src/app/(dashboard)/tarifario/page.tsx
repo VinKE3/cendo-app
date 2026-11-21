@@ -6,9 +6,10 @@ import { requireSessionDoctor } from "@/lib/security/server-session";
 
 export default async function TarifarioPage() {
   const doctor = await requireSessionDoctor();
-  const [items, categories, profile] = await Promise.all([
+  const [items, categories, externalLabs, profile] = await Promise.all([
     listTariffs(doctor.tenantId),
     listCategories(doctor.tenantId, "tariff"),
+    listCategories(doctor.tenantId, "external_lab"),
     getOwnConfigProfile(doctor.tenantId, doctor.id),
   ]);
 
@@ -27,6 +28,7 @@ export default async function TarifarioPage() {
     <TarifarioView
       initialItems={items}
       initialCategories={categories}
+      initialExternalLabs={externalLabs}
       clinicInfo={clinicInfo}
       canEdit={canEdit}
       canDelete={canDelete}

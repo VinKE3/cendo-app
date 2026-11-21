@@ -1,6 +1,8 @@
 "use client";
 
-import type { UseFormReturn } from "react-hook-form";
+import { useFieldArray, useWatch, type UseFormReturn } from "react-hook-form";
+import { FlaskConical, Lock, Plus, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,12 +18,14 @@ import type {
   ProcedureTariffItem,
   TariffInput,
 } from "@/features/tarifario/tarifario.schema";
+import { formatCurrency } from "@/lib/utils";
 
 interface TariffModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editingItem: ProcedureTariffItem | null;
   categories: string[];
+  externalLabs: string[];
   form: UseFormReturn<TariffInput>;
   isSubmitting: boolean;
   onSubmit: (e?: React.BaseSyntheticEvent) => Promise<void>;
@@ -32,18 +36,31 @@ export function TariffModal({
   onOpenChange,
   editingItem,
   categories,
+  externalLabs,
   form,
   isSubmitting,
   onSubmit,
 }: TariffModalProps) {
   const {
+    control,
     register,
     formState: { errors },
   } = form;
 
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "providerCosts",
+  });
+
+  const watchedPrice = useWatch({ control, name: "price" });
+  const watchedProviderCosts = useWatch({ control, name: "providerCosts" });
+  const cendoPrice = Number.isFinite(Number(watchedPrice))
+    ? Number(watchedPrice)
+    : 0;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
             {editingItem ? "Editar Prestación del Tarifario" : "Nueva Prestación CENDO"}
@@ -147,10 +164,163 @@ export function TariffModal({
             </label>
             <Textarea
               id="tariff-description"
-              rows={3}
+              rows={2}
               placeholder="Detalle breve del alcance clínico del examen o procedimiento..."
               {...register("description")}
             />
+          </div>
+
+          <div className="space-y-2.5 rounded-xl border border-border bg-muted/25 p-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-1.5">
+                  <FlaskConical className="size-3.5 text-primary" />
+                  <span className="text-xs font-semibold text-foreground">
+                    Costos por Laboratorio Externo (Opcional)
+                  </span>
+                  <Badge variant="outline" className="gap-1 text-[10px]">
+                    <Lock className="size-2.5" />
+                    Solo uso interno CENDO
+                  </Badge>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Si terceriza este análisis (ej. BIOLINK, BIOLAQ), registre cuánto le
+                  cobra cada laboratorio para ver su margen real al cotizar.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  append({
+                    laboratoryName: externalLabs[0] ?? "Lab Clínico General",
+                    variant: "",
+                    cost: 0,
+                  })
+                }
+              >
+                <Plus className="size-3.5" />
+                Agregar laboratorio
+              </Button>
+            </div>
+
+            {fields.length > 0 ? (
+              <div className="space-y-2">
+                {fields.map((field, index) => {
+                  const rowCost = Number(watchedProviderCosts?.[index]?.cost ?? 0);
+                  const currentLab =
+                    watchedProviderCosts?.[index]?.laboratoryName ?? "";
+                  const margin = cendoPrice - (Number.isFinite(rowCost) ? rowCost : 0);
+                  return (
+                    <div
+                      key={field.id}
+                      className="grid grid-cols-1 gap-2 rounded-lg border border-border bg-card p-2.5 sm:grid-cols-12 sm:items-center"
+                    >
+                      <div className="sm:col-span-4">
+                        <label
+                          htmlFor={`provider-lab-${index}`}
+                          className="mb-1 block text-[10px] font-medium text-muted-foreground"
+                        >
+                          Laboratorio externo
+                        </label>
+                        <select
+                          id={`provider-lab-${index}`}
+                          className="h-8 w-full rounded-lg border border-input bg-transparent px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                          {...register(`providerCosts.${index}.laboratoryName`)}
+                        >
+                          {currentLab && !externalLabs.includes(currentLab) ? (
+                            <option value={currentLab}>{currentLab}</option>
+                          ) : null}
+                          {externalLabs.map((lab) => (
+                            <option key={lab} value={lab}>
+                              {lab}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="sm:col-span-4">
+                        <label
+                          htmlFor={`provider-variant-${index}`}
+                          className="mb-1 block text-[10px] font-medium text-muted-foreground"
+                        >
+                          Modalidad / Nota (opc.)
+                        </label>
+                        <Input
+                          id={`provider-variant-${index}`}
+                          placeholder="Ej. Solo / Dentro de VPH"
+                          className="h-8 text-xs"
+                          {...register(`providerCosts.${index}.variant`)}
+                        />
+                      </div>
+
+                      <div className="sm:col-span-3">
+                        <label
+                          htmlFor={`provider-cost-${index}`}
+                          className="mb-1 block text-[10px] font-medium text-muted-foreground"
+                        >
+                          Costo Lab (S/)
+                        </label>
+                        <Input
+                          id={`provider-cost-${index}`}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className="h-8 font-mono text-xs tabular-nums"
+                          {...register(`providerCosts.${index}.cost`, {
+                            valueAsNumber: true,
+                          })}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 pt-3 sm:col-span-1 sm:justify-end">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={() => remove(index)}
+                          aria-label="Quitar laboratorio externo"
+                          className="text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] sm:col-span-12">
+                        {errors.providerCosts?.[index]?.laboratoryName ? (
+                          <span className="text-destructive">
+                            {errors.providerCosts[index]?.laboratoryName?.message}
+                          </span>
+                        ) : errors.providerCosts?.[index]?.cost ? (
+                          <span className="text-destructive">
+                            {errors.providerCosts[index]?.cost?.message}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">
+                            Ganancia neta CENDO con esta opción:
+                          </span>
+                        )}
+                        <span
+                          className={
+                            margin >= 0
+                              ? "font-mono font-semibold text-success"
+                              : "font-mono font-semibold text-destructive"
+                          }
+                        >
+                          {margin >= 0 ? "+" : ""}
+                          {formatCurrency(margin)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="rounded-lg border border-dashed border-border bg-card/50 px-3 py-2 text-center text-[11px] text-muted-foreground">
+                Sin laboratorios externos vinculados (prestación 100% CENDO o margen directo).
+              </p>
+            )}
           </div>
         </form>
 

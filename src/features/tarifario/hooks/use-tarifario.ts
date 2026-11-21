@@ -20,7 +20,8 @@ import {
 
 export function useTarifario(
   initialItems: ProcedureTariffItem[],
-  initialCategories: CatalogCategoryItem[]
+  initialCategories: CatalogCategoryItem[],
+  initialExternalLabs: CatalogCategoryItem[] = []
 ) {
   const [items, setItems] = useState<ProcedureTariffItem[]>(initialItems);
   const [search, setSearchState] = useState("");
@@ -46,6 +47,24 @@ export function useTarifario(
     },
   });
 
+  const externalLabManager = useCatalogCategories({
+    scope: "external_lab",
+    initialCategories: initialExternalLabs,
+    onRenameSuccess: (oldName, newName) => {
+      const oldLower = oldName.trim().toLowerCase();
+      setItems((prev) =>
+        prev.map((row) => ({
+          ...row,
+          providerCosts: row.providerCosts.map((entry) =>
+            entry.laboratoryName.trim().toLowerCase() === oldLower
+              ? { ...entry, laboratoryName: newName }
+              : entry
+          ),
+        }))
+      );
+    },
+  });
+
   const defaultCategory = categoryManager.categoryNames[0] ?? "Procedimiento";
 
   const form = useForm<TariffInput>({
@@ -56,6 +75,7 @@ export function useTarifario(
       category: defaultCategory,
       description: "",
       price: 180,
+      providerCosts: [],
       active: true,
     },
   });
@@ -87,6 +107,19 @@ export function useTarifario(
     pagination.resetPage();
   };
 
+  const syncExternalLabUsage = (nextItems: ProcedureTariffItem[]) => {
+    const usedLabsPerRow = nextItems.flatMap((row) =>
+      Array.from(
+        new Set(
+          row.providerCosts
+            .map((entry) => entry.laboratoryName.trim())
+            .filter(Boolean)
+        )
+      )
+    );
+    externalLabManager.syncUsageCounts(usedLabsPerRow);
+  };
+
   const openCreateModal = () => {
     setEditingItem(null);
     form.reset({
@@ -95,6 +128,7 @@ export function useTarifario(
       category: categoryManager.categoryNames[0] ?? "",
       description: "",
       price: 180,
+      providerCosts: [],
       active: true,
     });
     setDialogOpen(true);
@@ -108,14 +142,39 @@ export function useTarifario(
       category: item.category,
       description: item.description,
       price: item.price,
+      providerCosts: item.providerCosts.map((entry) => ({
+        laboratoryName: entry.laboratoryName,
+        ...(entry.variant ? { variant: entry.variant } : {}),
+        cost: entry.cost,
+      })),
       active: item.active,
     });
     setDialogOpen(true);
   };
 
   const onSubmit = form.handleSubmit(async (values) => {
+    const normalizedValues: TariffInput = {
+      ...values,
+      providerCosts: (values.providerCosts ?? []).map((entry) => {
+        const cleanVariant = entry.variant?.trim();
+        return cleanVariant
+          ? {
+              laboratoryName: entry.laboratoryName.trim(),
+              variant: cleanVariant,
+              cost: entry.cost,
+            }
+          : {
+              laboratoryName: entry.laboratoryName.trim(),
+              cost: entry.cost,
+            };
+      }),
+    };
+
     if (editingItem) {
-      const res = await updateTariffAction({ ...values, id: editingItem.id });
+      const res = await updateTariffAction({
+        ...normalizedValues,
+        id: editingItem.id,
+      });
       if (!res.success || !res.data) {
         toast.error(res.error || "No se pudo actualizar la tarifa.");
         return;
@@ -125,9 +184,10 @@ export function useTarifario(
       );
       setItems(nextItems);
       categoryManager.syncUsageCounts(nextItems.map((i) => i.category));
+      syncExternalLabUsage(nextItems);
       toast.success(`Tarifa ${res.data.code} actualizada.`);
     } else {
-      const res = await createTariffAction(values);
+      const res = await createTariffAction(normalizedValues);
       if (!res.success || !res.data) {
         toast.error(res.error || "No se pudo registrar la tarifa.");
         return;
@@ -135,6 +195,7 @@ export function useTarifario(
       const nextItems = [...items, res.data!];
       setItems(nextItems);
       categoryManager.syncUsageCounts(nextItems.map((i) => i.category));
+      syncExternalLabUsage(nextItems);
       toast.success(`Tarifa ${res.data.code} registrada.`);
     }
 
@@ -155,6 +216,7 @@ export function useTarifario(
     const nextItems = items.filter((row) => row.id !== id);
     setItems(nextItems);
     categoryManager.syncUsageCounts(nextItems.map((i) => i.category));
+    syncExternalLabUsage(nextItems);
     toast.success("Prestación eliminada del tarifario.");
   };
 
@@ -165,6 +227,8 @@ export function useTarifario(
     pagination,
     categories: categoryManager.categoryNames,
     categoryManager,
+    externalLabs: externalLabManager.categoryNames,
+    externalLabManager,
     search,
     setSearch,
     categoryFilter,

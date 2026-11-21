@@ -69,7 +69,9 @@ async function ensureDefaultCategoriesForScope(
       ? DEFAULT_APPOINTMENT_TYPES
       : scope === "consultation_reason"
         ? DEFAULT_CONSULTATION_REASONS
-        : null;
+        : scope === "external_lab"
+          ? (["BIOLINK", "BIOLAQ", "Lab Clínico General"] as const)
+          : null;
 
   if (!defaults) return;
 
@@ -123,6 +125,30 @@ async function getUsageMapByScope(
     for (const r of rows) {
       const k = r.key.trim().toLowerCase();
       map.set(k, (map.get(k) ?? 0) + Number(r.total));
+    }
+    return map;
+  }
+
+  if (scope === "external_lab") {
+    const rows = await db
+      .select({ providerCosts: proceduresTariff.providerCosts })
+      .from(proceduresTariff)
+      .where(
+        and(
+          eq(proceduresTariff.tenantId, tenantId),
+          isNull(proceduresTariff.deletedAt)
+        )
+      );
+
+    for (const r of rows) {
+      const labsInRow = new Set(
+        (r.providerCosts ?? [])
+          .map((entry) => entry.laboratoryName.trim().toLowerCase())
+          .filter(Boolean)
+      );
+      for (const labKey of labsInRow) {
+        map.set(labKey, (map.get(labKey) ?? 0) + 1);
+      }
     }
     return map;
   }
@@ -211,6 +237,23 @@ async function countScopeUsage(
         )
       );
     return Number(row?.value ?? 0);
+  }
+
+  if (scope === "external_lab") {
+    const rows = await db
+      .select({ providerCosts: proceduresTariff.providerCosts })
+      .from(proceduresTariff)
+      .where(
+        and(
+          eq(proceduresTariff.tenantId, tenantId),
+          isNull(proceduresTariff.deletedAt)
+        )
+      );
+    return rows.filter((r) =>
+      (r.providerCosts ?? []).some(
+        (entry) => entry.laboratoryName.trim().toLowerCase() === cleanName
+      )
+    ).length;
   }
 
   if (scope === "vademecum") {
@@ -407,6 +450,36 @@ export async function renameCategory(
             sql`LOWER(TRIM(${proceduresTariff.category})) = ${oldLower}`
           )
         );
+    } else if (input.scope === "external_lab") {
+      const tariffRows = await tx
+        .select({
+          id: proceduresTariff.id,
+          providerCosts: proceduresTariff.providerCosts,
+        })
+        .from(proceduresTariff)
+        .where(
+          and(
+            eq(proceduresTariff.tenantId, tenantId),
+            isNull(proceduresTariff.deletedAt)
+          )
+        );
+
+      for (const row of tariffRows) {
+        const current = row.providerCosts ?? [];
+        const hasMatch = current.some(
+          (entry) => entry.laboratoryName.trim().toLowerCase() === oldLower
+        );
+        if (!hasMatch) continue;
+        const nextCosts = current.map((entry) =>
+          entry.laboratoryName.trim().toLowerCase() === oldLower
+            ? { ...entry, laboratoryName: input.name }
+            : entry
+        );
+        await tx
+          .update(proceduresTariff)
+          .set({ providerCosts: nextCosts, updatedBy: ctx.userId })
+          .where(eq(proceduresTariff.id, row.id));
+      }
     } else if (input.scope === "vademecum") {
       await tx
         .update(medicationsVademecum)
