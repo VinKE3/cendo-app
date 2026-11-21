@@ -797,6 +797,7 @@ export function TabConsultas({
         manualTestName={inlineLab.manualTestName}
         onManualTestNameChange={inlineLab.setManualTestName}
         onApplyTemplate={inlineLab.applyTemplate}
+        onSwitchToPathology={inlineLab.switchToPathologyMode}
         onResetToGeneral={inlineLab.resetToGeneralOrder}
         onOpenManageTemplates={() => inlineLab.setTemplateManagerOpen(true)}
         onApplyPresetPack={inlineLab.applyPresetPack}

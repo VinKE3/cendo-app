@@ -34,6 +34,7 @@ import type { MedicalConsultationItem } from "@/features/consultas/consultas.sch
 import {
   LAB_INSTRUCTION_PRESETS,
   LAB_URGENCIES,
+  PATHOLOGY_SAMPLE_SUGGESTIONS,
   hasDuplicateLabTest,
   type LabCatalogTest,
   type LabCategory,
@@ -75,6 +76,7 @@ interface LabOrderModalProps {
   manualTestName: string;
   onManualTestNameChange: (val: string) => void;
   onApplyTemplate: (tmpl: LabOrderTemplateItem) => void;
+  onSwitchToPathology: () => void;
   onResetToGeneral: () => void;
   onOpenManageTemplates: () => void;
   onApplyPresetPack: (pack: LabPresetPack) => void;
@@ -119,6 +121,7 @@ export function LabOrderModal({
   manualTestName,
   onManualTestNameChange,
   onApplyTemplate,
+  onSwitchToPathology,
   onResetToGeneral,
   onOpenManageTemplates,
   onApplyPresetPack,
@@ -137,10 +140,12 @@ export function LabOrderModal({
   } = form;
 
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showExtraSpecimenFields, setShowExtraSpecimenFields] = useState(false);
 
   const handleDialogOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
       setShowTemplates(false);
+      setShowExtraSpecimenFields(false);
     }
     onOpenChange(nextOpen);
   };
@@ -152,10 +157,18 @@ export function LabOrderModal({
       <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-5xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FlaskConical className="size-5 text-primary" />
+            {isPathologyTemplate ? (
+              <Microscope className="size-5 text-primary" />
+            ) : (
+              <FlaskConical className="size-5 text-primary" />
+            )}
             {editingItem
-              ? "Editar Orden de Laboratorio / Patología"
-              : "Nueva Orden de Laboratorio / Remisión de Muestra"}
+              ? isPathologyTemplate
+                ? "Editar Solicitud de Anatomía Patológica"
+                : "Editar Orden de Laboratorio"
+              : isPathologyTemplate
+                ? "Nueva Solicitud de Anatomía Patológica"
+                : "Nueva Orden de Laboratorio"}
           </DialogTitle>
           <DialogDescription>
             Paciente:{" "}
@@ -172,6 +185,35 @@ export function LabOrderModal({
         ) : null}
 
         <form onSubmit={onSubmit} className="space-y-5">
+          {/* Selector de Modo Principal: Orden de Laboratorio vs Solicitud de Anatomía Patológica */}
+          <div className="grid grid-cols-2 gap-2 rounded-xl border border-border bg-muted/30 p-1.5">
+            <button
+              type="button"
+              onClick={onResetToGeneral}
+              className={cn(
+                "flex cursor-pointer items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-all",
+                !isPathologyTemplate
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-card hover:text-foreground"
+              )}
+            >
+              <FlaskConical className="size-4" />
+              <span>Orden de Laboratorio</span>
+            </button>
+            <button
+              type="button"
+              onClick={onSwitchToPathology}
+              className={cn(
+                "flex cursor-pointer items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-all",
+                isPathologyTemplate
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-card hover:text-foreground"
+              )}
+            >
+              <Microscope className="size-4" />
+              <span>Solicitud de Anatomía Patológica</span>
+            </button>
+          </div>
           {/* Bloque 1: Tipo de formato, Fecha, Urgencia, Vínculo */}
           <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-12">
@@ -373,99 +415,154 @@ export function LabOrderModal({
             ) : null}
           </div>
 
-          {/* Bloque 2.5: Metadatos de Muestra (Solo cuando templateType !== GENERAL) */}
+          {/* Bloque 2.5: Solicitud de Anatomía Patológica (Solo cuando templateType !== GENERAL) */}
           {isPathologyTemplate ? (
             <div className="space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="flex items-center gap-1.5 text-xs font-semibold text-primary uppercase">
                   <Microscope className="size-4" />
-                  Datos de Muestra Biológica & Correlación Gineco-Obstétrica
+                  Solicitud de Anatomía Patológica
                 </h3>
-                <span className="text-[11px] text-muted-foreground">
-                  Pre-hidratado desde antecedentes
-                </span>
+                <Badge variant="outline" className="bg-card text-[10px]">
+                  Formato CENDO
+                </Badge>
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-12">
-                <div className="space-y-1 sm:col-span-5">
+                <div className="space-y-1 sm:col-span-6">
                   <label className="block text-[11px] font-medium">
-                    Sitio Anatómico / Tipo de Toma
+                    Muestra <span className="text-destructive">*</span>
                   </label>
                   <Input
+                    list="pathology-sample-suggestions"
                     className="bg-card"
-                    placeholder="Ej. Cérvix hora 12 y 6"
+                    placeholder="Ej. Citología de Cérvix, Biopsia de Cérvix H12..."
                     {...register("anatomicalSite")}
                   />
+                  <datalist id="pathology-sample-suggestions">
+                    {PATHOLOGY_SAMPLE_SUGGESTIONS.map((sample) => (
+                      <option key={sample} value={sample} />
+                    ))}
+                  </datalist>
                 </div>
-                <div className="space-y-1 sm:col-span-4">
-                  <label className="block text-[11px] font-medium">
-                    Fijador / Medio de Transporte
-                  </label>
-                  <Input
-                    className="bg-card"
-                    {...register("fixative")}
-                  />
-                </div>
+
                 <div className="space-y-1 sm:col-span-3">
                   <label className="block text-[11px] font-medium">
-                    N° Frascos / Láminas
+                    Fecha de Toma de Muestra
                   </label>
                   <Input
-                    type="number"
-                    min={1}
-                    max={30}
+                    type="date"
                     className="bg-card font-mono"
-                    {...register("containerCount", { valueAsNumber: true })}
+                    {...register("sampleObtainedAt")}
                   />
                 </div>
 
-                <div className="space-y-1 sm:col-span-4">
-                  <label className="block text-[11px] font-medium">
-                    Aspecto Macroscópico
-                  </label>
-                  <Input
-                    className="bg-card"
-                    placeholder="Ej. Zona acetoblanca densa..."
-                    {...register("cervixAspect")}
-                  />
-                </div>
                 <div className="space-y-1 sm:col-span-3">
-                  <label className="block text-[11px] font-medium">FUR</label>
+                  <label className="block text-[11px] font-medium">
+                    Fecha de Última Regla (FUR)
+                  </label>
                   <Input
                     type="text"
                     className="bg-card font-mono"
-                    placeholder="YYYY-MM-DD"
+                    placeholder="DD/MM/AAAA o YYYY-MM-DD"
                     {...register("furDate")}
                   />
                 </div>
-                <div className="space-y-1 sm:col-span-2">
+
+                <div className="space-y-1 sm:col-span-5">
                   <label className="block text-[11px] font-medium">
-                    Paridad
+                    Médico Solicitante
                   </label>
                   <Input
-                    className="bg-card font-mono"
-                    placeholder="G0P0000"
-                    {...register("obstetricParity")}
-                  />
-                </div>
-                <div className="space-y-1 sm:col-span-3">
-                  <label className="block text-[11px] font-medium">MAC</label>
-                  <Input
+                    type="text"
                     className="bg-card"
-                    {...register("contraceptiveMethod")}
+                    placeholder="DR. PATRICK JOSÉ JACINTO GOMERO"
+                    {...register("requestingDoctor")}
                   />
                 </div>
 
-                <div className="space-y-1 sm:col-span-12">
+                <div className="space-y-1 sm:col-span-7">
                   <label className="block text-[11px] font-medium">
-                    Observaciones Clínicas para Anatomía Patológica
+                    Datos Clínicos
                   </label>
                   <Input
+                    type="text"
                     className="bg-card"
-                    placeholder="Hallazgos colposcópicos relevantes o sospecha clínica..."
+                    placeholder="Ej. Ninguno, o hallazgos relevantes para patología..."
                     {...register("clinicalFindings")}
                   />
                 </div>
+              </div>
+
+              <div className="border-t border-primary/20 pt-2">
+                <button
+                  type="button"
+                  aria-expanded={showExtraSpecimenFields}
+                  onClick={() => setShowExtraSpecimenFields((prev) => !prev)}
+                  className="inline-flex cursor-pointer items-center gap-1.5 text-[11px] font-medium text-primary hover:underline"
+                >
+                  {showExtraSpecimenFields ? (
+                    <ChevronUp className="size-3.5" />
+                  ) : (
+                    <ChevronDown className="size-3.5" />
+                  )}
+                  <span>
+                    + Detalles opcionales de muestra (Fijador, N° frascos,
+                    Paridad, MAC)
+                  </span>
+                </button>
+
+                {showExtraSpecimenFields ? (
+                  <div className="mt-2.5 grid grid-cols-1 gap-3 sm:grid-cols-12">
+                    <div className="space-y-1 sm:col-span-4">
+                      <label className="block text-[11px] font-medium">
+                        Fijador / Medio de Transporte
+                      </label>
+                      <Input className="bg-card" {...register("fixative")} />
+                    </div>
+                    <div className="space-y-1 sm:col-span-2">
+                      <label className="block text-[11px] font-medium">
+                        N° Frascos
+                      </label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={30}
+                        className="bg-card font-mono"
+                        {...register("containerCount", { valueAsNumber: true })}
+                      />
+                    </div>
+                    <div className="space-y-1 sm:col-span-6">
+                      <label className="block text-[11px] font-medium">
+                        Aspecto Macroscópico
+                      </label>
+                      <Input
+                        className="bg-card"
+                        placeholder="Ej. Zona acetoblanca densa..."
+                        {...register("cervixAspect")}
+                      />
+                    </div>
+                    <div className="space-y-1 sm:col-span-4">
+                      <label className="block text-[11px] font-medium">
+                        Paridad
+                      </label>
+                      <Input
+                        className="bg-card font-mono"
+                        placeholder="G0P0000"
+                        {...register("obstetricParity")}
+                      />
+                    </div>
+                    <div className="space-y-1 sm:col-span-8">
+                      <label className="block text-[11px] font-medium">
+                        MAC
+                      </label>
+                      <Input
+                        className="bg-card"
+                        {...register("contraceptiveMethod")}
+                      />
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : null}
@@ -475,9 +572,16 @@ export function LabOrderModal({
             {/* Catálogo */}
             <div className="space-y-2.5 rounded-xl border border-border bg-muted/20 p-3.5 lg:col-span-6">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-xs font-semibold text-foreground uppercase">
-                  Catálogo de Exámenes ({filteredCatalog.length})
-                </h3>
+                <div>
+                  <h3 className="text-xs font-semibold text-foreground uppercase">
+                    Catálogo de Exámenes ({filteredCatalog.length})
+                  </h3>
+                  {isPathologyTemplate ? (
+                    <p className="text-[10.5px] text-muted-foreground">
+                      Opcional si ya especificó la Muestra arriba.
+                    </p>
+                  ) : null}
+                </div>
                 <select
                   aria-label="Filtrar categoría"
                   value={catalogCategory}

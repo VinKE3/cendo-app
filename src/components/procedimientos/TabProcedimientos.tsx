@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import {
-  CheckCircle2,
-  Clock,
   FlaskConical,
   Loader2,
   MessageCircle,
@@ -63,7 +61,7 @@ import {
   PROCEDURE_TYPE_SHORT_LABELS,
   type MinorProcedureItem,
 } from "@/features/procedimientos/procedimientos.schema";
-import { cn, formatPeruDateDisplay } from "@/lib/utils";
+import { formatPeruDateDisplay } from "@/lib/utils";
 import { generateMinorProcedureWhatsAppUrl } from "@/lib/whatsapp-share";
 
 interface TabProcedimientosProps {
@@ -112,23 +110,13 @@ export function TabProcedimientos({
     templates: templateStore.procedureTemplates,
     onCreateTemplate: templateStore.createTemplate,
     onMacSynced,
+    onOpenPathologyAfterSave: onEmitPathologyOrderFromProcedure,
   });
-
-  const pathologyPendingCount = procedures.filter(
-    (p) =>
-      p.procedureDetails.specimenSentToPathology &&
-      (p.procedureDetails.pathologyStatus ?? "PENDIENTE") === "PENDIENTE"
-  ).length;
-
-  const pathologyReceivedCount = procedures.filter(
-    (p) =>
-      p.procedureDetails.specimenSentToPathology &&
-      p.procedureDetails.pathologyStatus === "RECIBIDO"
-  ).length;
 
   const deviceProceduresCount = procedures.filter((p) =>
     isContraceptiveDeviceProcedure(p.procedureType)
   ).length;
+  const biopsyProceduresCount = procedures.length - deviceProceduresCount;
 
   return (
     <div className="space-y-4">
@@ -152,20 +140,10 @@ export function TabProcedimientos({
           <CardContent className="flex items-center justify-between pt-4 pb-4">
             <div>
               <p className="text-[11px] font-semibold text-muted-foreground uppercase">
-                Muestras en Patología (Pend. / Recib.)
+                Biopsias / Resecciones
               </p>
               <p className="mt-0.5 font-mono text-xl font-bold text-foreground">
-                <span
-                  className={cn(
-                    pathologyPendingCount > 0
-                      ? "text-warning"
-                      : "text-foreground"
-                  )}
-                >
-                  {pathologyPendingCount}
-                </span>{" "}
-                /{" "}
-                <span className="text-success">{pathologyReceivedCount}</span>
+                {biopsyProceduresCount}
               </p>
             </div>
             <FlaskConical className="size-5 text-primary" />
@@ -281,7 +259,7 @@ export function TabProcedimientos({
                         Anestesia / Hemostasia
                       </TableHead>
                       <TableHead className="text-xs">
-                        Patología / Dispositivo
+                        Sitio / Dispositivo
                       </TableHead>
                       <TableHead className="text-right text-xs">
                         Acciones
@@ -294,11 +272,6 @@ export function TabProcedimientos({
                       const isDevice = isContraceptiveDeviceProcedure(
                         item.procedureType
                       );
-                      const pathStatus =
-                        det.pathologyStatus ??
-                        (det.specimenSentToPathology
-                          ? "PENDIENTE"
-                          : "NO_APLICA");
                       const waUrl = generateMinorProcedureWhatsAppUrl({
                         patientName: patient.fullName,
                         patientPhone: patient.phone,
@@ -368,33 +341,7 @@ export function TabProcedimientos({
                           </TableCell>
 
                           <TableCell className="max-w-xs align-top text-xs">
-                            {det.specimenSentToPathology ? (
-                              <div className="space-y-1">
-                                <Badge
-                                  variant="outline"
-                                  className={cn(
-                                    "gap-1 text-[10px]",
-                                    pathStatus === "RECIBIDO"
-                                      ? "border-success/40 bg-success/10 text-success"
-                                      : "border-warning/40 bg-warning/15 text-foreground"
-                                  )}
-                                >
-                                  {pathStatus === "RECIBIDO" ? (
-                                    <CheckCircle2 className="size-3" />
-                                  ) : (
-                                    <Clock className="size-3" />
-                                  )}
-                                  {pathStatus === "RECIBIDO"
-                                    ? "Patología: Recibido"
-                                    : "Patología: Pendiente"}
-                                </Badge>
-                                <p className="line-clamp-1 text-[11px] text-muted-foreground">
-                                  {det.pathologyResultNotes ||
-                                    det.specimenDescription ||
-                                    "Muestra en formol 10%"}
-                                </p>
-                              </div>
-                            ) : isDevice && det.deviceInfo ? (
+                            {isDevice && det.deviceInfo ? (
                               <div className="space-y-1">
                                 <Badge
                                   variant="outline"
@@ -406,9 +353,25 @@ export function TabProcedimientos({
                                   {det.deviceInfo}
                                 </p>
                               </div>
+                            ) : det.biopsySites || det.specimenSentToPathology ? (
+                              <div className="space-y-1">
+                                {det.specimenSentToPathology ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="border-primary/30 bg-primary/10 text-[10px] text-primary"
+                                  >
+                                    Remitido a Patología
+                                  </Badge>
+                                ) : null}
+                                <p className="line-clamp-2 text-[11px] text-muted-foreground">
+                                  {det.biopsySites ||
+                                    det.specimenDescription ||
+                                    "Protocolo quirúrgico"}
+                                </p>
+                              </div>
                             ) : (
                               <span className="text-[11px] text-muted-foreground">
-                                No requiere patología
+                                —
                               </span>
                             )}
                           </TableCell>
@@ -416,13 +379,13 @@ export function TabProcedimientos({
                           <TableCell className="text-right align-top">
                             <div className="inline-flex items-center justify-end gap-1">
                               {canEdit &&
-                              det.specimenSentToPathology &&
+                              !isDevice &&
                               onEmitPathologyOrderFromProcedure ? (
                                 <Button
                                   type="button"
                                   variant="outline"
                                   size="xs"
-                                  title="Emitir Orden de Anatomía Patológica pre-llenada"
+                                  title="Emitir Solicitud de Anatomía Patológica pre-llenada"
                                   onClick={() =>
                                     onEmitPathologyOrderFromProcedure(item)
                                   }
@@ -542,6 +505,9 @@ export function TabProcedimientos({
         anesthesiaOptions={proc.anesthesiaOptions}
         bleedingOptions={proc.bleedingOptions}
         hemostasisOptions={proc.hemostasisOptions}
+        openPathologyAfterSave={proc.openPathologyAfterSave}
+        onOpenPathologyAfterSaveChange={proc.setOpenPathologyAfterSave}
+        onEmitPathologyOrder={onEmitPathologyOrderFromProcedure}
         onSelectProcedureType={proc.handleSelectProcedureType}
         onApplyTemplate={proc.applyTemplate}
         onImportFromLastColposcopy={proc.importFromLastColposcopy}

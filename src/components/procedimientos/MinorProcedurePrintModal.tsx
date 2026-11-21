@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
 import {
+  isContraceptiveDeviceProcedure,
   PROCEDURE_TYPE_LABELS,
   type MinorProcedureItem,
 } from "@/features/procedimientos/procedimientos.schema";
@@ -108,7 +109,7 @@ export function MinorProcedurePrintModal({
           {procedure ? (
             <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-2">
               {canEdit &&
-              procedure.procedureDetails.specimenSentToPathology &&
+              !isContraceptiveDeviceProcedure(procedure.procedureType) &&
               onEmitPathologyOrder ? (
                 <Button
                   type="button"
@@ -120,7 +121,7 @@ export function MinorProcedurePrintModal({
                   }}
                 >
                   <FlaskConical className="size-3.5 text-primary" />
-                  Emitir Orden de Patología
+                  Emitir Solicitud de Patología
                 </Button>
               ) : null}
 

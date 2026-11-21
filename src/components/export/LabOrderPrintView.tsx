@@ -68,12 +68,13 @@ export function LabOrderPrintView({
         <CendoCoverPage
           documentTitle={
             isPathologyTemplate
-              ? "REMISIÓN A ANATOMÍA PATOLÓGICA / CITOLOGÍA"
+              ? "SOLICITUD DE ANATOMÍA PATOLÓGICA"
               : "ORDEN DE LABORATORIO CLÍNICO"
           }
           patientFullName={patient.fullName}
           documentNumber={`${patient.documentType} ${patient.documentNumber}`}
           doctorName={labOrder.doctorName.toUpperCase()}
+          doctorSpecialty={resolvedSig.doctorSpecialty}
           doctorCredentials={credentials || "CMP 61693 • RNE 38657"}
           clinicAddress={clinicAddress}
           clinicEmail={clinicEmail}
@@ -81,20 +82,20 @@ export function LabOrderPrintView({
         />
       ) : null}
 
-      <section className="page-sheet box-border flex min-h-[297mm] w-[210mm] flex-col justify-between overflow-hidden rounded-xl border border-border bg-card shadow-sm print:rounded-none print:border-none print:shadow-none">
-        <div className="flex-1 space-y-3 px-[14mm] pt-[10mm] pb-4">
+      <section className="page-sheet box-border flex min-h-[296.5mm] w-[210mm] flex-col justify-between overflow-hidden rounded-xl border border-border bg-card shadow-sm print:rounded-none print:border-none print:shadow-none">
+        <div className="flex-1 space-y-2.5 px-[12mm] pt-[8mm] pb-2">
           {/* 1. Membrete Institucional */}
-          <header className="flex items-start justify-between gap-4 border-b-2 border-primary pb-2.5">
+          <header className="flex items-start justify-between gap-4 border-b-2 border-primary pb-2">
             <div className="flex items-center gap-3">
-              <BrandLogo size="md" showText={false} />
+              <BrandLogo size="sm" showText={false} />
               <div>
-                <h1 className="font-sans text-lg font-extrabold tracking-tight text-primary">
+                <h1 className="font-sans text-base font-extrabold tracking-tight text-primary">
                   CENDO • CENTRO DE ENDOMETRIOSIS
                 </h1>
-                <p className="text-[11px] font-medium text-foreground">
+                <p className="text-[10.5px] font-medium text-foreground">
                   Ginecología Especializada • Cirugía Laparoscópica • Patología Cervical
                 </p>
-                <p className="mt-0.5 font-mono text-[9.5px] text-muted-foreground">
+                <p className="mt-0.5 font-mono text-[9px] text-muted-foreground">
                   {clinicAddress} • Citas: {clinicPhone}
                 </p>
               </div>
@@ -103,13 +104,12 @@ export function LabOrderPrintView({
             <div className="shrink-0 border-l border-border pl-4 text-right">
               <div className="inline-block rounded border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-[10px] font-bold tracking-wider text-primary uppercase">
                 {isPathologyTemplate
-                  ? labOrder.templateTitle
-                    ? labOrder.templateTitle.split("(")[0].trim().toUpperCase()
-                    : "REMISIÓN A PATOLOGÍA"
+                  ? "SOLICITUD DE ANATOMÍA PATOLÓGICA"
                   : "ORDEN DE LABORATORIO"}
               </div>
               <p className="mt-1 font-mono text-[9.5px] text-muted-foreground">
-                N° LAB-{labOrder.id.slice(0, 8).toUpperCase()}
+                N° {isPathologyTemplate ? "AP" : "LAB"}-
+                {labOrder.id.slice(0, 8).toUpperCase()}
               </p>
               <p className="font-mono text-[10px] font-semibold text-foreground">
                 Fecha: {formatPeruDateDisplay(labOrder.orderDate)}
@@ -135,7 +135,7 @@ export function LabOrderPrintView({
               <span className="block text-[9px] font-semibold text-muted-foreground uppercase">
                 Paciente
               </span>
-              <strong className="text-sm font-bold text-foreground">
+              <strong className="text-[13px] font-bold text-foreground">
                 {patient.fullName}
               </strong>
             </div>
@@ -165,7 +165,7 @@ export function LabOrderPrintView({
               </span>
             </div>
 
-            <div className="col-span-12 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-1.5 text-[11px]">
+            <div className="col-span-12 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-1 text-[10.5px]">
               <div>
                 <strong className="text-foreground">Diagnóstico / Indicación: </strong>
                 <span className="text-foreground">{labOrder.diagnosis}</span>
@@ -178,91 +178,102 @@ export function LabOrderPrintView({
             </div>
           </div>
 
-          {/* 2.5 Datos de Muestra & Anatomía Patológica */}
+          {/* 2.5 Datos de Muestra & Solicitud de Anatomía Patológica */}
           {isPathologyTemplate && specimen ? (
-            <div className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-2.5 text-xs">
+            <div className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary/20 pb-1">
                 <span className="flex items-center gap-1.5 text-[10px] font-bold tracking-wider text-primary uppercase">
                   <Microscope className="size-3.5" />
-                  Remisión de Muestra & Estudio Patológico / Citológico
+                  Solicitud de Anatomía Patológica
                 </span>
                 <span className="rounded border border-primary/20 bg-card px-2 py-0.5 font-mono text-[9px] font-semibold text-primary">
-                  {labOrder.templateTitle || labOrder.templateType}
+                  {labOrder.templateTitle || "Protocolo CENDO"}
                 </span>
               </div>
 
-              <div className="grid grid-cols-4 gap-2 text-[10.5px]">
-                <div>
+              <div className="grid grid-cols-12 gap-2.5 text-[11px]">
+                <div className="col-span-6">
                   <span className="block text-[9px] font-semibold text-muted-foreground uppercase">
-                    Sitio Anatómico
+                    Muestra
                   </span>
-                  <span className="font-semibold text-foreground">
-                    {specimen.anatomicalSite || "No especificado"}
+                  <span className="font-bold text-foreground uppercase">
+                    {specimen.anatomicalSite ||
+                      labOrder.items[0]?.testName ||
+                      "No especificada"}
                   </span>
                 </div>
-                <div>
+                <div className="col-span-3">
                   <span className="block text-[9px] font-semibold text-muted-foreground uppercase">
-                    Fijador / Transporte
+                    Fecha de Toma de Muestra
                   </span>
-                  <span className="font-mono text-foreground">
-                    {specimen.fixative || "Formol tamponado 10%"}
+                  <span className="font-mono font-semibold text-foreground">
+                    {specimen.sampleObtainedAt
+                      ? formatPeruDateDisplay(specimen.sampleObtainedAt)
+                      : formatPeruDateDisplay(labOrder.orderDate)}
                   </span>
                 </div>
-                <div>
+                <div className="col-span-3">
                   <span className="block text-[9px] font-semibold text-muted-foreground uppercase">
-                    N° Envases
+                    Fecha de Última Regla (FUR)
                   </span>
-                  <span className="font-bold text-foreground">
-                    {specimen.containerCount ?? 1} envase(s)
+                  <span className="font-mono font-semibold text-foreground">
+                    {specimen.furDate
+                      ? formatPeruDateDisplay(specimen.furDate)
+                      : "No consignada"}
                   </span>
                 </div>
-                <div>
+
+                <div className="col-span-6 border-t border-primary/15 pt-1.5">
                   <span className="block text-[9px] font-semibold text-muted-foreground uppercase">
-                    Aspecto Macroscópico
+                    Médico Solicitante
+                  </span>
+                  <span className="font-semibold text-foreground uppercase">
+                    {specimen.requestingDoctor || labOrder.doctorName}
+                  </span>
+                </div>
+                <div className="col-span-6 border-t border-primary/15 pt-1.5">
+                  <span className="block text-[9px] font-semibold text-muted-foreground uppercase">
+                    Datos Clínicos
                   </span>
                   <span className="text-foreground">
-                    {specimen.cervixAspect || "Sin particularidades"}
+                    {specimen.clinicalFindings || labOrder.diagnosis || "Ninguno"}
                   </span>
                 </div>
               </div>
 
-              {specimen.furDate ||
+              {specimen.fixative ||
+              (typeof specimen.containerCount === "number" &&
+                specimen.containerCount > 1) ||
+              specimen.cervixAspect ||
               specimen.obstetricParity ||
               specimen.contraceptiveMethod ? (
-                <div className="grid grid-cols-3 gap-2 border-t border-primary/20 pt-1 text-[10px]">
-                  <div>
-                    <strong className="text-muted-foreground">FUR: </strong>
-                    <span className="font-mono font-semibold text-foreground">
-                      {specimen.furDate
-                        ? formatPeruDateDisplay(specimen.furDate)
-                        : "—"}
+                <div className="flex flex-wrap gap-x-4 gap-y-0.5 border-t border-primary/15 pt-1.5 text-[9.5px] text-muted-foreground">
+                  {specimen.fixative ? (
+                    <span>
+                      <strong>Fijador:</strong> {specimen.fixative}
                     </span>
-                  </div>
-                  <div>
-                    <strong className="text-muted-foreground">
-                      Fórmula Obstétrica:{" "}
-                    </strong>
-                    <span className="font-mono font-semibold text-foreground">
-                      {specimen.obstetricParity || "—"}
+                  ) : null}
+                  {typeof specimen.containerCount === "number" ? (
+                    <span>
+                      <strong>N° Envases:</strong> {specimen.containerCount}
                     </span>
-                  </div>
-                  <div>
-                    <strong className="text-muted-foreground">MAC: </strong>
-                    <span className="font-semibold text-foreground">
-                      {specimen.contraceptiveMethod || "—"}
+                  ) : null}
+                  {specimen.cervixAspect ? (
+                    <span>
+                      <strong>Aspecto Macroscópico:</strong>{" "}
+                      {specimen.cervixAspect}
                     </span>
-                  </div>
-                </div>
-              ) : null}
-
-              {specimen.clinicalFindings ? (
-                <div className="border-t border-primary/20 pt-1 text-[10px]">
-                  <strong className="text-muted-foreground">
-                    Observaciones para Patología:{" "}
-                  </strong>
-                  <span className="italic text-foreground">
-                    {specimen.clinicalFindings}
-                  </span>
+                  ) : null}
+                  {specimen.obstetricParity ? (
+                    <span>
+                      <strong>Paridad:</strong> {specimen.obstetricParity}
+                    </span>
+                  ) : null}
+                  {specimen.contraceptiveMethod ? (
+                    <span>
+                      <strong>MAC:</strong> {specimen.contraceptiveMethod}
+                    </span>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -274,11 +285,15 @@ export function LabOrderPrintView({
               <div className="flex items-center gap-1.5">
                 <FlaskConical className="size-3.5 text-primary" />
                 <span className="text-[10.5px] font-bold tracking-wider text-foreground uppercase">
-                  Exámenes Solicitados ({labOrder.items.length})
+                  {isPathologyTemplate
+                    ? `Estudio Solicitado (${labOrder.items.length})`
+                    : `Exámenes Solicitados (${labOrder.items.length})`}
                 </span>
               </div>
               <span className="font-mono text-[9px] text-muted-foreground">
-                Laboratorio Clínico / Anatomía Patológica
+                {isPathologyTemplate
+                  ? "Anatomía Patológica / Citología"
+                  : "Laboratorio Clínico"}
               </span>
             </div>
 
@@ -333,7 +348,7 @@ export function LabOrderPrintView({
               <Info className="size-3.5" />
               <strong className="text-[9.5px] font-bold tracking-wider uppercase">
                 {isPathologyTemplate
-                  ? "Indicaciones de Remisión y Seguimiento"
+                  ? "Indicaciones de Remisión"
                   : "Indicaciones de Preparación para la Paciente"}
               </strong>
             </div>
@@ -343,23 +358,9 @@ export function LabOrderPrintView({
           </div>
         </div>
 
-        {/* Talón de Recepción & Firma */}
-        <div className="shrink-0 space-y-2 px-[14mm] pt-2 pb-2">
-          {isPathologyTemplate ? (
-            <div className="space-y-1 rounded border border-dashed border-border bg-muted/20 p-2 font-mono text-[8.5px] text-muted-foreground">
-              <div className="flex justify-between font-bold text-foreground">
-                <span>TALÓN DE RECEPCIÓN & CADENA DE CUSTODIA</span>
-                <span>N° REGISTRO PATOLOGÍA: __________________</span>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <div>Recibido por: ________________________</div>
-                <div>Fecha/Hora: ____/____/202__ ___:___</div>
-                <div>Envase: [ ] Conforme [ ] Observado</div>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="flex items-end justify-between border-t border-border pt-2">
+        {/* Firma y Cenefa */}
+        <div className="shrink-0 break-inside-avoid">
+          <div className="flex items-end justify-between border-t border-border px-[12mm] pt-2 pb-1.5">
             <div className="space-y-0.5 font-mono text-[8.5px] text-muted-foreground">
               <p>Documento médico oficial • CENDO Miraflores</p>
               <p>Emitido a través del Sistema Clínico CENDO</p>
@@ -371,6 +372,8 @@ export function LabOrderPrintView({
               doctorCredentials={credentials || "CMP 61693 • RNE 38657"}
               signatureSrc={resolvedSignatureSrc}
               showDigitalSignature={resolvedShowDigitalSignature}
+              compact
+              showSalutation
             />
           </div>
 
@@ -378,6 +381,7 @@ export function LabOrderPrintView({
             address={clinicAddress}
             email={clinicEmail}
             phone={clinicPhone}
+            compact
           />
         </div>
       </section>

@@ -31,7 +31,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { ProcedurePathologyStatus } from "@/db/schema/specialty";
 import {
   procedureTemplatePayloadSchema,
   type ProcedureClinicalTemplateItem,
@@ -46,7 +45,6 @@ import type {
 } from "@/features/pacientes/pacientes.schema";
 import {
   isContraceptiveDeviceProcedure,
-  PATHOLOGY_STATUS_LABELS,
   PROCEDURE_TYPE_LABELS,
   resolveSuggestedMacFromProcedure,
   type CreateMinorProcedureInput,
@@ -74,6 +72,9 @@ interface MinorProcedureModalProps {
   anesthesiaOptions: readonly string[];
   bleedingOptions: readonly string[];
   hemostasisOptions: readonly string[];
+  openPathologyAfterSave?: boolean;
+  onOpenPathologyAfterSaveChange?: (value: boolean) => void;
+  onEmitPathologyOrder?: (item: MinorProcedureItem) => void;
   onSelectProcedureType: (type: ProcedureType) => void;
   onApplyTemplate: (template: ProcedureClinicalTemplateItem) => void;
   onImportFromLastColposcopy: () => void;
@@ -110,6 +111,9 @@ export function MinorProcedureModal({
   anesthesiaOptions,
   bleedingOptions,
   hemostasisOptions,
+  openPathologyAfterSave = false,
+  onOpenPathologyAfterSaveChange,
+  onEmitPathologyOrder,
   onSelectProcedureType,
   onApplyTemplate,
   onImportFromLastColposcopy,
@@ -136,9 +140,6 @@ export function MinorProcedureModal({
     (watchedValues.procedureType as ProcedureType | undefined) ??
     "BIOPSIA_CERVICAL";
   const isDeviceProc = isContraceptiveDeviceProcedure(currentType);
-  const specimenSent = Boolean(
-    watchedValues.procedureDetails?.specimenSentToPathology
-  );
   const informedConsent =
     watchedValues.procedureDetails?.informedConsentConfirmed ?? true;
   const syncMac = Boolean(watchedValues.syncPatientMac);
@@ -397,7 +398,7 @@ export function MinorProcedureModal({
                 </label>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-foreground">
                     Anestesia Empleada
@@ -443,32 +444,6 @@ export function MinorProcedureModal({
                         {h}
                       </option>
                     ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-foreground">
-                    ¿Muestra a Patología?
-                  </label>
-                  <select
-                    className={selectClassName}
-                    value={specimenSent ? "si" : "no"}
-                    onChange={(e) => {
-                      const nextSent = e.target.value === "si";
-                      setValue(
-                        "procedureDetails.specimenSentToPathology",
-                        nextSent,
-                        { shouldDirty: true }
-                      );
-                      setValue(
-                        "procedureDetails.pathologyStatus",
-                        nextSent ? "PENDIENTE" : "NO_APLICA",
-                        { shouldDirty: true }
-                      );
-                    }}
-                  >
-                    <option value="si">Sí, muestra remitida</option>
-                    <option value="no">No requiere patología</option>
                   </select>
                 </div>
               </div>
@@ -546,71 +521,50 @@ export function MinorProcedureModal({
                 </div>
               ) : null}
 
-              {/* Seguimiento de Muestra en Anatomía Patológica (BIOLAQ) */}
-              {specimenSent ? (
-                <div className="space-y-2.5 rounded-lg border border-warning/40 bg-warning/10 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="flex items-center gap-1.5 text-xs font-bold text-primary uppercase">
-                      <FlaskConical className="size-3.5" />
-                      Cadena de Custodia & Seguimiento de Anatomía Patológica
-                    </span>
-                    <Badge variant="outline" className="font-mono text-[10px]">
-                      Trazabilidad BIOLAQ
-                    </Badge>
+              {/* Acceso directo a Solicitud de Anatomía Patológica en el módulo Laboratorio */}
+              {!isDeviceProc &&
+              ((editingItem && onEmitPathologyOrder) ||
+                (!editingItem && onOpenPathologyAfterSaveChange)) ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2">
+                  <div className="flex items-center gap-2 text-xs text-foreground">
+                    <FlaskConical className="size-4 shrink-0 text-primary" />
+                    {editingItem ? (
+                      <span>
+                        ¿Requiere emitir o volver a imprimir la{" "}
+                        <strong>Solicitud de Anatomía Patológica</strong>?
+                      </span>
+                    ) : (
+                      <label className="flex cursor-pointer items-center gap-2 font-medium select-none">
+                        <input
+                          type="checkbox"
+                          checked={openPathologyAfterSave}
+                          onChange={(e) =>
+                            onOpenPathologyAfterSaveChange?.(e.target.checked)
+                          }
+                          className="size-3.5 accent-primary"
+                        />
+                        <span>
+                          Al guardar, abrir{" "}
+                          <strong>Solicitud de Anatomía Patológica</strong>{" "}
+                          (módulo Laboratorio)
+                        </span>
+                      </label>
+                    )}
                   </div>
-
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
-                    <div className="space-y-1 md:col-span-8">
-                      <label className="text-xs font-medium text-foreground">
-                        Rotulación y Descripción del Espécimen (Frasco Formol
-                        10%)
-                      </label>
-                      <Input
-                        placeholder="Ej. Dos fragmentos cervicales en formol al 10% rotulados Biopsia Cervical CENDO..."
-                        {...register("procedureDetails.specimenDescription")}
-                      />
-                    </div>
-
-                    <div className="space-y-1 md:col-span-4">
-                      <label className="text-xs font-medium text-foreground">
-                        Estado del Resultado Patológico
-                      </label>
-                      <select
-                        className={selectClassName}
-                        value={
-                          watchedValues.procedureDetails?.pathologyStatus ===
-                          "RECIBIDO"
-                            ? "RECIBIDO"
-                            : "PENDIENTE"
-                        }
-                        onChange={(e) =>
-                          setValue(
-                            "procedureDetails.pathologyStatus",
-                            e.target.value as ProcedurePathologyStatus,
-                            { shouldDirty: true }
-                          )
-                        }
-                      >
-                        <option value="PENDIENTE">
-                          {PATHOLOGY_STATUS_LABELS.PENDIENTE}
-                        </option>
-                        <option value="RECIBIDO">
-                          {PATHOLOGY_STATUS_LABELS.RECIBIDO}
-                        </option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1 md:col-span-12">
-                      <label className="text-xs font-medium text-foreground">
-                        Resultado Histopatológico Definitivo (Opcional —
-                        completar al recibir informe de laboratorio)
-                      </label>
-                      <Input
-                        placeholder="Ej. BIOLAQ AP-2026: Lesión intraepitelial escamosa de bajo grado (NIC I) — bordes quirúrgicos libres."
-                        {...register("procedureDetails.pathologyResultNotes")}
-                      />
-                    </div>
-                  </div>
+                  {editingItem && onEmitPathologyOrder ? (
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="outline"
+                      onClick={() => {
+                        onOpenChange(false);
+                        onEmitPathologyOrder(editingItem);
+                      }}
+                    >
+                      <FlaskConical className="size-3.5 text-primary" />+ Emitir
+                      Solicitud de Anatomía Patológica
+                    </Button>
+                  ) : null}
                 </div>
               ) : null}
 

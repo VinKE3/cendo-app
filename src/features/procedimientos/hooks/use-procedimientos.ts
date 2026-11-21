@@ -44,6 +44,7 @@ export interface UseProcedimientosParams {
     input: CreateClinicalTemplateInput
   ) => Promise<{ success: boolean }>;
   onMacSynced?: (newMac: string) => void;
+  onOpenPathologyAfterSave?: (proc: MinorProcedureItem) => void;
 }
 
 function buildDefaultProcedureValues(
@@ -65,7 +66,11 @@ function buildDefaultProcedureValues(
     postOpDiagnosis: preset.postOpDiagnosis,
     cie10Code: preset.cie10Code,
     anesthesiaType: preset.anesthesiaType,
-    procedureDetails: { ...preset.procedureDetails },
+    procedureDetails: {
+      ...preset.procedureDetails,
+      specimenSentToPathology: false,
+      pathologyStatus: "NO_APLICA",
+    },
     postOpIndications: preset.postOpIndications,
     medicationsPrescribed: preset.medicationsPrescribed,
     nextControlDate: "",
@@ -82,6 +87,7 @@ export function useProcedimientos({
   templates,
   onCreateTemplate,
   onMacSynced,
+  onOpenPathologyAfterSave,
 }: UseProcedimientosParams) {
   const todayStr = useMemo(() => getPeruDateString(), []);
 
@@ -91,6 +97,7 @@ export function useProcedimientos({
     null
   );
   const [saveAndPrintIntent, setSaveAndPrintIntent] = useState(false);
+  const [openPathologyAfterSave, setOpenPathologyAfterSave] = useState(false);
 
   const [printingItem, setPrintingItem] = useState<MinorProcedureItem | null>(
     null
@@ -347,6 +354,7 @@ export function useProcedimientos({
   const openCreateModal = (initialType: ProcedureType = "BIOPSIA_CERVICAL") => {
     setEditingItem(null);
     setSaveAndPrintIntent(false);
+    setOpenPathologyAfterSave(false);
     form.reset(
       buildDefaultProcedureValues(
         patientId,
@@ -361,6 +369,7 @@ export function useProcedimientos({
   const openEditModal = (item: MinorProcedureItem) => {
     setEditingItem(item);
     setSaveAndPrintIntent(false);
+    setOpenPathologyAfterSave(false);
     form.reset({
       patientId: item.patientId,
       consultationId: item.consultationId ?? "",
@@ -397,9 +406,19 @@ export function useProcedimientos({
   };
 
   const onSubmit = form.handleSubmit(async (values) => {
+    const payload: CreateMinorProcedureInput = openPathologyAfterSave
+      ? {
+          ...values,
+          procedureDetails: {
+            ...values.procedureDetails,
+            specimenSentToPathology: true,
+          },
+        }
+      : values;
+
     const res = editingItem
-      ? await updateMinorProcedureAction({ ...values, id: editingItem.id })
-      : await createMinorProcedureAction(values);
+      ? await updateMinorProcedureAction({ ...payload, id: editingItem.id })
+      : await createMinorProcedureAction(payload);
 
     if (!res.success || !res.data) {
       toast.error(res.error || "No se pudo guardar el procedimiento menor.");
@@ -425,7 +444,14 @@ export function useProcedimientos({
       );
     }
 
+    const shouldOpenPathology = openPathologyAfterSave;
+    setOpenPathologyAfterSave(false);
     setDialogOpen(false);
+    if (shouldOpenPathology && onOpenPathologyAfterSave) {
+      setSaveAndPrintIntent(false);
+      onOpenPathologyAfterSave(savedItem);
+      return;
+    }
     if (saveAndPrintIntent) {
       setSaveAndPrintIntent(false);
       setPrintingItem(savedItem);
@@ -484,5 +510,7 @@ export function useProcedimientos({
     setDeleteTarget,
     deletingId,
     confirmDelete,
+    openPathologyAfterSave,
+    setOpenPathologyAfterSave,
   };
 }

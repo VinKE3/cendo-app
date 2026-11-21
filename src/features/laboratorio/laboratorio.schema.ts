@@ -18,6 +18,32 @@ export const LAB_TEMPLATE_TYPES = [
 ] as const;
 export type LabTemplateType = (typeof LAB_TEMPLATE_TYPES)[number];
 
+export const PATHOLOGY_SAMPLE_SUGGESTIONS = [
+  "Citología de Cérvix",
+  "Biopsia de Cérvix",
+  "Biopsia de Endometrio",
+  "Cono Cervical LEEP",
+  "Biopsia Core de Mama",
+  "Pólipo Cervical / Endocervical",
+  "Líquido Peritoneal",
+] as const;
+
+/**
+ * Construye el nombre de archivo PDF diferenciando solicitudes de Anatomía Patológica de órdenes generales.
+ */
+export function buildLabOrderPdfTitle(
+  order: { templateType: string; orderDate: string },
+  patientFullName: string
+): string {
+  const safePatientName = patientFullName
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, "")
+    .replace(/\s+/g, " ");
+  const prefix =
+    order.templateType !== "GENERAL" ? "Anatomia_Patologica" : "OrdenLab";
+  return `${prefix}_${safePatientName}_${order.orderDate}`;
+}
+
 export const LAB_CATEGORIES = [
   "Ginecología & Marcadores",
   "Perfil Hormonal & Ovárico",
@@ -455,7 +481,7 @@ export function getDefaultInstructionsForTemplateType(
   if (templateType === "GENERAL") {
     return "Acudir en ayuno de 8 a 10 horas si incluye perfil metabólico o cumplir las indicaciones específicas de cada análisis.";
   }
-  return "Muestra acondicionada y remitida desde consultorio CENDO con cadena de custodia. Entregar al laboratorio receptor junto a este formato para emisión de informe.";
+  return "Muestra remitida desde consultorio CENDO para estudio de Anatomía Patológica.";
 }
 
 export function inferLabSampleAndCategory(testName: string): {
@@ -581,6 +607,7 @@ export const labSpecimenDetailsInputSchema = z
     clinicalFindings: z.string().trim().max(1000).optional(),
     sampleObtainedAt: z.string().trim().max(30).optional(),
     procedureOrigin: z.string().trim().max(200).optional(),
+    requestingDoctor: z.string().trim().max(160).optional(),
   })
   .strict();
 
@@ -611,10 +638,24 @@ const labOrderCoreShape = {
 };
 
 function validateLabOrderPayload(
-  data: { items: LabOrderItemRecord[]; customTests: string },
+  data: {
+    items: LabOrderItemRecord[];
+    customTests: string;
+    templateType?: LabTemplateType;
+    specimenDetails?: LabSpecimenDetailsRecord | null;
+  },
   ctx: z.RefinementCtx
 ) {
-  if (data.items.length === 0 && data.customTests.trim().length < 3) {
+  const hasPathologySample =
+    data.templateType &&
+    data.templateType !== "GENERAL" &&
+    (data.specimenDetails?.anatomicalSite?.trim().length ?? 0) >= 2;
+
+  if (
+    data.items.length === 0 &&
+    data.customTests.trim().length < 3 &&
+    !hasPathologySample
+  ) {
     ctx.addIssue({
       code: "custom",
       path: ["items"],

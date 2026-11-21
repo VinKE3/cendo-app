@@ -71,6 +71,7 @@ export interface LabSpecimenDetailsRecord {
   clinicalFindings?: string;
   sampleObtainedAt?: string;
   procedureOrigin?: string;
+  requestingDoctor?: string;
 }
 
 export interface QuoteItemRecord {

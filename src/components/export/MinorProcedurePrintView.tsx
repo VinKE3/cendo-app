@@ -8,11 +8,10 @@ import { useSignatureSettings } from "@/components/providers/SignatureSettingsPr
 import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
 import {
   isContraceptiveDeviceProcedure,
-  PATHOLOGY_STATUS_LABELS,
   PROCEDURE_TYPE_LABELS,
   type MinorProcedureItem,
 } from "@/features/procedimientos/procedimientos.schema";
-import { cn, formatPeruDateDisplay } from "@/lib/utils";
+import { formatPeruDateDisplay } from "@/lib/utils";
 
 interface MinorProcedurePrintViewProps {
   procedure: MinorProcedureItem;
@@ -59,9 +58,6 @@ export function MinorProcedurePrintView({
   const procedureLabel =
     PROCEDURE_TYPE_LABELS[procedure.procedureType] || procedure.procedureType;
   const shortCode = `PROC-${procedure.id.slice(0, 8).toUpperCase()}`;
-  const pathologyStatus =
-    det.pathologyStatus ??
-    (det.specimenSentToPathology ? "PENDIENTE" : "NO_APLICA");
 
   return (
     <div
@@ -204,7 +200,7 @@ export function MinorProcedurePrintView({
               Descripción de la Técnica Quirúrgica & Hallazgos Operatorios
             </h2>
 
-            <div className="grid grid-cols-4 gap-2 rounded-lg border border-border bg-muted/25 p-2 text-[10.5px]">
+            <div className="grid grid-cols-3 gap-2 rounded-lg border border-border bg-muted/25 p-2 text-[10.5px]">
               <div>
                 <span className="block text-[8.5px] font-semibold text-muted-foreground uppercase">
                   Anestesia Empleada
@@ -227,23 +223,6 @@ export function MinorProcedurePrintView({
                 </span>
                 <strong className="font-mono text-foreground">
                   {det.hemostasisMethod}
-                </strong>
-              </div>
-              <div>
-                <span className="block text-[8.5px] font-semibold text-muted-foreground uppercase">
-                  Envío a Patología
-                </span>
-                <strong
-                  className={cn(
-                    "font-mono",
-                    det.specimenSentToPathology
-                      ? "text-primary"
-                      : "text-muted-foreground"
-                  )}
-                >
-                  {det.specimenSentToPathology
-                    ? "Sí (Remitido)"
-                    : "No requerido"}
                 </strong>
               </div>
             </div>
@@ -291,33 +270,14 @@ export function MinorProcedurePrintView({
                 </div>
               ) : null}
 
-              {det.specimenSentToPathology ? (
-                <div className="space-y-1 rounded-lg border border-warning/40 bg-warning/10 p-2.5">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <strong className="text-[9.5px] font-bold text-primary uppercase">
-                      Rotulación y Cadena de Custodia del Espécimen (Anatomía
-                      Patológica)
-                    </strong>
-                    <span
-                      className={cn(
-                        "rounded border px-2 py-0.5 font-mono text-[8.5px] font-bold",
-                        pathologyStatus === "RECIBIDO"
-                          ? "border-success/40 bg-success/10 text-success"
-                          : "border-warning/50 bg-card text-foreground"
-                      )}
-                    >
-                      {PATHOLOGY_STATUS_LABELS[pathologyStatus]}
-                    </span>
-                  </div>
-                  <p className="text-[10.5px] font-medium text-foreground">
-                    {det.specimenDescription ||
-                      "Muestra tisular fijada en formol tamponado al 10% remitida a Anatomía Patológica."}
-                  </p>
-                  {det.pathologyResultNotes ? (
-                    <p className="border-t border-warning/30 pt-1 text-[10.5px] font-bold text-primary">
-                      Resultado Histopatológico: {det.pathologyResultNotes}
-                    </p>
-                  ) : null}
+              {det.pathologyResultNotes ? (
+                <div className="rounded-lg border border-primary/25 bg-primary/5 p-2.5 text-[10.5px]">
+                  <strong className="text-primary">
+                    Resultado Histopatológico:{" "}
+                  </strong>
+                  <span className="font-medium text-foreground">
+                    {det.pathologyResultNotes}
+                  </span>
                 </div>
               ) : null}
 

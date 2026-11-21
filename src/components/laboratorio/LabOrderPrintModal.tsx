@@ -15,7 +15,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { LabOrderItem } from "@/features/laboratorio/laboratorio.schema";
+import {
+  buildLabOrderPdfTitle,
+  type LabOrderItem,
+} from "@/features/laboratorio/laboratorio.schema";
 import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
 import { printHtmlElement } from "@/lib/pdfGenerator";
 import { generateLabOrderWhatsAppUrl } from "@/lib/whatsapp-share";
@@ -140,7 +143,7 @@ export function LabOrderPrintModal({
                 onClick={() => {
                   printHtmlElement(
                     "lab-order-print-sheet",
-                    `OrdenLab_${patient.fullName}_${labOrder.orderDate}`
+                    buildLabOrderPdfTitle(labOrder, patient.fullName)
                   );
                 }}
               >

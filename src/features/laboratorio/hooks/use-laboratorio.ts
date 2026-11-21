@@ -86,6 +86,7 @@ const labOrderModalFormSchema = z.object({
   clinicalFindings: z.string().trim().max(1000),
   sampleObtainedAt: z.string().trim().max(30),
   procedureOrigin: z.string().trim().max(200),
+  requestingDoctor: z.string().trim().max(160),
 });
 
 export type LabOrderModalFormValues = z.infer<typeof labOrderModalFormSchema>;
@@ -156,6 +157,7 @@ export function useLaboratorio({
       clinicalFindings: "",
       sampleObtainedAt: todayStr,
       procedureOrigin: "Consultorio Ginecológico CENDO",
+      requestingDoctor: "DR. PATRICK JOSÉ JACINTO GOMERO",
     }),
     [background, patient, todayStr]
   );
@@ -298,6 +300,8 @@ export function useLaboratorio({
       sampleObtainedAt: sp?.sampleObtainedAt ?? item.orderDate,
       procedureOrigin:
         sp?.procedureOrigin ?? defaultSpecimenValues.procedureOrigin,
+      requestingDoctor:
+        sp?.requestingDoctor ?? defaultSpecimenValues.requestingDoctor,
     });
     setDialogOpen(true);
   };
@@ -409,6 +413,8 @@ export function useLaboratorio({
         sp?.sampleObtainedAt ?? draft.orderDate ?? todayStr,
       procedureOrigin:
         sp?.procedureOrigin ?? defaultSpecimenValues.procedureOrigin,
+      requestingDoctor:
+        sp?.requestingDoctor ?? defaultSpecimenValues.requestingDoctor,
     });
     setDialogOpen(true);
   };
@@ -550,20 +556,20 @@ export function useLaboratorio({
         matchedBiopsyTmpl?.clinicalNotes ||
         getDefaultInstructionsForTemplateType("BIOPSIA"),
       templateType: "BIOPSIA",
-      templateTitle:
-        matchedBiopsyTmpl?.title ||
-        `Anatomía Patológica — ${procLabel.slice(0, 48)}`,
+      templateTitle: "Solicitud de Anatomía Patológica",
       ...defaultSpecimenValues,
       anatomicalSite:
         proc.procedureDetails.biopsySites ||
-        "Cérvix / Cavidad Endometrial",
+        procLabel ||
+        "Biopsia ginecológica",
       sampleMethod: procLabel,
       fixative: matchedBiopsyTmpl?.fixativeTransport || "Formol tamponado al 10%",
       containerCount: 1,
       cervixAspect: proc.preOpDiagnosis,
-      clinicalFindings: `${proc.postOpDiagnosis}. ${proc.procedureDetails.specimenDescription || ""}`.trim(),
+      clinicalFindings: proc.postOpDiagnosis,
       sampleObtainedAt: proc.procedureDate || todayStr,
       procedureOrigin: "Sala de Procedimientos Menores CENDO",
+      requestingDoctor: proc.doctorName || defaultSpecimenValues.requestingDoctor,
     });
 
     setDialogOpen(true);
@@ -698,6 +704,66 @@ export function useLaboratorio({
     toast.success(`Plantilla aplicada: ${tmpl.title}`);
   };
 
+  const openCreatePathologyModal = () => {
+    resetConsultModeFlags(null);
+    setEditingItem(null);
+    setSourceLabel(null);
+    setSaveAndPrintIntent(false);
+    setSelectedTests([]);
+    setCatalogSearch("");
+    setCatalogCategory("Anatomía Patológica & Biopsias");
+    setManualTestName("");
+    form.reset({
+      consultationId: consultations[0]?.id ?? "",
+      orderDate: todayStr,
+      diagnosis: consultations[0]?.diagnosis ?? "",
+      cie10Code: consultations[0]?.cie10Code ?? "",
+      urgency: "Rutina",
+      customTests: "",
+      patientInstructions: getDefaultInstructionsForTemplateType("BIOPSIA"),
+      templateType: "BIOPSIA",
+      templateTitle: "Solicitud de Anatomía Patológica",
+      ...defaultSpecimenValues,
+    });
+    setDialogOpen(true);
+  };
+
+  const switchToPathologyMode = () => {
+    if (form.getValues("templateType") !== "GENERAL") return;
+    form.setValue("templateType", "BIOPSIA", { shouldDirty: true });
+    form.setValue("templateTitle", "Solicitud de Anatomía Patológica", {
+      shouldDirty: true,
+    });
+    const currentInstr = form.getValues("patientInstructions").trim();
+    const generalDefault = getDefaultInstructionsForTemplateType("GENERAL");
+    if (!currentInstr || currentInstr === generalDefault) {
+      form.setValue(
+        "patientInstructions",
+        getDefaultInstructionsForTemplateType("BIOPSIA"),
+        { shouldDirty: true }
+      );
+    }
+    const currentOrderDate = form.getValues("orderDate") || todayStr;
+    if (!form.getValues("sampleObtainedAt").trim()) {
+      form.setValue("sampleObtainedAt", currentOrderDate, {
+        shouldDirty: true,
+      });
+    }
+    if (!form.getValues("furDate").trim() && defaultSpecimenValues.furDate) {
+      form.setValue("furDate", defaultSpecimenValues.furDate, {
+        shouldDirty: true,
+      });
+    }
+    if (!form.getValues("requestingDoctor").trim()) {
+      form.setValue(
+        "requestingDoctor",
+        defaultSpecimenValues.requestingDoctor,
+        { shouldDirty: true }
+      );
+    }
+    setCatalogCategory("Anatomía Patológica & Biopsias");
+  };
+
   const resetToGeneralOrder = () => {
     form.setValue("templateType", "GENERAL", { shouldDirty: true });
     form.setValue("templateTitle", "", { shouldDirty: true });
@@ -706,6 +772,7 @@ export function useLaboratorio({
       getDefaultInstructionsForTemplateType("GENERAL"),
       { shouldDirty: true }
     );
+    setCatalogCategory("Todas");
   };
 
   const applyPresetPack = (pack: LabPresetPack) => {
@@ -803,12 +870,45 @@ export function useLaboratorio({
   };
 
   const onSubmit = form.handleSubmit(async (values) => {
-    if (selectedTests.length === 0 && values.customTests.trim().length < 3) {
-      toast.error(
-        "Seleccione al menos un examen del catálogo o indique análisis en el campo adicional."
-      );
-      return;
+    const isPathology = values.templateType !== "GENERAL";
+    const sampleText = values.anatomicalSite.trim();
+    const hasCustomTests = values.customTests.trim().length >= 3;
+
+    if (selectedTests.length === 0 && !hasCustomTests) {
+      if (!isPathology) {
+        toast.error(
+          "Seleccione al menos un examen del catálogo o indique análisis en el campo adicional."
+        );
+        return;
+      }
+      if (sampleText.length < 2) {
+        toast.error(
+          "Indique la Muestra para Anatomía Patológica o seleccione un estudio del catálogo."
+        );
+        return;
+      }
     }
+
+    const effectiveItems: LabOrderItemRecord[] =
+      selectedTests.length > 0
+        ? selectedTests
+        : isPathology && !hasCustomTests && sampleText.length >= 2
+          ? [
+              {
+                id: `lab-ap-${
+                  sampleText
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, "-")
+                    .replace(/^-+|-+$/g, "")
+                    .slice(0, 32) || "muestra"
+                }`,
+                category: "Anatomía Patológica & Biopsias",
+                testName: sampleText,
+                sampleType:
+                  values.fixative?.trim() || "Muestra para Anatomía Patológica",
+              },
+            ]
+          : [];
 
     const validConsultationId =
       values.consultationId && pgUuidRegex.test(values.consultationId)
@@ -830,6 +930,7 @@ export function useLaboratorio({
             clinicalFindings: values.clinicalFindings || undefined,
             sampleObtainedAt: values.sampleObtainedAt || undefined,
             procedureOrigin: values.procedureOrigin || undefined,
+            requestingDoctor: values.requestingDoctor || undefined,
           };
 
     if (draftMode && onDraftSubmit) {
@@ -839,7 +940,7 @@ export function useLaboratorio({
           diagnosis: values.diagnosis,
           cie10Code: values.cie10Code,
           urgency: values.urgency,
-          items: selectedTests,
+          items: effectiveItems,
           customTests: values.customTests,
           patientInstructions: values.patientInstructions,
           templateType: values.templateType,
@@ -868,7 +969,7 @@ export function useLaboratorio({
       diagnosis: values.diagnosis,
       cie10Code: values.cie10Code,
       urgency: values.urgency,
-      items: selectedTests,
+      items: effectiveItems,
       customTests: values.customTests,
       patientInstructions: values.patientInstructions,
       templateType: values.templateType,
@@ -1024,6 +1125,7 @@ export function useLaboratorio({
     categories: LAB_CATEGORIES,
     presetPacks: LAB_PRESET_PACKS,
     openCreateModal,
+    openCreatePathologyModal,
     openEditModal,
     openFromConsultation,
     openDraftCreate,
@@ -1033,6 +1135,7 @@ export function useLaboratorio({
     openPathologyFromProcedure,
     openPrenatalBattery,
     applyTemplate,
+    switchToPathologyMode,
     resetToGeneralOrder,
     applyPresetPack,
     addCatalogTest,

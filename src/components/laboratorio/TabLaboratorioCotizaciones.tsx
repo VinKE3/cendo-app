@@ -6,6 +6,7 @@ import {
   FlaskConical,
   Link2,
   MessageCircle,
+  Microscope,
   Pencil,
   Plus,
   Printer,
@@ -245,6 +246,15 @@ export function TabLaboratorioCotizaciones({
                 </Button>
                 <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={lab.openCreatePathologyModal}
+                >
+                  <Microscope className="size-3.5 text-primary" />
+                  Anatomía Patológica
+                </Button>
+                <Button
+                  type="button"
                   size="sm"
                   onClick={lab.openCreateModal}
                 >
@@ -372,10 +382,16 @@ export function TabLaboratorioCotizaciones({
                                     variant="outline"
                                     className="border-primary/30 text-[10px] text-primary"
                                   >
-                                    {ord.templateType}
+                                    Anatomía Patológica
                                   </Badge>
                                 ) : null}
                               </div>
+                              {ord.templateType !== "GENERAL" &&
+                              ord.specimenDetails?.anatomicalSite ? (
+                                <p className="text-[11px] font-medium text-primary">
+                                  Muestra: {ord.specimenDetails.anatomicalSite}
+                                </p>
+                              ) : null}
                             </div>
                           </TableCell>
 
@@ -748,6 +764,7 @@ export function TabLaboratorioCotizaciones({
         manualTestName={lab.manualTestName}
         onManualTestNameChange={lab.setManualTestName}
         onApplyTemplate={lab.applyTemplate}
+        onSwitchToPathology={lab.switchToPathologyMode}
         onResetToGeneral={lab.resetToGeneralOrder}
         onOpenManageTemplates={() => lab.setTemplateManagerOpen(true)}
         onApplyPresetPack={lab.applyPresetPack}
