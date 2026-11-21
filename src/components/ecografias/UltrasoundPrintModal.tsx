@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  buildUltrasoundPdfTitle,
   ULTRASOUND_TYPE_LABELS,
   type UltrasoundReportItem,
 } from "@/features/ecografias/ecografias.schema";
@@ -143,7 +144,11 @@ export function UltrasoundPrintModal({
                 onClick={() => {
                   printHtmlElement(
                     "ultrasound-print-sheet",
-                    `Ecografia_${patient.fullName}_${report.reportDate}`
+                    buildUltrasoundPdfTitle(
+                      report.ultrasoundType,
+                      patient.fullName,
+                      report.reportDate
+                    )
                   );
                 }}
               >

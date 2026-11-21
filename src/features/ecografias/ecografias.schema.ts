@@ -53,6 +53,33 @@ export const ULTRASOUND_COVER_TITLES: Record<UltrasoundType, string> = {
   DOPPLER: "ECOGRAFÍA DOPPLER COLOR GINECOLÓGICO",
 };
 
+export const ULTRASOUND_PDF_TYPE_SLUGS: Record<UltrasoundType, string> = {
+  TRANSVAGINAL: "Transvaginal",
+  PELVICA: "Pelvica",
+  MAMA_BILATERAL: "Mama_Bilateral",
+  OBSTETRICA_1T: "Obstetrica_1T",
+  OBSTETRICA_GENETICA: "Genetica_11-14s",
+  OBSTETRICA_2T_3T: "Obstetrica_2T-3T",
+  OBSTETRICA_MORFOLOGICA: "Morfologica_Doppler",
+  DOPPLER: "Doppler_Color",
+};
+
+/**
+ * Construye un título/nombre de archivo PDF ordenado y seguro por tipo de ecografía.
+ */
+export function buildUltrasoundPdfTitle(
+  ultrasoundType: UltrasoundType,
+  patientFullName: string,
+  reportDate: string
+): string {
+  const typeSlug = ULTRASOUND_PDF_TYPE_SLUGS[ultrasoundType] || ultrasoundType;
+  const safePatientName = patientFullName
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, "")
+    .replace(/\s+/g, " ");
+  return `Ecografia_${typeSlug}_${safePatientName}_${reportDate}`;
+}
+
 export const UTERUS_POSITIONS = ["AVF", "RVF", "Indiferente"] as const;
 
 export const ENDOMETRIUM_PATTERNS = [
