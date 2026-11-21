@@ -43,6 +43,13 @@
       "when": 1795300137014,
       "tag": "0005_hot_killer_shrike",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795301484817,
+      "tag": "0006_organic_spacker_dave",
+      "breakpoints": true
     }
   ]
 }

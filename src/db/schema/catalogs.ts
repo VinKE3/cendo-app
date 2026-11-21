@@ -172,3 +172,31 @@ export const clinicalTemplates = pgTable(
     ),
   ]
 );
+
+export const cie10Codes = pgTable(
+  "cie10_codes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => clinics.id, { onDelete: "cascade" }),
+    code: varchar("code", { length: 15 }).notNull(),
+    name: text("name").notNull(),
+    category: text("category").notNull(),
+    keywords: jsonb("keywords").$type<string[]>().default([]).notNull(),
+    isFavorite: boolean("is_favorite").default(false).notNull(),
+    createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+    updatedBy: uuid("updated_by").references(() => profiles.id, { onDelete: "set null" }),
+    ...auditColumns,
+  },
+  (table) => [
+    uniqueIndex("idx_cie10_codes_tenant_code")
+      .on(table.tenantId, sql`UPPER(TRIM(${table.code}))`)
+      .where(sql`${table.deletedAt} IS NULL`),
+    index("idx_cie10_codes_tenant_category").on(
+      table.tenantId,
+      table.category,
+      table.isFavorite
+    ),
+  ]
+);

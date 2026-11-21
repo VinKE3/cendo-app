@@ -9,7 +9,7 @@ import {
   ultrasoundReports,
 } from "@/db/schema";
 import { calculateAge, getPeruDateString } from "@/lib/utils";
-import { searchCie10 } from "@/features/catalogo/cie10.data";
+import { searchCie10InDb } from "@/features/cie10/services/cie10.service";
 
 export async function getTodayAppointmentsCount(tenantId: string): Promise<number> {
   const todayPeru = getPeruDateString();
@@ -176,83 +176,83 @@ export async function globalClinicalSearch(tenantId: string, query: string) {
   const clean = query.trim();
   const pattern = `%${clean}%`;
 
-  const [matchedPatients, matchedTariffs, matchedMeds] = await Promise.all([
-    db
-      .select({
-        id: patients.id,
-        fullName: patients.fullName,
-        documentType: patients.documentType,
-        documentNumber: patients.documentNumber,
-        phone: patients.phone,
-      })
-      .from(patients)
-      .where(
-        and(
-          eq(patients.tenantId, tenantId),
-          isNull(patients.deletedAt),
-          clean
-            ? or(
-                ilike(patients.fullName, pattern),
-                ilike(patients.documentNumber, pattern),
-                ilike(patients.phone, pattern)
-              )
-            : undefined
+  const [matchedPatients, matchedTariffs, matchedMeds, matchedCie10] =
+    await Promise.all([
+      db
+        .select({
+          id: patients.id,
+          fullName: patients.fullName,
+          documentType: patients.documentType,
+          documentNumber: patients.documentNumber,
+          phone: patients.phone,
+        })
+        .from(patients)
+        .where(
+          and(
+            eq(patients.tenantId, tenantId),
+            isNull(patients.deletedAt),
+            clean
+              ? or(
+                  ilike(patients.fullName, pattern),
+                  ilike(patients.documentNumber, pattern),
+                  ilike(patients.phone, pattern)
+                )
+              : undefined
+          )
         )
-      )
-      .orderBy(desc(patients.updatedAt))
-      .limit(6),
-    db
-      .select({
-        id: proceduresTariff.id,
-        code: proceduresTariff.code,
-        name: proceduresTariff.name,
-        category: proceduresTariff.category,
-        price: proceduresTariff.price,
-      })
-      .from(proceduresTariff)
-      .where(
-        and(
-          eq(proceduresTariff.tenantId, tenantId),
-          eq(proceduresTariff.active, true),
-          isNull(proceduresTariff.deletedAt),
-          clean
-            ? or(
-                ilike(proceduresTariff.name, pattern),
-                ilike(proceduresTariff.code, pattern),
-                ilike(proceduresTariff.category, pattern)
-              )
-            : undefined
+        .orderBy(desc(patients.updatedAt))
+        .limit(6),
+      db
+        .select({
+          id: proceduresTariff.id,
+          code: proceduresTariff.code,
+          name: proceduresTariff.name,
+          category: proceduresTariff.category,
+          price: proceduresTariff.price,
+        })
+        .from(proceduresTariff)
+        .where(
+          and(
+            eq(proceduresTariff.tenantId, tenantId),
+            eq(proceduresTariff.active, true),
+            isNull(proceduresTariff.deletedAt),
+            clean
+              ? or(
+                  ilike(proceduresTariff.name, pattern),
+                  ilike(proceduresTariff.code, pattern),
+                  ilike(proceduresTariff.category, pattern)
+                )
+              : undefined
+          )
         )
-      )
-      .orderBy(proceduresTariff.code)
-      .limit(8),
-    db
-      .select({
-        id: medicationsVademecum.id,
-        genericName: medicationsVademecum.genericName,
-        atcCode: medicationsVademecum.atcCode,
-        therapeuticGroup: medicationsVademecum.therapeuticGroup,
-        commercialBrands: medicationsVademecum.commercialBrands,
-      })
-      .from(medicationsVademecum)
-      .where(
-        and(
-          eq(medicationsVademecum.tenantId, tenantId),
-          isNull(medicationsVademecum.deletedAt),
-          clean
-            ? or(
-                ilike(medicationsVademecum.genericName, pattern),
-                ilike(medicationsVademecum.atcCode, pattern),
-                ilike(medicationsVademecum.therapeuticGroup, pattern)
-              )
-            : undefined
+        .orderBy(proceduresTariff.code)
+        .limit(8),
+      db
+        .select({
+          id: medicationsVademecum.id,
+          genericName: medicationsVademecum.genericName,
+          atcCode: medicationsVademecum.atcCode,
+          therapeuticGroup: medicationsVademecum.therapeuticGroup,
+          commercialBrands: medicationsVademecum.commercialBrands,
+        })
+        .from(medicationsVademecum)
+        .where(
+          and(
+            eq(medicationsVademecum.tenantId, tenantId),
+            isNull(medicationsVademecum.deletedAt),
+            clean
+              ? or(
+                  ilike(medicationsVademecum.genericName, pattern),
+                  ilike(medicationsVademecum.atcCode, pattern),
+                  ilike(medicationsVademecum.therapeuticGroup, pattern)
+                )
+              : undefined
+          )
         )
-      )
-      .orderBy(medicationsVademecum.genericName)
-      .limit(6),
-  ]);
-
-  const matchedCie10 = searchCie10(clean, undefined, 6);
+        .orderBy(medicationsVademecum.genericName)
+        .limit(6),
+      searchCie10InDb(tenantId, clean, 6),
+    ]);
 
   return {
     patients: matchedPatients,

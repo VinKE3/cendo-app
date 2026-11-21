@@ -19,6 +19,9 @@ import {
 function revalidateScopeRoute(scope: CategoryScope) {
   if (scope === "tariff" || scope === "external_lab") {
     revalidatePath("/tarifario");
+  } else if (scope === "cie10") {
+    revalidatePath("/cie-10");
+    revalidatePath("/dashboard");
   } else if (scope === "vademecum") {
     revalidatePath("/vademecum");
   } else if (scope === "appointment_type") {

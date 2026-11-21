@@ -2,14 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { Search, Sparkles } from "lucide-react";
+import { useCie10Catalog } from "@/components/providers/Cie10CatalogProvider";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
-  CIE10_CATEGORY_LABELS,
-  CIE10_GYN_CATALOG,
-  getCie10ByCode,
-  searchCie10,
-} from "@/features/catalogo/cie10.data";
+  findCie10ByCode,
+  formatCie10CategoryLabel,
+  searchCie10Catalog,
+} from "@/features/cie10/cie10.schema";
 
 interface Cie10AutocompleteProps {
   diagnosis: string;
@@ -26,16 +26,17 @@ export function Cie10Autocomplete({
   required = false,
   diagnosisError,
 }: Cie10AutocompleteProps) {
+  const { catalog } = useCie10Catalog();
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const favoritePresets = useMemo(
-    () => CIE10_GYN_CATALOG.filter((item) => item.isFavorite).slice(0, 10),
-    []
+    () => catalog.filter((item) => item.isFavorite).slice(0, 15),
+    [catalog]
   );
 
   const suggestions = useMemo(
-    () => searchCie10(diagnosis, CIE10_GYN_CATALOG, 8),
-    [diagnosis]
+    () => searchCie10Catalog(diagnosis, catalog, 8),
+    [diagnosis, catalog]
   );
 
   const handleSelectItem = (name: string, code: string) => {
@@ -60,7 +61,7 @@ export function Cie10Autocomplete({
             aria-label="Diagnósticos frecuentes CENDO"
             value=""
             onChange={(e) => {
-              const found = getCie10ByCode(e.target.value);
+              const found = findCie10ByCode(e.target.value, catalog);
               if (found) {
                 handleSelectItem(found.name, found.code);
               }
@@ -71,7 +72,7 @@ export function Cie10Autocomplete({
               Diagnóstico frecuente (1 clic)...
             </option>
             {favoritePresets.map((item) => (
-              <option key={item.code} value={item.code}>
+              <option key={item.id} value={item.code}>
                 {item.code} — {item.name}
               </option>
             ))}
@@ -104,7 +105,7 @@ export function Cie10Autocomplete({
             <div className="absolute z-40 mt-1 max-h-56 w-full divide-y divide-border overflow-y-auto rounded-lg border border-border bg-popover text-popover-foreground shadow-md">
               {suggestions.map((item) => (
                 <button
-                  key={`${item.code}-${item.name}`}
+                  key={`${item.id}-${item.code}`}
                   type="button"
                   onMouseDown={(e) => {
                     e.preventDefault();
@@ -115,7 +116,7 @@ export function Cie10Autocomplete({
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium text-foreground">{item.name}</p>
                     <p className="text-[10px] text-muted-foreground">
-                      {CIE10_CATEGORY_LABELS[item.category]}
+                      {formatCie10CategoryLabel(item.category)}
                     </p>
                   </div>
                   <Badge variant="outline" className="shrink-0 font-mono text-[10px]">
@@ -133,7 +134,7 @@ export function Cie10Autocomplete({
             value={cie10Code}
             onChange={(e) => {
               const code = e.target.value.toUpperCase();
-              const exact = getCie10ByCode(code);
+              const exact = findCie10ByCode(code, catalog);
               onChange(exact && !diagnosis.trim() ? exact.name : diagnosis, code);
             }}
             placeholder="CIE-10 (N80.3)"

@@ -3,6 +3,7 @@ import { z } from "zod";
 export const CATEGORY_SCOPES = [
   "tariff",
   "external_lab",
+  "cie10",
   "vademecum",
   "appointment_type",
   "consultation_reason",

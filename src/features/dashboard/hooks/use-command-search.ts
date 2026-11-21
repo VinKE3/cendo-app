@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { globalSearchAction } from "../actions/search.actions";
-import type { Cie10Item } from "@/features/catalogo/cie10.data";
+import type { Cie10RecordItem } from "@/features/cie10/cie10.schema";
 import type { CommercialBrandItem } from "@/features/vademecum/vademecum.schema";
 
 export type SearchScope = "all" | "patients" | "tariff" | "vademecum" | "cie10";
@@ -30,7 +30,7 @@ export interface GlobalSearchResults {
     therapeuticGroup: string;
     commercialBrands: CommercialBrandItem[];
   }>;
-  cie10: Cie10Item[];
+  cie10: Cie10RecordItem[];
 }
 
 const EMPTY_RESULTS: GlobalSearchResults = {

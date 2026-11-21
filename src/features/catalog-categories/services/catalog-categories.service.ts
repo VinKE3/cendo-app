@@ -2,11 +2,13 @@ import { and, asc, count, eq, isNull, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   catalogCategories,
+  cie10Codes,
   medicalAppointments,
   medicalConsultations,
   medicationsVademecum,
   proceduresTariff,
 } from "@/db/schema";
+import { CIE10_CATEGORY_LABELS } from "@/features/catalogo/cie10.data";
 import { recordAuditLog } from "@/lib/audit/audit-log";
 import { DomainError, type SessionPayload } from "@/lib/security/action-guard";
 import type {
@@ -60,6 +62,8 @@ function findLegacyKeysForLabel(label: string): string[] {
     .map(([key]) => key);
 }
 
+export const DEFAULT_CIE10_CATEGORIES = Object.values(CIE10_CATEGORY_LABELS);
+
 async function ensureDefaultCategoriesForScope(
   tenantId: string,
   scope: CategoryScope
@@ -71,7 +75,9 @@ async function ensureDefaultCategoriesForScope(
         ? DEFAULT_CONSULTATION_REASONS
         : scope === "external_lab"
           ? (["BIOLINK", "BIOLAQ", "Lab Clínico General"] as const)
-          : null;
+          : scope === "cie10"
+            ? DEFAULT_CIE10_CATEGORIES
+            : null;
 
   if (!defaults) return;
 
@@ -149,6 +155,23 @@ async function getUsageMapByScope(
       for (const labKey of labsInRow) {
         map.set(labKey, (map.get(labKey) ?? 0) + 1);
       }
+    }
+    return map;
+  }
+
+  if (scope === "cie10") {
+    const rows = await db
+      .select({
+        key: cie10Codes.category,
+        total: count(),
+      })
+      .from(cie10Codes)
+      .where(and(eq(cie10Codes.tenantId, tenantId), isNull(cie10Codes.deletedAt)))
+      .groupBy(cie10Codes.category);
+
+    for (const r of rows) {
+      const k = r.key.trim().toLowerCase();
+      map.set(k, (map.get(k) ?? 0) + Number(r.total));
     }
     return map;
   }
@@ -254,6 +277,20 @@ async function countScopeUsage(
         (entry) => entry.laboratoryName.trim().toLowerCase() === cleanName
       )
     ).length;
+  }
+
+  if (scope === "cie10") {
+    const [row] = await db
+      .select({ value: count() })
+      .from(cie10Codes)
+      .where(
+        and(
+          eq(cie10Codes.tenantId, tenantId),
+          isNull(cie10Codes.deletedAt),
+          sql`LOWER(TRIM(${cie10Codes.category})) = ${cleanName}`
+        )
+      );
+    return Number(row?.value ?? 0);
   }
 
   if (scope === "vademecum") {
@@ -480,6 +517,17 @@ export async function renameCategory(
           .set({ providerCosts: nextCosts, updatedBy: ctx.userId })
           .where(eq(proceduresTariff.id, row.id));
       }
+    } else if (input.scope === "cie10") {
+      await tx
+        .update(cie10Codes)
+        .set({ category: input.name, updatedBy: ctx.userId })
+        .where(
+          and(
+            eq(cie10Codes.tenantId, tenantId),
+            isNull(cie10Codes.deletedAt),
+            sql`LOWER(TRIM(${cie10Codes.category})) = ${oldLower}`
+          )
+        );
     } else if (input.scope === "vademecum") {
       await tx
         .update(medicationsVademecum)
