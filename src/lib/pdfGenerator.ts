@@ -70,7 +70,7 @@ export function printHtmlElement(
   const format: PrintPaperFormat = options?.paperFormat ?? "A4";
   const pageSize = format === "A5" ? "A5 portrait" : "A4 portrait";
   const sheetWidth = format === "A5" ? "148mm" : "210mm";
-  const sheetMinHeight = format === "A5" ? "210mm" : "297mm";
+  const sheetMinHeight = format === "A5" ? "209.5mm" : "296.5mm";
 
   const styleNodes = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
     .map((node) => node.outerHTML)
@@ -133,7 +133,12 @@ export function printHtmlElement(
         .no-print {
           display: none !important;
         }
+        .break-inside-avoid {
+          break-inside: avoid !important;
+          page-break-inside: avoid !important;
+        }
         .page-sheet {
+          box-sizing: border-box !important;
           width: ${sheetWidth} !important;
           min-height: ${sheetMinHeight} !important;
           margin: 0 !important;

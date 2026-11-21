@@ -6,6 +6,7 @@ interface CendoFooterWaveProps {
   address?: string;
   email?: string;
   phone?: string;
+  compact?: boolean;
   className?: string;
 }
 
@@ -13,6 +14,7 @@ export function CendoFooterWave({
   address = "Alfredo Benavides N°2975, Of. 405 / Miraflores - Lima",
   email = "cendoperu@gmail.com",
   phone = "985 945 697",
+  compact = false,
   className,
 }: CendoFooterWaveProps) {
   return (
@@ -21,7 +23,7 @@ export function CendoFooterWave({
         viewBox="0 0 1200 170"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        className="block h-[34mm] w-full"
+        className={cn("block w-full", compact ? "h-[18mm]" : "h-[34mm]")}
         preserveAspectRatio="none"
         aria-hidden="true"
       >
@@ -35,7 +37,12 @@ export function CendoFooterWave({
         />
       </svg>
 
-      <div className="bg-primary px-8 pb-4 pt-1 text-primary-foreground">
+      <div
+        className={cn(
+          "bg-primary text-primary-foreground",
+          compact ? "px-8 pb-2.5 pt-0.5" : "px-8 pb-4 pt-1"
+        )}
+      >
         <div className="mx-auto flex flex-wrap items-center justify-between gap-3 text-[10px] font-medium tracking-tight">
           <div className="flex items-center gap-2">
             <span className="inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-primary-foreground text-primary">

@@ -35,7 +35,7 @@ export function CendoCoverPage({
     <section
       className={cn(
         "page-sheet relative mx-auto flex flex-col justify-between overflow-hidden border border-border bg-card text-foreground shadow-sm print:border-none print:shadow-none",
-        isA5 ? "min-h-[210mm] w-[148mm]" : "min-h-[297mm] w-[210mm]",
+        isA5 ? "h-[209.5mm] w-[148mm]" : "h-[296.5mm] w-[210mm]",
         className,
       )}
       aria-label={`Carátula institucional - ${documentTitle}`}

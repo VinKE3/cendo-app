@@ -17,7 +17,7 @@ import {
 } from "@/features/ecografias/ecografias.schema";
 import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
 import { buildClinicalImageViewUrl } from "@/lib/clinical-images";
-import { formatPeruDateDisplay } from "@/lib/utils";
+import { cn, formatPeruDateDisplay } from "@/lib/utils";
 
 interface UltrasoundPrintViewProps {
   report: UltrasoundReportItem;
@@ -121,28 +121,28 @@ export function UltrasoundPrintView({
       ) : null}
 
       {/* PÁGINA DEL INFORME ESTRUCTURADO */}
-      <section className="page-sheet box-border flex min-h-[297mm] w-[210mm] flex-col justify-between overflow-hidden rounded-xl border border-border bg-card shadow-sm print:rounded-none print:border-none print:shadow-none">
-        <div className="flex-1 space-y-3.5 px-[14mm] pt-[10mm] pb-4">
+      <section className="page-sheet box-border flex min-h-[296.5mm] w-[210mm] flex-col justify-between overflow-hidden rounded-xl border border-border bg-card shadow-sm print:rounded-none print:border-none print:shadow-none">
+        <div className="flex-1 space-y-2 px-[12mm] pt-[7mm] pb-1.5">
           {/* 1. Membrete CENDO */}
-          <header className="flex items-start justify-between gap-4 border-b-2 border-primary pb-3">
+          <header className="flex items-start justify-between gap-4 border-b-2 border-primary pb-2">
             <div className="flex items-center gap-3">
-              <BrandLogo size="md" showText={false} />
+              <BrandLogo size="sm" showText={false} />
               <div>
-                <h1 className="font-sans text-lg font-extrabold tracking-tight text-primary">
+                <h1 className="font-sans text-base font-extrabold tracking-tight text-primary">
                   CENDO • CENTRO DE ENDOMETRIOSIS
                 </h1>
-                <p className="text-[11px] font-medium text-foreground">
+                <p className="text-[10.5px] font-medium text-foreground">
                   Unidad de Diagnóstico por Imágenes • Ecografía Ginecológica y
                   Obstétrica
                 </p>
-                <p className="mt-0.5 font-mono text-[9.5px] text-muted-foreground">
+                <p className="mt-0.5 font-mono text-[9px] text-muted-foreground">
                   {clinicAddress} • Citas: {clinicPhone}
                 </p>
               </div>
             </div>
 
             <div className="shrink-0 border-l border-border pl-4 text-right">
-              <div className="inline-block rounded border border-primary/20 bg-primary/10 px-2.5 py-1 text-[10px] font-bold tracking-wider text-primary uppercase">
+              <div className="inline-block rounded border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-[10px] font-bold tracking-wider text-primary uppercase">
                 INFORME ECOGRÁFICO
               </div>
               <p className="mt-1 font-mono text-[10px] text-muted-foreground">
@@ -155,12 +155,12 @@ export function UltrasoundPrintView({
           </header>
 
           {/* Banner Modalidad */}
-          <div className="flex items-center justify-between rounded-lg border-l-[5px] border-warning bg-primary px-4 py-3 text-primary-foreground">
+          <div className="flex items-center justify-between rounded-lg border-l-[5px] border-warning bg-primary px-3.5 py-2 text-primary-foreground">
             <div>
               <span className="block font-mono text-[8.5px] font-bold tracking-widest text-warning uppercase">
                 Modalidad Diagnóstica Especializada
               </span>
-              <h2 className="mt-0.5 text-lg leading-tight font-extrabold tracking-wide uppercase">
+              <h2 className="mt-0.5 text-[15px] leading-tight font-extrabold tracking-wide uppercase">
                 {ULTRASOUND_TYPE_LABELS[report.ultrasoundType] ||
                   report.ultrasoundType}
               </h2>
@@ -172,12 +172,12 @@ export function UltrasoundPrintView({
           </div>
 
           {/* 2. Filiación de la Paciente */}
-          <div className="grid grid-cols-12 items-center gap-2 rounded-lg border border-border bg-muted/30 p-3">
+          <div className="grid grid-cols-12 items-center gap-1.5 rounded-lg border border-border bg-muted/30 p-2">
             <div className="col-span-6">
               <span className="block text-[9px] font-semibold text-muted-foreground uppercase">
                 Paciente
               </span>
-              <strong className="text-sm font-bold text-foreground">
+              <strong className="text-[13px] font-bold text-foreground">
                 {patient.fullName}
               </strong>
             </div>
@@ -200,7 +200,7 @@ export function UltrasoundPrintView({
               </span>
             </div>
 
-            <div className="col-span-12 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-1.5 text-[11px]">
+            <div className="col-span-12 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-1 text-[10.5px]">
               <div>
                 <strong className="text-muted-foreground">
                   Motivo de Estudio:{" "}
@@ -221,16 +221,16 @@ export function UltrasoundPrintView({
           </div>
 
           {/* 3. Hallazgos Detallados */}
-          <div className="space-y-2.5 rounded-lg border border-border bg-card p-3.5">
-            <h3 className="border-b border-border pb-1 text-[10px] font-bold tracking-wider text-primary uppercase">
+          <div className="space-y-1.5 rounded-lg border border-border bg-card p-2.5">
+            <h3 className="border-b border-border pb-0.5 text-[10px] font-bold tracking-wider text-primary uppercase">
               Informe / Hallazgos Ecográficos Detallados
             </h3>
 
             {isGynMode ? (
-              <div className="space-y-2.5 text-[11px]">
-                <div className="grid grid-cols-4 gap-2 rounded-lg border border-border bg-muted/25 p-2.5">
+              <div className="space-y-1.5 text-[10.5px]">
+                <div className="grid grid-cols-4 gap-1.5 rounded-lg border border-border bg-muted/25 p-2">
                   <div>
-                    <span className="block text-[9.5px] text-muted-foreground">
+                    <span className="block text-[9px] text-muted-foreground">
                       Posición Útero
                     </span>
                     <strong className="font-mono text-foreground">
@@ -238,7 +238,7 @@ export function UltrasoundPrintView({
                     </strong>
                   </div>
                   <div>
-                    <span className="block text-[9.5px] text-muted-foreground">
+                    <span className="block text-[9px] text-muted-foreground">
                       Dimensiones
                     </span>
                     <strong className="font-mono text-foreground">
@@ -246,7 +246,7 @@ export function UltrasoundPrintView({
                     </strong>
                   </div>
                   <div>
-                    <span className="block text-[9.5px] text-muted-foreground">
+                    <span className="block text-[9px] text-muted-foreground">
                       Volumen Uterino
                     </span>
                     <strong className="font-mono text-foreground">
@@ -256,7 +256,7 @@ export function UltrasoundPrintView({
                     </strong>
                   </div>
                   <div>
-                    <span className="block text-[9.5px] text-muted-foreground">
+                    <span className="block text-[9px] text-muted-foreground">
                       Endometrio
                     </span>
                     <strong className="font-mono text-foreground">
@@ -272,7 +272,7 @@ export function UltrasoundPrintView({
                 typeof f.cervixLengthMm === "number" ||
                 f.cervixStatus ||
                 f.uterusEcopulsionPain ? (
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     {f.myometriumStatus ? (
                       <div>
                         <strong className="text-muted-foreground">
@@ -311,8 +311,8 @@ export function UltrasoundPrintView({
                   </div>
                 ) : null}
 
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="rounded border border-border bg-muted/15 p-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded border border-border bg-muted/15 p-1.5">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[9px] font-semibold text-muted-foreground uppercase">
                         Ovario Derecho
@@ -327,7 +327,7 @@ export function UltrasoundPrintView({
                       {f.rightOvaryDimensions || "Sin particularidades"}
                     </span>
                   </div>
-                  <div className="rounded border border-border bg-muted/15 p-2">
+                  <div className="rounded border border-border bg-muted/15 p-1.5">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[9px] font-semibold text-muted-foreground uppercase">
                         Ovario Izquierdo
@@ -348,7 +348,7 @@ export function UltrasoundPrintView({
                 f.periOvarianFluid ||
                 f.ovaryEcopulsionPain ||
                 f.douglasPouch ? (
-                  <div className="space-y-1 rounded border border-border bg-muted/20 p-2">
+                  <div className="space-y-0.5 rounded border border-border bg-muted/20 p-1.5">
                     {f.ovariesNotes ? (
                       <div>
                         <strong className="text-muted-foreground">
@@ -387,7 +387,7 @@ export function UltrasoundPrintView({
                 {f.slidingSign ||
                 f.uterosacralLigaments ||
                 f.endometriosisFoci ? (
-                  <div className="grid grid-cols-3 gap-2 rounded border border-border bg-muted/20 p-2">
+                  <div className="grid grid-cols-3 gap-1.5 rounded border border-border bg-muted/20 p-1.5">
                     {f.slidingSign ? (
                       <div>
                         <span className="block text-[9px] font-semibold text-muted-foreground uppercase">
@@ -420,7 +420,7 @@ export function UltrasoundPrintView({
             ) : null}
 
             {isBreastMode ? (
-              <div className="space-y-2.5 text-[11px]">
+              <div className="space-y-1.5 text-[10.5px]">
                 {f.breastPattern || f.breastAcrType ? (
                   <div>
                     <strong className="text-muted-foreground">
@@ -431,11 +431,11 @@ export function UltrasoundPrintView({
                 ) : null}
 
                 {f.breastLesions && f.breastLesions.length > 0 ? (
-                  <div className="space-y-1.5 rounded-lg border border-border bg-muted/15 p-2.5">
-                    <strong className="block text-[10px] font-bold text-primary uppercase">
+                  <div className="space-y-0.5 rounded-lg border border-border bg-muted/15 p-2 text-[10px]">
+                    <strong className="block text-[9.5px] font-bold text-primary uppercase">
                       Hallazgos Focales / Lesiones Descritas
                     </strong>
-                    <ul className="space-y-1">
+                    <ul className="space-y-0.5">
                       {f.breastLesions.map((lesion, lIdx) => (
                         <li key={lesion.id || lIdx} className="leading-snug text-foreground">
                           • {formatBreastLesionSentence(lesion)}
@@ -446,17 +446,17 @@ export function UltrasoundPrintView({
                 ) : null}
 
                 {f.rightBreastFindings || f.leftBreastFindings ? (
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <div className="rounded border border-border bg-muted/20 p-2.5">
-                      <strong className="mb-0.5 block text-[10px] text-primary uppercase">
+                  <div className="grid grid-cols-2 gap-2 text-[10px]">
+                    <div className="rounded border border-border bg-muted/20 p-2">
+                      <strong className="mb-0.5 block text-[9.5px] text-primary uppercase">
                         Mama Derecha y Axila
                       </strong>
                       <p className="whitespace-pre-line text-foreground">
                         {f.rightBreastFindings || "Sin lesiones focales."}
                       </p>
                     </div>
-                    <div className="rounded border border-border bg-muted/20 p-2.5">
-                      <strong className="mb-0.5 block text-[10px] text-primary uppercase">
+                    <div className="rounded border border-border bg-muted/20 p-2">
+                      <strong className="mb-0.5 block text-[9.5px] text-primary uppercase">
                         Mama Izquierda y Axila
                       </strong>
                       <p className="whitespace-pre-line text-foreground">
@@ -467,18 +467,18 @@ export function UltrasoundPrintView({
                 ) : null}
 
                 {f.breastComplement ? (
-                  <div className="rounded border border-border bg-muted/15 p-2 text-foreground">
+                  <div className="rounded border border-border bg-muted/15 p-1.5 text-[10px] text-foreground">
                     <strong className="text-muted-foreground">Complemento: </strong>
                     <span>{f.breastComplement}</span>
                   </div>
                 ) : null}
 
                 {f.biradsCategory ? (
-                  <div className="flex items-center justify-between rounded border border-primary/25 bg-primary/5 px-3 py-1.5">
+                  <div className="flex items-center justify-between rounded border border-primary/25 bg-primary/5 px-2.5 py-1">
                     <span className="font-semibold text-primary">
                       Clasificación ACR BI-RADS:
                     </span>
-                    <span className="rounded bg-primary px-2.5 py-0.5 font-mono text-[11px] font-bold text-primary-foreground">
+                    <span className="rounded bg-primary px-2 py-0.5 font-mono text-[10.5px] font-bold text-primary-foreground">
                       {f.biradsCategory}
                     </span>
                   </div>
@@ -487,11 +487,11 @@ export function UltrasoundPrintView({
             ) : null}
 
             {isObs1TMode ? (
-              <div className="space-y-2.5 text-[11px]">
+              <div className="space-y-1.5 text-[10.5px]">
                 {/* Bloque Útero I Trimestre */}
                 {f.uterusDimensions || f.uterusPosition || f.myometriumStatus ? (
-                  <div className="rounded border border-border bg-muted/15 p-2">
-                    <strong className="text-primary uppercase text-[9.5px] block mb-0.5">
+                  <div className="rounded border border-border bg-muted/15 p-1.5">
+                    <strong className="mb-0.5 block text-[9.5px] text-primary uppercase">
                       Útero Grávido
                     </strong>
                     <div className="flex flex-wrap gap-x-4 gap-y-0.5">
@@ -518,9 +518,9 @@ export function UltrasoundPrintView({
                 ) : null}
 
                 {/* Bloque Saco / Embrión */}
-                <div className="grid grid-cols-4 gap-2 rounded-lg border border-border bg-muted/25 p-2.5">
+                <div className="grid grid-cols-4 gap-1.5 rounded-lg border border-border bg-muted/25 p-2">
                   <div>
-                    <span className="block text-[9.5px] text-muted-foreground">
+                    <span className="block text-[9px] text-muted-foreground">
                       Sacos Gestacionales
                     </span>
                     <strong className="font-mono text-foreground">
@@ -528,7 +528,7 @@ export function UltrasoundPrintView({
                     </strong>
                   </div>
                   <div>
-                    <span className="block text-[9.5px] text-muted-foreground">
+                    <span className="block text-[9px] text-muted-foreground">
                       CRL / LCN
                     </span>
                     <strong className="font-mono text-foreground">
@@ -538,7 +538,7 @@ export function UltrasoundPrintView({
                     </strong>
                   </div>
                   <div>
-                    <span className="block text-[9.5px] text-muted-foreground">
+                    <span className="block text-[9px] text-muted-foreground">
                       Edad Gestacional
                     </span>
                     <strong className="font-mono text-foreground">
@@ -546,7 +546,7 @@ export function UltrasoundPrintView({
                     </strong>
                   </div>
                   <div>
-                    <span className="block text-[9.5px] text-muted-foreground">
+                    <span className="block text-[9px] text-muted-foreground">
                       Actividad Cardíaca
                     </span>
                     <strong className="font-mono text-foreground">
@@ -558,7 +558,7 @@ export function UltrasoundPrintView({
                   {typeof f.gestationalSacMm === "number" ||
                   typeof f.yolkSacMm === "number" ||
                   f.choriodecidualReaction ? (
-                    <div className="col-span-4 flex flex-wrap gap-x-4 border-t border-border pt-1 text-[10.5px]">
+                    <div className="col-span-4 flex flex-wrap gap-x-4 border-t border-border pt-1 text-[10px]">
                       {typeof f.gestationalSacMm === "number" ? (
                         <span>
                           <strong>Saco Gestacional:</strong> {f.gestationalSacMm} mm
@@ -584,11 +584,11 @@ export function UltrasoundPrintView({
                 f.nasalBone ||
                 f.ductusVenosusWave ||
                 typeof f.uterineArteriesMeanPi === "number" ? (
-                  <div className="space-y-1.5 rounded-lg border border-primary/30 bg-primary/5 p-2.5">
+                  <div className="space-y-1 rounded-lg border border-primary/30 bg-primary/5 p-2">
                     <strong className="block text-[9.5px] font-bold text-primary uppercase">
                       Marcadores Genéticos & Riesgo FMF (11–14 Semanas)
                     </strong>
-                    <div className="grid grid-cols-3 gap-2 font-mono text-[10.5px]">
+                    <div className="grid grid-cols-3 gap-1.5 font-mono text-[10px]">
                       <div>
                         <span className="block text-[9px] text-muted-foreground">
                           Translucencia Nucal
@@ -648,7 +648,7 @@ export function UltrasoundPrintView({
                 f.rightOvaryDimensions ||
                 f.leftOvaryDimensions ||
                 f.douglasPouch ? (
-                  <div className="space-y-1 rounded border border-border bg-muted/15 p-2 text-[10.5px]">
+                  <div className="space-y-0.5 rounded border border-border bg-muted/15 p-1.5 text-[10px]">
                     {typeof f.cervixLengthMm === "number" || f.cervixStatus ? (
                       <div>
                         <strong className="text-muted-foreground">Cérvix: </strong>
@@ -704,9 +704,9 @@ export function UltrasoundPrintView({
             ) : null}
 
             {isObs23Mode ? (
-              <div className="space-y-2.5 text-[11px]">
+              <div className="space-y-1.5 text-[10.5px]">
                 {/* Estática, Sexo, Vitalidad & Anatomía */}
-                <div className="space-y-1 rounded border border-border bg-muted/15 p-2.5">
+                <div className="space-y-0.5 rounded border border-border bg-muted/15 p-2">
                   <div className="flex flex-wrap gap-x-5 gap-y-0.5 border-b border-border pb-1">
                     {f.fetalStatic ? (
                       <span>
@@ -741,7 +741,7 @@ export function UltrasoundPrintView({
                   {f.fetalAnatomySummary ? (
                     <p>{f.fetalAnatomySummary}</p>
                   ) : null}
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[10.5px]">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[10px]">
                     {f.fetalHeartFourChambers ? (
                       <div>
                         <strong className="text-muted-foreground">Corazón: </strong>
@@ -772,7 +772,7 @@ export function UltrasoundPrintView({
                 </div>
 
                 {/* Biometría Fetal */}
-                <div className="grid grid-cols-6 gap-2 rounded-lg border border-border bg-muted/25 p-2 text-center font-mono">
+                <div className="grid grid-cols-6 gap-1.5 rounded-lg border border-border bg-muted/25 p-1.5 text-center font-mono">
                   <div>
                     <span className="block text-[9px] text-muted-foreground">
                       DBP
@@ -821,10 +821,10 @@ export function UltrasoundPrintView({
                 </div>
 
                 {/* Perfil Biofísico + Placenta + Cordón + Líquido */}
-                <div className="grid grid-cols-12 gap-2">
+                <div className="grid grid-cols-12 gap-1.5">
                   {bppTotal !== null ? (
-                    <div className="col-span-4 rounded border border-border bg-muted/15 p-2 text-[10px]">
-                      <div className="flex items-center justify-between border-b border-border pb-0.5 mb-1">
+                    <div className="col-span-4 rounded border border-border bg-muted/15 p-1.5 text-[9.5px]">
+                      <div className="mb-0.5 flex items-center justify-between border-b border-border pb-0.5">
                         <strong className="text-primary uppercase">
                           Perfil Biofísico
                         </strong>
@@ -842,8 +842,8 @@ export function UltrasoundPrintView({
                   <div
                     className={
                       bppTotal !== null
-                        ? "col-span-8 space-y-0.5 rounded border border-border bg-muted/15 p-2 text-[10.5px]"
-                        : "col-span-12 space-y-0.5 rounded border border-border bg-muted/15 p-2 text-[10.5px]"
+                        ? "col-span-8 space-y-0.5 rounded border border-border bg-muted/15 p-1.5 text-[9.5px]"
+                        : "col-span-12 space-y-0.5 rounded border border-border bg-muted/15 p-1.5 text-[9.5px]"
                     }
                   >
                     {f.placentaLocation || f.placentaGrade || f.placentaHematomas ? (
@@ -888,16 +888,16 @@ export function UltrasoundPrintView({
                 {/* Tabla Estudio Doppler Materno-Fetal */}
                 {showDopplerTable ? (
                   <div className="overflow-hidden rounded border border-primary/25">
-                    <div className="bg-primary/10 px-2.5 py-1 text-[9.5px] font-bold tracking-wider text-primary uppercase">
+                    <div className="bg-primary/10 px-2.5 py-0.5 text-[9px] font-bold tracking-wider text-primary uppercase">
                       Estudio Doppler Materno-Fetal
                     </div>
-                    <table className="w-full text-[10.5px]">
+                    <table className="w-full text-[9.5px]">
                       <thead>
-                        <tr className="border-b border-border bg-muted/30 text-left text-[9.5px] font-semibold text-muted-foreground">
-                          <th className="px-2.5 py-1">Vaso Evaluado</th>
-                          <th className="w-24 px-2 py-1 font-mono">IP</th>
-                          <th className="w-28 px-2 py-1 font-mono">Percentil</th>
-                          <th className="w-28 px-2.5 py-1">Interpretación</th>
+                        <tr className="border-b border-border bg-muted/30 text-left text-[9px] font-semibold text-muted-foreground">
+                          <th className="px-2.5 py-0.5">Vaso Evaluado</th>
+                          <th className="w-24 px-2 py-0.5 font-mono">IP</th>
+                          <th className="w-28 px-2 py-0.5 font-mono">Percentil</th>
+                          <th className="w-28 px-2.5 py-0.5">Interpretación</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
@@ -905,16 +905,16 @@ export function UltrasoundPrintView({
                           const row = f.doppler?.[vessel.key];
                           return (
                             <tr key={vessel.key}>
-                              <td className="px-2.5 py-1 font-medium text-foreground">
+                              <td className="px-2.5 py-[2.5px] font-medium text-foreground">
                                 {vessel.label}
                               </td>
-                              <td className="px-2 py-1 font-mono">
+                              <td className="px-2 py-[2.5px] font-mono">
                                 {typeof row?.pi === "number" ? row.pi : "—"}
                               </td>
-                              <td className="px-2 py-1 font-mono">
+                              <td className="px-2 py-[2.5px] font-mono">
                                 {row?.percentile || "—"}
                               </td>
-                              <td className="px-2.5 py-1 font-semibold">
+                              <td className="px-2.5 py-[2.5px] font-semibold">
                                 {row?.status || "—"}
                               </td>
                             </tr>
@@ -929,15 +929,15 @@ export function UltrasoundPrintView({
           </div>
 
           {/* 4. Conclusión Diagnóstica */}
-          <div className="space-y-1.5 rounded-lg border border-primary/25 bg-primary/5 p-3">
+          <div className="space-y-1 rounded-lg border border-primary/25 bg-primary/5 p-2.5 text-[11px]">
             <h3 className="text-[10px] font-bold tracking-wider text-primary uppercase">
               Conclusión Diagnóstica
             </h3>
-            <p className="font-semibold leading-relaxed whitespace-pre-line text-foreground">
+            <p className="leading-relaxed font-semibold whitespace-pre-line text-foreground">
               {report.conclusion}
             </p>
             {report.recommendations ? (
-              <div className="border-t border-primary/20 pt-1.5 text-[11px]">
+              <div className="border-t border-primary/20 pt-1 text-[10.5px]">
                 <strong className="text-primary">
                   Recomendaciones / Seguimiento:{" "}
                 </strong>
@@ -949,7 +949,7 @@ export function UltrasoundPrintView({
           </div>
 
           {isBreastMode ? (
-            <div className="rounded border border-border bg-muted/20 px-3 py-1.5 text-[9px] leading-snug text-muted-foreground">
+            <div className="rounded border border-border bg-muted/20 px-2.5 py-1 text-[8.5px] leading-snug text-muted-foreground">
               <p>
                 <strong className="text-foreground">ACR BI-RADS:</strong> (0)
                 Requiere evaluación adicional • (1) Normal • (2) Hallazgo
@@ -968,7 +968,7 @@ export function UltrasoundPrintView({
           ) : null}
 
           {report.images.length > 0 ? (
-            <p className="font-mono text-[10px] text-muted-foreground">
+            <p className="font-mono text-[9.5px] text-muted-foreground">
               * Adjunta {report.images.length} captura(s) ecográfica(s) en anexo
               fotográfico siguiente ({photoChunks.length}{" "}
               {photoChunks.length === 1 ? "página" : "páginas"}).
@@ -977,8 +977,8 @@ export function UltrasoundPrintView({
         </div>
 
         {/* Firma y Cenefa */}
-        <div>
-          <div className="px-[14mm] pb-4 text-right">
+        <div className="shrink-0 break-inside-avoid">
+          <div className="px-[12mm] pb-1.5 text-right">
             <CendoSignatureBlock
               doctorName={report.doctorName}
               doctorSpecialty={resolvedSig.doctorSpecialty}
@@ -986,6 +986,7 @@ export function UltrasoundPrintView({
               signatureSrc={resolvedSignatureSrc}
               showDigitalSignature={resolvedShowDigitalSignature}
               align="right"
+              compact
               showSalutation
             />
           </div>
@@ -993,66 +994,83 @@ export function UltrasoundPrintView({
             address={clinicAddress}
             email={clinicEmail}
             phone={clinicPhone}
+            compact
           />
         </div>
       </section>
 
       {/* PÁGINAS ANEXAS DE CAPTURAS FOTOGRÁFICAS (SIN RECORTES) */}
-      {photoChunks.map((batch, pageIdx) => (
-        <section
-          key={`eco-photos-${pageIdx}`}
-          className="page-sheet box-border flex min-h-[297mm] w-[210mm] flex-col justify-between overflow-hidden rounded-xl border border-border bg-card shadow-sm print:rounded-none print:border-none print:shadow-none"
-        >
-          <div className="flex-1 space-y-4 px-[14mm] pt-[10mm] pb-4">
-            <header className="flex items-center justify-between border-b-2 border-primary pb-2.5">
-              <div className="flex items-center gap-2.5">
-                <BrandLogo size="sm" showText={false} />
-                <div>
-                  <h2 className="font-sans text-base font-extrabold tracking-tight text-primary">
-                    ANEXO FOTOGRÁFICO DE ECOGRAFÍA ({pageIdx + 1} /{" "}
-                    {photoChunks.length})
-                  </h2>
-                  <p className="text-[10px] text-muted-foreground">
-                    Paciente: <strong>{patient.fullName}</strong> •{" "}
-                    {patient.documentType} {patient.documentNumber}
-                  </p>
-                </div>
-              </div>
-              <div className="text-right font-mono text-[10px] text-muted-foreground">
-                <p>N° ECO-{report.id.slice(0, 8).toUpperCase()}</p>
-                <p>{formatPeruDateDisplay(report.reportDate)}</p>
-              </div>
-            </header>
+      {photoChunks.map((batch, pageIdx) => {
+        const photoBoxHeightClass =
+          batch.length <= 2
+            ? "h-[92mm]"
+            : batch.length <= 4
+              ? "h-[74mm]"
+              : "h-[56mm]";
 
-            <div className="grid grid-cols-2 gap-4">
-              {batch.map((img, idx) => (
-                <figure
-                  key={img.storagePath}
-                  className="overflow-hidden rounded-lg border border-border bg-muted/15"
-                >
-                  <div className="flex aspect-[4/3] items-center justify-center bg-card p-1">
-                    {/* eslint-disable-next-line @next/next/no-img-element -- Ventana de impresión con endpoint binario autenticado */}
-                    <img
-                      src={buildClinicalImageViewUrl(img.storagePath)}
-                      alt={img.caption || `Captura ecográfica ${idx + 1}`}
-                      className="max-h-full max-w-full object-contain"
-                    />
+        return (
+          <section
+            key={`eco-photos-${pageIdx}`}
+            className="page-sheet box-border flex h-[296.5mm] max-h-[296.5mm] w-[210mm] flex-col justify-between overflow-hidden rounded-xl border border-border bg-card shadow-sm print:rounded-none print:border-none print:shadow-none"
+          >
+            <div className="flex-1 space-y-2.5 px-[12mm] pt-[7mm] pb-2">
+              <header className="flex items-center justify-between border-b-2 border-primary pb-2">
+                <div className="flex items-center gap-2.5">
+                  <BrandLogo size="sm" showText={false} />
+                  <div>
+                    <h2 className="font-sans text-sm font-extrabold tracking-tight text-primary">
+                      ANEXO FOTOGRÁFICO DE ECOGRAFÍA ({pageIdx + 1} /{" "}
+                      {photoChunks.length})
+                    </h2>
+                    <p className="text-[10px] text-muted-foreground">
+                      Paciente: <strong>{patient.fullName}</strong> •{" "}
+                      {patient.documentType} {patient.documentNumber}
+                    </p>
                   </div>
-                  <figcaption className="border-t border-border bg-muted/30 px-2.5 py-1.5 font-mono text-[9.5px] font-medium text-foreground">
-                    Fig. {pageIdx * 6 + idx + 1}: {img.caption}
-                  </figcaption>
-                </figure>
-              ))}
-            </div>
-          </div>
+                </div>
+                <div className="text-right font-mono text-[10px] text-muted-foreground">
+                  <p>N° ECO-{report.id.slice(0, 8).toUpperCase()}</p>
+                  <p>{formatPeruDateDisplay(report.reportDate)}</p>
+                </div>
+              </header>
 
-          <CendoFooterWave
-            address={clinicAddress}
-            email={clinicEmail}
-            phone={clinicPhone}
-          />
-        </section>
-      ))}
+              <div className="grid grid-cols-2 gap-2.5">
+                {batch.map((img, idx) => (
+                  <figure
+                    key={img.storagePath}
+                    className="break-inside-avoid overflow-hidden rounded-lg border border-border bg-muted/15"
+                  >
+                    <div
+                      className={cn(
+                        "flex items-center justify-center bg-card p-1",
+                        photoBoxHeightClass
+                      )}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- Ventana de impresión con endpoint binario autenticado */}
+                      <img
+                        src={buildClinicalImageViewUrl(img.storagePath)}
+                        alt={img.caption || `Captura ecográfica ${idx + 1}`}
+                        className="max-h-full max-w-full object-contain"
+                      />
+                    </div>
+                    <figcaption className="line-clamp-2 border-t border-border bg-muted/30 px-2 py-1 font-mono text-[9px] leading-tight font-medium text-foreground">
+                      Fig. {pageIdx * 6 + idx + 1}: {img.caption}
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+            </div>
+
+            <CendoFooterWave
+              address={clinicAddress}
+              email={clinicEmail}
+              phone={clinicPhone}
+              compact
+              className="shrink-0"
+            />
+          </section>
+        );
+      })}
     </div>
   );
 }
