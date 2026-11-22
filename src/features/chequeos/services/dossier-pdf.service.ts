@@ -2467,25 +2467,74 @@ export async function generateCheckupDossierPdf(params: {
 
       if (!downloaded) {
         throw new DomainError(
-          `El documento PDF "${docRow.title}" no está disponible en Storage.`
+          `El documento "${docRow.title}" no está disponible en Storage.`
         );
       }
 
-      try {
-        const extPdf = await PDFDocument.load(downloaded.buffer, {
-          ignoreEncryption: true,
-        });
-        const copiedPages = await pdfDoc.copyPages(
-          extPdf,
-          extPdf.getPageIndices()
-        );
-        for (const extPage of copiedPages) {
-          pdfDoc.addPage(extPage);
+      const lowerMime = (docRow.mimeType || "").toLowerCase();
+
+      if (lowerMime === "image/jpeg" || lowerMime === "image/png") {
+        try {
+          const imgBytes = new Uint8Array(downloaded.buffer);
+          const embeddedImg =
+            lowerMime === "image/png"
+              ? await pdfDoc.embedPng(imgBytes)
+              : await pdfDoc.embedJpg(imgBytes);
+          const imgPage = pdfDoc.addPage([PAGE_W, PAGE_H]);
+          const topY = drawHeaderAndFooterOnPage(imgPage, assets, {
+            badgeText: "IMAGEN EXTERNA",
+            codeText: docRow.documentType,
+            dateText: formatPeruDateDisplay(docRow.documentDate),
+          });
+          imgPage.drawText(sanitizeWinAnsi(docRow.title).slice(0, 88), {
+            x: MARGIN_X,
+            y: topY,
+            size: 11,
+            font: assets.fontBold,
+            color: C_PRIMARY,
+          });
+          const boxTop = topY - 14;
+          const boxBottom = assets.footerSafeY + 12;
+          const maxW = CONTENT_W;
+          const maxH = Math.max(120, boxTop - boxBottom);
+          const scale = Math.min(
+            maxW / Math.max(1, embeddedImg.width),
+            maxH / Math.max(1, embeddedImg.height)
+          );
+          const drawW = embeddedImg.width * scale;
+          const drawH = embeddedImg.height * scale;
+          imgPage.drawImage(embeddedImg, {
+            x: MARGIN_X + (CONTENT_W - drawW) / 2,
+            y: boxTop - drawH,
+            width: drawW,
+            height: drawH,
+          });
+        } catch {
+          throw new DomainError(
+            `No se pudo incrustar la imagen externa "${docRow.title}" en el Dossier PDF.`
+          );
         }
-      } catch {
+      } else if (lowerMime === "image/webp") {
         throw new DomainError(
-          `No se pudo adjuntar el PDF externo "${docRow.title}": el archivo está dañado o protegido con contraseña de apertura.`
+          `La imagen "${docRow.title}" está en formato WebP; vuelva a subirla para optimizarla a JPEG e incluirla en el Dossier PDF.`
         );
+      } else {
+        try {
+          const extPdf = await PDFDocument.load(downloaded.buffer, {
+            ignoreEncryption: true,
+          });
+          const copiedPages = await pdfDoc.copyPages(
+            extPdf,
+            extPdf.getPageIndices()
+          );
+          for (const extPage of copiedPages) {
+            pdfDoc.addPage(extPage);
+          }
+        } catch {
+          throw new DomainError(
+            `No se pudo adjuntar el PDF externo "${docRow.title}": el archivo está dañado o protegido con contraseña de apertura.`
+          );
+        }
       }
     }
   }
@@ -2501,7 +2550,7 @@ export async function generateCheckupDossierPdf(params: {
     );
   }
 
-  const finalBytes = await pdfDoc.save();
+  const finalBytes = await pdfDoc.save({ useObjectStreams: true });
   const safeLast = patientRow.lastName
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")

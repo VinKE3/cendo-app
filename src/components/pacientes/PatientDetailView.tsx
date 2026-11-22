@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Activity,
   AlertTriangle,
@@ -43,7 +44,10 @@ import type {
   MedicalConsultationItem,
 } from "@/features/consultas/consultas.schema";
 import type { ProcedureQuoteItem } from "@/features/cotizaciones/cotizaciones.schema";
-import type { PatientDocumentItem } from "@/features/documentos/documentos.schema";
+import type {
+  PatientDocumentItem,
+  WordHistoryDocumentItem,
+} from "@/features/documentos/documentos.schema";
 import type { UltrasoundReportItem } from "@/features/ecografias/ecografias.schema";
 import type {
   LabOrderItem,
@@ -57,6 +61,8 @@ import type { ProcedureTariffItem } from "@/features/tarifario/tarifario.schema"
 import { cn, formatPeruDateDisplay } from "@/lib/utils";
 import { TabChequeos } from "../chequeos/TabChequeos";
 import { TabConsultas } from "../consultas/TabConsultas";
+import { TabDocumentos } from "../documentos/TabDocumentos";
+import { WordImportModal } from "../documentos/WordImportModal";
 import {
   TabLaboratorioCotizaciones,
   type TabLabCotizHandle,
@@ -79,6 +85,7 @@ interface PatientDetailViewProps {
   initialColposcopies: ColposcopyReportItem[];
   initialCheckups: ClinicalCheckupItem[];
   initialPatientDocuments: PatientDocumentItem[];
+  initialWordHistories?: WordHistoryDocumentItem[];
   initialProcedures: MinorProcedureItem[];
   initialPrenatalCard: PrenatalCardItem | null;
   initialClinicalTemplates: ClinicalTemplateItem[];
@@ -119,6 +126,7 @@ export function PatientDetailView({
   initialColposcopies,
   initialCheckups,
   initialPatientDocuments,
+  initialWordHistories = [],
   initialProcedures,
   initialPrenatalCard,
   initialClinicalTemplates,
@@ -127,8 +135,10 @@ export function PatientDetailView({
   canEdit,
   canDelete = false,
 }: PatientDetailViewProps) {
+  const router = useRouter();
   const recetasRef = useRef<TabRecetasHandle>(null);
   const labCotizRef = useRef<TabLabCotizHandle>(null);
+  const [wordImportOpen, setWordImportOpen] = useState(false);
   const [consultationsList, setConsultationsList] =
     useState<MedicalConsultationItem[]>(initialConsultations);
   const [prescriptionsList, setPrescriptionsList] =
@@ -147,10 +157,36 @@ export function PatientDetailView({
     useState<ClinicalCheckupItem[]>(initialCheckups);
   const [documentsList, setDocumentsList] =
     useState<PatientDocumentItem[]>(initialPatientDocuments);
+  const [wordHistoriesList, setWordHistoriesList] =
+    useState<WordHistoryDocumentItem[]>(initialWordHistories);
   const [proceduresList, setProceduresList] =
     useState<MinorProcedureItem[]>(initialProcedures);
   const [prenatalCardState, setPrenatalCardState] =
     useState<PrenatalCardItem | null>(initialPrenatalCard);
+
+  const [prevServerSyncKey, setPrevServerSyncKey] = useState({
+    initialConsultations,
+    initialUltrasounds,
+    initialPatientDocuments,
+    initialWordHistories,
+  });
+  if (
+    prevServerSyncKey.initialConsultations !== initialConsultations ||
+    prevServerSyncKey.initialUltrasounds !== initialUltrasounds ||
+    prevServerSyncKey.initialPatientDocuments !== initialPatientDocuments ||
+    prevServerSyncKey.initialWordHistories !== initialWordHistories
+  ) {
+    setPrevServerSyncKey({
+      initialConsultations,
+      initialUltrasounds,
+      initialPatientDocuments,
+      initialWordHistories,
+    });
+    setConsultationsList(initialConsultations);
+    setUltrasoundsList(initialUltrasounds);
+    setDocumentsList(initialPatientDocuments);
+    setWordHistoriesList(initialWordHistories);
+  }
 
   const {
     patient,
@@ -304,7 +340,7 @@ export function PatientDetailView({
     checkups: checkupsList.length,
     procedures: proceduresList.length,
     prenatalCards: prenatalCardState ? 1 : 0,
-    documents: documentsList.length,
+    documents: documentsList.length + wordHistoriesList.length,
     prescriptions: prescriptionsList.length,
     labOrders: labOrdersList.length,
     quotes: quotesList.length,
@@ -432,7 +468,9 @@ export function PatientDetailView({
 
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                   <span className="font-mono font-semibold text-foreground">
-                    {patient.age} años ({formatPeruDateDisplay(patient.birthDate)})
+                    {patient.birthDate
+                      ? `${patient.age} años (${formatPeruDateDisplay(patient.birthDate)})`
+                      : "Edad / F. Nac. por completar"}
                   </span>
                   <span className="inline-flex items-center gap-1 font-mono">
                     <Phone className="size-3" />
@@ -994,13 +1032,33 @@ export function PatientDetailView({
         />
       </div>
 
+      <div className={activeTab === "documentos" ? "block" : "hidden"}>
+        <TabDocumentos
+          patient={patient}
+          documents={documentsList}
+          onDocumentsChange={setDocumentsList}
+          wordHistories={wordHistoriesList}
+          onWordHistoriesChange={setWordHistoriesList}
+          canEdit={canEdit}
+          canDelete={canDelete}
+          onOpenWordImport={() => setWordImportOpen(true)}
+        />
+      </div>
+
+      <WordImportModal
+        open={wordImportOpen}
+        onOpenChange={setWordImportOpen}
+        onImportCompleted={() => router.refresh()}
+      />
+
       {activeTab !== "resumen" &&
       activeTab !== "consultas" &&
       activeTab !== "chequeos" &&
       activeTab !== "procedimientos" &&
       activeTab !== "prenatal" &&
       activeTab !== "recetas" &&
-      activeTab !== "laboratorio" ? (
+      activeTab !== "laboratorio" &&
+      activeTab !== "documentos" ? (
         <Card className="border border-border bg-card">
           <CardHeader className="border-b border-border">
             <div className="flex items-center justify-between gap-2">

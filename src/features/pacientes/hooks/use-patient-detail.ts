@@ -117,6 +117,12 @@ export function usePatientDetail(initialDetail: PatientDetailData) {
   const [background, setBackground] = useState<PatientBackgroundItem | null>(
     initialDetail.background
   );
+  const [prevInitialDetail, setPrevInitialDetail] = useState(initialDetail);
+  if (prevInitialDetail !== initialDetail) {
+    setPrevInitialDetail(initialDetail);
+    setPatient(initialDetail.patient);
+    setBackground(initialDetail.background);
+  }
   const counts = initialDetail.counts;
 
   const activeTab: PatientDetailTab = resolveTabFromQuery(searchParams.get("tab"));

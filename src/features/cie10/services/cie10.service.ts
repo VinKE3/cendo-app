@@ -72,15 +72,24 @@ export async function ensureDefaultCie10ForTenant(tenantId: string) {
 export async function listCie10Codes(
   tenantId: string
 ): Promise<Cie10RecordItem[]> {
-  await ensureDefaultCie10ForTenant(tenantId);
-
-  const rows = await db
+  let rows = await db
     .select()
     .from(cie10Codes)
     .where(
       and(eq(cie10Codes.tenantId, tenantId), isNull(cie10Codes.deletedAt))
     )
     .orderBy(desc(cie10Codes.isFavorite), asc(cie10Codes.code));
+
+  if (rows.length === 0) {
+    await ensureDefaultCie10ForTenant(tenantId);
+    rows = await db
+      .select()
+      .from(cie10Codes)
+      .where(
+        and(eq(cie10Codes.tenantId, tenantId), isNull(cie10Codes.deletedAt))
+      )
+      .orderBy(desc(cie10Codes.isFavorite), asc(cie10Codes.code));
+  }
 
   return rows.map(mapRow);
 }

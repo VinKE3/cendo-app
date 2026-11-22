@@ -3,8 +3,9 @@ import { getSessionDoctorProfile } from "@/features/auth/services/auth.service";
 import {
   createPatientDocumentMetaSchema,
   deletePatientDocumentSchema,
-  isPdfMagicBytes,
+  detectSupportedDocumentMime,
   listPatientDocumentsSchema,
+  MAX_PATIENT_IMAGE_BYTES,
   MAX_PATIENT_PDF_BYTES,
   viewPatientDocumentSchema,
 } from "@/features/documentos/documentos.schema";
@@ -56,7 +57,7 @@ export async function GET(request: Request) {
       return new NextResponse(doc.buffer, {
         status: 200,
         headers: {
-          "Content-Type": "application/pdf",
+          "Content-Type": doc.mimeType,
           "Content-Disposition": `${download ? "attachment" : "inline"}; filename="${doc.fileName}"`,
           "Cache-Control": "private, no-store",
           "X-Content-Type-Options": "nosniff",
@@ -117,7 +118,7 @@ export async function POST(request: Request) {
 
     if (!(file instanceof Blob)) {
       return NextResponse.json(
-        { success: false, error: "Debe adjuntar un archivo PDF válido." },
+        { success: false, error: "Debe adjuntar un archivo PDF o imagen válida." },
         { status: 400 }
       );
     }
@@ -126,18 +127,33 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: "El archivo PDF debe pesar más de 0 bytes y como máximo 15 MB.",
+          error: "El archivo debe pesar más de 0 bytes y como máximo 25 MB.",
         },
         { status: 400 }
       );
     }
 
     const bytes = new Uint8Array(await file.arrayBuffer());
-    if (!isPdfMagicBytes(bytes)) {
+    const detectedMime = detectSupportedDocumentMime(bytes);
+    if (!detectedMime) {
       return NextResponse.json(
         {
           success: false,
-          error: "Solo se admiten archivos PDF válidos (%PDF-).",
+          error:
+            "Solo se admiten archivos PDF (%PDF-) o imágenes JPG, PNG o WebP.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (
+      detectedMime !== "application/pdf" &&
+      bytes.byteLength > MAX_PATIENT_IMAGE_BYTES
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "La imagen supera el límite máximo permitido de 15 MB.",
         },
         { status: 400 }
       );
@@ -147,11 +163,16 @@ export async function POST(request: Request) {
     const originalFileName =
       "name" in file && typeof file.name === "string" && file.name.trim()
         ? file.name.trim()
-        : "documento.pdf";
+        : detectedMime === "application/pdf"
+          ? "documento.pdf"
+          : "imagen.jpg";
 
     const fallbackTitle =
       rawTitle ||
-      originalFileName.replace(/\.pdf$/i, "").replace(/[_-]+/g, " ").trim() ||
+      originalFileName
+        .replace(/\.(pdf|jpg|jpeg|png|webp)$/i, "")
+        .replace(/[_-]+/g, " ")
+        .trim() ||
       "Documento Clínico Externo";
 
     const metaParsed = createPatientDocumentMetaSchema.safeParse({

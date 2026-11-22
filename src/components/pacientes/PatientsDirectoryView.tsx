@@ -1,10 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   Calendar,
   Eye,
+  FileUp,
   Pencil,
   Phone,
   Plus,
@@ -13,6 +16,7 @@ import {
   Trash2,
   Users,
 } from "lucide-react";
+import { WordImportModal } from "@/components/documentos/WordImportModal";
 import { TablePagination } from "@/components/common/TablePagination";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -66,6 +70,8 @@ export function PatientsDirectoryView({
   canEdit,
   canDelete,
 }: PatientsDirectoryViewProps) {
+  const router = useRouter();
+  const [wordImportOpen, setWordImportOpen] = useState(false);
   const {
     items,
     filteredCount,
@@ -119,10 +125,20 @@ export function PatientsDirectoryView({
         </div>
 
         {canEdit ? (
-          <Button type="button" onClick={openCreateModal}>
-            <Plus className="size-4" />
-            Registrar Paciente
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setWordImportOpen(true)}
+            >
+              <FileUp className="size-4 text-primary" />
+              Importar Word (.docx)
+            </Button>
+            <Button type="button" onClick={openCreateModal}>
+              <Plus className="size-4" />
+              Registrar Paciente
+            </Button>
+          </div>
         ) : null}
       </div>
 
@@ -228,7 +244,9 @@ export function PatientsDirectoryView({
                     <TableCell className="align-middle">
                       <div className="flex flex-col font-mono tabular-nums">
                         <span className="text-xs font-semibold text-foreground">
-                          {patient.age} años
+                          {patient.birthDate
+                            ? `${patient.age} años`
+                            : "Por completar"}
                         </span>
                         <span className="text-[10px] text-muted-foreground">
                           {formatPeruDateDisplay(patient.birthDate)}
@@ -363,6 +381,12 @@ export function PatientsDirectoryView({
         isSubmitting={isSubmitting}
         onSubmit={onSubmit}
         onSubmitIntent={submitWithRedirect}
+      />
+
+      <WordImportModal
+        open={wordImportOpen}
+        onOpenChange={setWordImportOpen}
+        onImportCompleted={() => router.refresh()}
       />
 
       <Dialog

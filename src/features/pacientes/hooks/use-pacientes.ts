@@ -82,6 +82,11 @@ function hasPositiveAllergy(value?: string | null): boolean {
 export function usePacientes(initialItems: PatientDirectoryItem[]) {
   const router = useRouter();
   const [items, setItems] = useState<PatientDirectoryItem[]>(initialItems);
+  const [prevInitialItems, setPrevInitialItems] = useState(initialItems);
+  if (prevInitialItems !== initialItems) {
+    setPrevInitialItems(initialItems);
+    setItems(initialItems);
+  }
   const [search, setSearchState] = useState("");
   const [coverageFilter, setCoverageFilterState] = useState<CoverageFilter>("ALL");
   const [sortBy, setSortByState] = useState<PatientSortBy>("recent");

@@ -11,7 +11,10 @@ import {
   listConsultationsByPatient,
 } from "@/features/consultas/services/consultas.service";
 import { listQuotesByPatient } from "@/features/cotizaciones/services/cotizaciones.service";
-import { listPatientDocumentsByPatient } from "@/features/documentos/services/documentos.service";
+import {
+  listPatientDocumentsByPatient,
+  listWordHistoriesByPatient,
+} from "@/features/documentos/services/documentos.service";
 import { listUltrasoundsByPatient } from "@/features/ecografias/services/ecografias.service";
 import {
   listLabOrdersByPatient,
@@ -65,9 +68,10 @@ export default async function PacienteDetailPage({
     doctor.tenantId,
     parsedId.data
   );
-  const [checkups, patientDocuments, tariffs] = await Promise.all([
+  const [checkups, patientDocuments, wordHistories, tariffs] = await Promise.all([
     listCheckupsByPatient(doctor.tenantId, parsedId.data),
     listPatientDocumentsByPatient(doctor.tenantId, parsedId.data),
+    listWordHistoriesByPatient(doctor.tenantId, parsedId.data),
     listTariffs(doctor.tenantId),
   ]);
   const [minorProcedures, prenatalCard] = await Promise.all([
@@ -98,6 +102,7 @@ export default async function PacienteDetailPage({
         initialColposcopies={colposcopies}
         initialCheckups={checkups}
         initialPatientDocuments={patientDocuments}
+        initialWordHistories={wordHistories}
         initialProcedures={minorProcedures}
         initialPrenatalCard={prenatalCard}
         initialClinicalTemplates={clinicalTemplates}

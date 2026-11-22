@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { getAuthenticatedContext } from "@/lib/security/action-guard";
 import {
@@ -5,13 +6,17 @@ import {
   type AuthenticatedDoctor,
 } from "@/features/auth/services/auth.service";
 
-export async function requireSessionDoctor(): Promise<AuthenticatedDoctor> {
+const resolveSessionDoctor = cache(async (): Promise<AuthenticatedDoctor | null> => {
   const ctx = await getAuthenticatedContext();
   if (!ctx) {
-    redirect("/login");
+    return null;
   }
 
-  const doctor = await getSessionDoctorProfile(ctx.userId, ctx.tenantId);
+  return getSessionDoctorProfile(ctx.userId, ctx.tenantId);
+});
+
+export async function requireSessionDoctor(): Promise<AuthenticatedDoctor> {
+  const doctor = await resolveSessionDoctor();
   if (!doctor) {
     redirect("/login");
   }

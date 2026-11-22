@@ -3,9 +3,11 @@
 import { useRef, useState, type DragEvent } from "react";
 import {
   Eye,
+  FileImage,
   FileText,
   FileUp,
   Loader2,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -22,6 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import {
   buildPatientDocumentViewUrl,
+  MAX_PATIENT_IMAGE_BYTES,
   MAX_PATIENT_PDF_BYTES,
   PATIENT_DOCUMENT_SHORT_LABELS,
   PATIENT_DOCUMENT_TYPE_LABELS,
@@ -29,6 +32,11 @@ import {
   type PatientDocumentItem,
   type PatientDocumentType,
 } from "@/features/documentos/documentos.schema";
+import { compressClinicalImageFile } from "@/lib/image-compressor";
+import {
+  compressPdfInBrowser,
+  PDF_COMPRESSION_THRESHOLD_BYTES,
+} from "@/lib/pdf-compressor";
 import { cn, formatPeruDateDisplay, getPeruDateString } from "@/lib/utils";
 
 interface PatientPdfDropzoneCardProps {
@@ -37,6 +45,8 @@ interface PatientPdfDropzoneCardProps {
   deletingDocId?: string | null;
   canDelete?: boolean;
   compact?: boolean;
+  allowImages?: boolean;
+  onPreviewDocument?: (doc: PatientDocumentItem) => void;
   selectedDocIds?: string[];
   onToggleSelectDoc?: (doc: PatientDocumentItem) => void;
   onUploadPdf: (params: {
@@ -65,43 +75,129 @@ export function PatientPdfDropzoneCard({
   deletingDocId,
   canDelete = false,
   compact = false,
+  allowImages = false,
+  onPreviewDocument,
   selectedDocIds,
   onToggleSelectDoc,
   onUploadPdf,
   onDeletePdf,
 }: PatientPdfDropzoneCardProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [docType, setDocType] =
-    useState<PatientDocumentType>("PLACAS_ECO_MAMA");
+  const [docType, setDocType] = useState<PatientDocumentType>(
+    allowImages ? "LABORATORIO_PAP" : "PLACAS_ECO_MAMA"
+  );
   const [title, setTitle] = useState("");
   const [docDate, setDocDate] = useState(() => getPeruDateString());
+  const [autoCompressHeavyPdf, setAutoCompressHeavyPdf] = useState(true);
+  const [processingHint, setProcessingHint] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [deleteTarget, setDeleteTarget] =
     useState<PatientDocumentItem | null>(null);
 
-  const handleFilePicked = async (file: File | undefined) => {
-    if (!file) return;
+  const busy = isUploading || Boolean(processingHint);
+
+  const handleFilePicked = async (pickedFile: File | undefined) => {
+    if (!pickedFile) return;
+
+    const lowerName = pickedFile.name.toLowerCase();
     const isPdf =
-      file.type === "application/pdf" ||
-      file.name.toLowerCase().endsWith(".pdf");
-    if (!isPdf) {
-      toast.error(`"${file.name}" no es un archivo PDF válido.`);
-      return;
-    }
-    if (file.size > MAX_PATIENT_PDF_BYTES) {
-      toast.error("El PDF supera el máximo permitido de 15 MB.");
+      pickedFile.type === "application/pdf" || lowerName.endsWith(".pdf");
+    const isImage =
+      pickedFile.type.startsWith("image/") ||
+      /\.(jpe?g|png|webp)$/i.test(lowerName);
+
+    if (!isPdf && !(allowImages && isImage)) {
+      toast.error(
+        allowImages
+          ? `"${pickedFile.name}" no es PDF ni imagen JPG/PNG/WebP válida.`
+          : `"${pickedFile.name}" no es un archivo PDF válido.`
+      );
       return;
     }
 
+    let fileToUpload = pickedFile;
+
+    if (isPdf) {
+      const canCompressAbove3Mb =
+        autoCompressHeavyPdf &&
+        pickedFile.size > PDF_COMPRESSION_THRESHOLD_BYTES;
+
+      if (!canCompressAbove3Mb && pickedFile.size > MAX_PATIENT_PDF_BYTES) {
+        toast.error(
+          "El PDF supera los 25 MB. Active la compresión automática para optimizarlo antes de subir."
+        );
+        return;
+      }
+
+      if (canCompressAbove3Mb) {
+        try {
+          setProcessingHint("Comprimiendo PDF...");
+          const res = await compressPdfInBrowser(pickedFile, {
+            onProgress: (p, tot) =>
+              setProcessingHint(`Optimizando pág. ${p}/${tot}...`),
+          });
+          fileToUpload = res.file;
+          if (res.compressed) {
+            toast.success(
+              `PDF optimizado: ${formatFileSize(res.originalBytes)} → ${formatFileSize(res.finalBytes)}`
+            );
+          }
+        } catch {
+          if (pickedFile.size > MAX_PATIENT_PDF_BYTES) {
+            setProcessingHint(null);
+            toast.error(
+              "No se pudo comprimir este PDF y excede el límite de 25 MB."
+            );
+            return;
+          }
+          toast.info("Se subirá el PDF original sin recomprimir.");
+        } finally {
+          setProcessingHint(null);
+        }
+      }
+
+      if (fileToUpload.size > MAX_PATIENT_PDF_BYTES) {
+        toast.error("Incluso optimizado, el PDF supera el máximo de 25 MB.");
+        return;
+      }
+    } else if (isImage) {
+      if (pickedFile.size > MAX_PATIENT_IMAGE_BYTES) {
+        toast.error("La imagen supera el máximo permitido de 15 MB.");
+        return;
+      }
+
+      if (
+        pickedFile.type === "image/webp" ||
+        pickedFile.size > 2.5 * 1024 * 1024
+      ) {
+        try {
+          setProcessingHint("Optimizando imagen...");
+          const compressed = await compressClinicalImageFile(pickedFile, {
+            maxWidth: 1800,
+            maxHeight: 1800,
+            quality: 0.86,
+          });
+          fileToUpload = new File([compressed.blob], compressed.filename, {
+            type: "image/jpeg",
+          });
+        } catch {
+          // Mantener imagen original si no excede límites
+        } finally {
+          setProcessingHint(null);
+        }
+      }
+    }
+
+    const cleanBase = pickedFile.name
+      .replace(/\.(pdf|jpe?g|png|webp)$/i, "")
+      .replace(/[_-]+/g, " ")
+      .trim();
     const fallbackTitle =
       title.trim() ||
-      `${PATIENT_DOCUMENT_SHORT_LABELS[docType]} — ${file.name
-        .replace(/\.pdf$/i, "")
-        .replace(/[_-]+/g, " ")
-        .trim()}`.slice(0, 150);
+      `${PATIENT_DOCUMENT_SHORT_LABELS[docType]} — ${cleanBase}`.slice(0, 150);
 
     const res = await onUploadPdf({
-      file,
+      file: fileToUpload,
       documentType: docType,
       title: fallbackTitle,
       documentDate: docDate,
@@ -140,13 +236,13 @@ export function PatientPdfDropzoneCard({
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-12">
           <div className="space-y-1 sm:col-span-5">
             <label className="block text-[11px] font-semibold text-foreground">
-              Tipo de PDF Externo
+              {allowImages ? "Tipo de Documento Externo" : "Tipo de PDF Externo"}
             </label>
             <select
               value={docType}
               onChange={(e) => setDocType(e.target.value as PatientDocumentType)}
               className={selectClassName}
-              disabled={isUploading}
+              disabled={busy}
             >
               {PATIENT_DOCUMENT_TYPES.map((t) => (
                 <option key={t} value={t}>
@@ -165,7 +261,7 @@ export function PatientPdfDropzoneCard({
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Ej. Placas VINNO Mama / BIOLAQ PAP"
               className="h-8 bg-card text-xs"
-              disabled={isUploading}
+              disabled={busy}
             />
           </div>
 
@@ -178,21 +274,50 @@ export function PatientPdfDropzoneCard({
               value={docDate}
               onChange={(e) => setDocDate(e.target.value)}
               className="h-8 bg-card font-mono text-xs"
-              disabled={isUploading}
+              disabled={busy}
             />
           </div>
         </div>
 
         <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-[11px] text-muted-foreground">
-            Arrastra aquí el PDF del ecógrafo <strong className="text-foreground">VINNO</strong> o{" "}
-            <strong className="text-foreground">BIOLAQ</strong> (máx. 15 MB).
-          </p>
+          <div className="space-y-1">
+            <p className="text-[11px] text-muted-foreground">
+              {allowImages ? (
+                <>
+                  Arrastra aquí resultados de laboratorio,{" "}
+                  <strong className="text-foreground">PDFs (VINNO / BIOLAQ)</strong>{" "}
+                  o <strong className="text-foreground">imágenes JPG / PNG / WebP</strong>{" "}
+                  (ej. Resonancias).
+                </>
+              ) : (
+                <>
+                  Arrastra aquí el PDF del ecógrafo{" "}
+                  <strong className="text-foreground">VINNO</strong> o{" "}
+                  <strong className="text-foreground">BIOLAQ</strong> (máx. 25 MB).
+                </>
+              )}
+            </p>
+            <label className="inline-flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground select-none hover:text-foreground">
+              <input
+                type="checkbox"
+                checked={autoCompressHeavyPdf}
+                onChange={(e) => setAutoCompressHeavyPdf(e.target.checked)}
+                disabled={busy}
+                className="size-3.5 rounded border-border accent-primary"
+              />
+              <Sparkles className="size-3 text-primary" />
+              Comprimir PDF pesado (&gt; 3 MB) automáticamente antes de subir
+            </label>
+          </div>
 
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pdf,application/pdf"
+            accept={
+              allowImages
+                ? ".pdf,application/pdf,.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                : ".pdf,application/pdf"
+            }
             className="hidden"
             onChange={(e) => {
               const picked = e.target.files?.[0];
@@ -205,16 +330,22 @@ export function PatientPdfDropzoneCard({
             type="button"
             variant="outline"
             size="xs"
-            disabled={isUploading}
+            disabled={busy}
             onClick={() => fileInputRef.current?.click()}
             className="bg-card"
           >
-            {isUploading ? (
+            {busy ? (
               <Loader2 className="size-3.5 animate-spin" />
             ) : (
               <FileUp className="size-3.5 text-primary" />
             )}
-            {isUploading ? "Subiendo PDF..." : "Adjuntar PDF"}
+            {processingHint
+              ? processingHint
+              : isUploading
+                ? "Subiendo..."
+                : allowImages
+                  ? "Adjuntar PDF / Imagen"
+                  : "Adjuntar PDF"}
           </Button>
         </div>
       </div>
@@ -254,6 +385,8 @@ export function PatientPdfDropzoneCard({
                       aria-label={`Incluir ${doc.title} en Dossier`}
                       className="size-3.5 shrink-0 cursor-pointer accent-primary"
                     />
+                  ) : doc.mimeType.startsWith("image/") ? (
+                    <FileImage className="size-4 shrink-0 text-primary" />
                   ) : (
                     <FileText className="size-4 shrink-0 text-primary" />
                   )}
@@ -282,14 +415,25 @@ export function PatientPdfDropzoneCard({
                     type="button"
                     variant="ghost"
                     size="icon-xs"
-                    onClick={() =>
+                    onClick={() => {
+                      if (
+                        onPreviewDocument &&
+                        doc.mimeType.startsWith("image/")
+                      ) {
+                        onPreviewDocument(doc);
+                        return;
+                      }
                       window.open(
                         buildPatientDocumentViewUrl(doc.id),
                         "_blank",
                         "noopener,noreferrer"
-                      )
+                      );
+                    }}
+                    title={
+                      doc.mimeType.startsWith("image/")
+                        ? "Previsualizar imagen"
+                        : "Abrir PDF original"
                     }
-                    title="Abrir PDF original"
                     aria-label={`Ver ${doc.title}`}
                   >
                     <Eye className="size-3.5" />
