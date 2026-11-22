@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { pgUuidSchema } from "@/features/configuracion/configuracion.schema";
 import {
   CIE10_CATEGORY_LABELS,
   type Cie10Category,
@@ -138,20 +139,20 @@ export const cie10FormSchema = z
 
 export const updateCie10Schema = cie10InputSchema
   .extend({
-    id: z.string().uuid("Identificador de registro CIE-10 inválido."),
+    id: pgUuidSchema("Identificador de registro CIE-10 inválido."),
   })
   .strict();
 
 export const toggleCie10FavoriteSchema = z
   .object({
-    id: z.string().uuid("Identificador de registro CIE-10 inválido."),
+    id: pgUuidSchema("Identificador de registro CIE-10 inválido."),
     isFavorite: z.boolean(),
   })
   .strict();
 
 export const deleteCie10Schema = z
   .object({
-    id: z.string().uuid("Identificador de registro CIE-10 inválido."),
+    id: pgUuidSchema("Identificador de registro CIE-10 inválido."),
   })
   .strict();
 

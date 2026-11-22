@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { pgUuidSchema } from "@/features/configuracion/configuracion.schema";
 
 export const DOCUMENT_TYPES = ["DNI", "CE", "Pasaporte"] as const;
 
@@ -176,7 +177,7 @@ export const patientInputSchema = z
 
 export const updatePatientSchema = z
   .object({
-    id: z.string().uuid("ID de paciente inválido."),
+    id: pgUuidSchema("ID de paciente inválido."),
     ...patientBaseShape,
   })
   .strict()
@@ -184,13 +185,13 @@ export const updatePatientSchema = z
 
 export const deletePatientSchema = z
   .object({
-    id: z.string().uuid("ID de paciente inválido."),
+    id: pgUuidSchema("ID de paciente inválido."),
   })
   .strict();
 
 export const patientBackgroundInputSchema = z
   .object({
-    patientId: z.string().uuid("ID de paciente inválido."),
+    patientId: pgUuidSchema("ID de paciente inválido."),
     obstetricFormula: z
       .string()
       .trim()

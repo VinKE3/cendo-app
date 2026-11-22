@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -109,7 +109,6 @@ function buildDefaultBackgroundValues(
 }
 
 export function usePatientDetail(initialDetail: PatientDetailData) {
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -125,17 +124,27 @@ export function usePatientDetail(initialDetail: PatientDetailData) {
   }
   const counts = initialDetail.counts;
 
-  const activeTab: PatientDetailTab = resolveTabFromQuery(searchParams.get("tab"));
+  const urlTab = resolveTabFromQuery(searchParams.get("tab"));
+  const [activeTab, setActiveTabState] = useState<PatientDetailTab>(urlTab);
+  const [prevUrlTab, setPrevUrlTab] = useState<PatientDetailTab>(urlTab);
+  if (prevUrlTab !== urlTab) {
+    setPrevUrlTab(urlTab);
+    setActiveTabState(urlTab);
+  }
 
   const setActiveTab = (tab: PatientDetailTab) => {
-    const nextParams = new URLSearchParams(searchParams.toString());
-    if (tab === "resumen") {
-      nextParams.delete("tab");
-    } else {
-      nextParams.set("tab", tab);
+    setActiveTabState(tab);
+    if (typeof window !== "undefined") {
+      const nextParams = new URLSearchParams(window.location.search);
+      if (tab === "resumen") {
+        nextParams.delete("tab");
+      } else {
+        nextParams.set("tab", tab);
+      }
+      const qs = nextParams.toString();
+      const nextUrl = qs ? `${pathname}?${qs}` : pathname;
+      window.history.replaceState(window.history.state, "", nextUrl);
     }
-    const qs = nextParams.toString();
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   };
 
   // Modal de filiación

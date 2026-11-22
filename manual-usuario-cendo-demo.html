@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manual de Usuario — Plataforma Clínica CENDO (VERSIÓN DEMO)</title>
+  <style>
+    :root {
+      --primary: #0A4D68;
+      --primary-dark: #07384C;
+      --primary-soft: #EBF5F8;
+      --warning: #F59E0B;
+      --warning-soft: #FEF3C7;
+      --warning-border: #FCD34D;
+      --success: #059669;
+      --success-soft: #ECFDF5;
+      --danger: #DC2626;
+      --danger-soft: #FEF2F2;
+      --ink: #1E293B;
+      --muted: #475569;
+      --subtle: #64748B;
+      --border: #CBD5E1;
+      --bg-page: #F1F5F9;
+      --bg-card: #FFFFFF;
+      --bg-muted: #F8FAFC;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "Inter", "Segoe UI", Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--ink);
+      background: var(--bg-page);
+      line-height: 1.55;
+      font-size: 10.5pt;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Barra flotante solo pantalla */
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: #0F172A;
+      color: #FFFFFF;
+      border-bottom: 3px solid var(--warning);
+      padding: 12px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.25);
+    }
+
+    .toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .toolbar-badge {
+      background: var(--warning);
+      color: #1E293B;
+      font-weight: 800;
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .toolbar-title {
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .toolbar-sub {
+      font-size: 11.5px;
+      color: #CBD5E1;
+    }
+
+    .toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn-print {
+      appearance: none;
+      border: none;
+      background: var(--warning);
+      color: #0F172A;
+      font-weight: 800;
+      font-size: 13px;
+      padding: 9px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 2px 8px rgba(245, 158, 11, 0.35);
+      transition: transform 0.15s ease, background 0.15s ease;
+    }
+
+    .btn-print:hover {
+      background: #FBBF24;
+      transform: translateY(-1px);
+    }
+
+    .toolbar-tip {
+      font-size: 11.5px;
+      color: #E2E8F0;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      padding: 6px 10px;
+      border-radius: 6px;
+    }
+
+    /* Contenedor tipo A4 */
+    .document {
+      max-width: 210mm;
+      margin: 24px auto 48px;
+      background: var(--bg-card);
+      box-shadow: 0 10px 35px rgba(15, 23, 42, 0.12);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .sheet {
+      padding: 16mm 16mm 18mm;
+    }
+
+    /* Portada */
+    .cover {
+      padding: 20mm 18mm 18mm;
+      background: linear-gradient(160deg, #FFFFFF 0%, #F4F9FB 70%, #EBF5F8 100%);
+      border-bottom: 4px solid var(--primary);
+      position: relative;
+    }
+
+    .cover-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .brand-lockup {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-wordmark {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .brand-title {
+      font-family: "Lora", Georgia, "Times New Roman", serif;
+      font-size: 28pt;
+      font-weight: 700;
+      color: var(--primary);
+      line-height: 1;
+      letter-spacing: 0.03em;
+    }
+
+    .brand-bar {
+      height: 3px;
+      width: 100%;
+      background: var(--warning);
+      margin: 5px 0;
+    }
+
+    .brand-sub {
+      font-size: 8.5pt;
+      font-weight: 700;
+      color: var(--primary);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .demo-pill {
+      background: var(--warning-soft);
+      color: #92400E;
+      border: 1.5px solid var(--warning);
+      padding: 7px 14px;
+      border-radius: 999px;
+      font-size: 9pt;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .cover-hero {
+      margin-top: 14px;
+      margin-bottom: 22px;
+    }
+
+    .cover-kicker {
+      font-size: 9.5pt;
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 8px;
+    }
+
+    .cover-title {
+      font-size: 24pt;
+      font-weight: 800;
+      color: #0F172A;
+      line-height: 1.18;
+      margin-bottom: 10px;
+    }
+
+    .cover-desc {
+      font-size: 11pt;
+      color: var(--muted);
+      max-width: 95%;
+    }
+
+    .cover-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin: 20px 0;
+    }
+
+    .meta-box {
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--primary);
+      border-radius: 8px;
+      padding: 11px 14px;
+    }
+
+    .meta-label {
+      font-size: 8pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--subtle);
+      margin-bottom: 3px;
+    }
+
+    .meta-value {
+      font-size: 10pt;
+      font-weight: 700;
+      color: #0F172A;
+    }
+
+    .demo-notice {
+      background: #FFFBEB;
+      border: 1.5px solid var(--warning);
+      border-left: 6px solid var(--warning);
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-top: 18px;
+    }
+
+    .demo-notice-title {
+      font-size: 10pt;
+      font-weight: 800;
+      color: #92400E;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 4px;
+    }
+
+    .demo-notice p {
+      font-size: 9.5pt;
+      color: #78350F;
+    }
+
+    /* Índice */
+    .toc-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px 14px;
+      margin-top: 12px;
+    }
+
+    .toc-item {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      padding: 7px 10px;
+      background: var(--bg-muted);
+      border: 1px solid #E2E8F0;
+      border-radius: 6px;
+      text-decoration: none;
+      color: var(--ink);
+      font-size: 9.5pt;
+    }
+
+    .toc-num {
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-weight: 800;
+      color: var(--primary);
+      background: var(--primary-soft);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 8.5pt;
+      flex-shrink: 0;
+    }
+
+    /* Encabezados de sección */
+    .section {
+      margin-top: 24px;
+      padding-top: 14px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 8px;
+      margin-bottom: 14px;
+      break-after: avoid;
+      page-break-after: avoid;
+    }
+
+    .section-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      background: var(--primary);
+      color: #FFFFFF;
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-weight: 800;
+      font-size: 11pt;
+      flex-shrink: 0;
+    }
+
+    h2 {
+      font-size: 14pt;
+      font-weight: 800;
+      color: #0F172A;
+      line-height: 1.2;
+    }
+
+    .route-chip {
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 8.5pt;
+      font-weight: 700;
+      color: var(--primary);
+      background: var(--primary-soft);
+      border: 1px solid #B6DCE8;
+      padding: 3px 8px;
+      border-radius: 6px;
+      white-space: nowrap;
+    }
+
+    h3 {
+      font-size: 11pt;
+      font-weight: 800;
+      color: var(--primary-dark);
+      margin: 14px 0 6px;
+      break-after: avoid;
+      page-break-after: avoid;
+    }
+
+    p {
+      margin-bottom: 8px;
+      color: var(--ink);
+    }
+
+    ul, ol {
+      margin: 6px 0 10px 18px;
+    }
+
+    li {
+      margin-bottom: 5px;
+    }
+
+    /* Botón UI ilustrado en texto */
+    .ui-btn {
+      display: inline-block;
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 8.5pt;
+      font-weight: 700;
+      padding: 1px 7px;
+      border-radius: 5px;
+      background: var(--primary-soft);
+      color: var(--primary-dark);
+      border: 1px solid #BAE6FD;
+      white-space: nowrap;
+    }
+
+    .ui-btn-solid {
+      background: var(--primary);
+      color: #FFFFFF;
+      border-color: var(--primary);
+    }
+
+    .ui-btn-wa {
+      background: var(--success-soft);
+      color: #065F46;
+      border-color: #A7F3D0;
+    }
+
+    .ui-btn-warn {
+      background: var(--warning-soft);
+      color: #92400E;
+      border-color: var(--warning-border);
+    }
+
+    .ui-btn-danger {
+      background: var(--danger-soft);
+      color: #991B1B;
+      border-color: #FECACA;
+    }
+
+    /* Tablas */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 14px;
+      font-size: 9.2pt;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    th {
+      background: var(--primary);
+      color: #FFFFFF;
+      text-align: left;
+      padding: 7px 10px;
+      font-weight: 700;
+      font-size: 8.5pt;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    td {
+      border: 1px solid #E2E8F0;
+      padding: 7px 10px;
+      vertical-align: top;
+    }
+
+    tr:nth-child(even) td {
+      background: #F8FAFC;
+    }
+
+    /* Tarjetas y cajas */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin: 10px 0 12px;
+    }
+
+    .info-card {
+      background: var(--bg-muted);
+      border: 1px solid #E2E8F0;
+      border-radius: 8px;
+      padding: 10px 12px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .info-card-title {
+      font-size: 9.5pt;
+      font-weight: 800;
+      color: var(--primary-dark);
+      margin-bottom: 4px;
+    }
+
+    .callout {
+      border-radius: 8px;
+      padding: 10px 13px;
+      margin: 10px 0 12px;
+      font-size: 9.5pt;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .callout-clinical {
+      background: var(--primary-soft);
+      border: 1px solid #BAE6FD;
+      border-left: 4px solid var(--primary);
+    }
+
+    .callout-success {
+      background: var(--success-soft);
+      border: 1px solid #A7F3D0;
+      border-left: 4px solid var(--success);
+    }
+
+    .callout-warn {
+      background: var(--warning-soft);
+      border: 1px solid var(--warning-border);
+      border-left: 4px solid var(--warning);
+    }
+
+    .step-list {
+      counter-reset: step;
+      list-style: none;
+      margin: 8px 0 12px;
+      padding: 0;
+    }
+
+    .step-list li {
+      counter-increment: step;
+      position: relative;
+      padding-left: 28px;
+      margin-bottom: 7px;
+    }
+
+    .step-list li::before {
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: 1px;
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      background: var(--primary);
+      color: #FFFFFF;
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 8pt;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .page-break {
+      page-break-before: always;
+      break-before: page;
+    }
+
+    .doc-footer {
+      margin-top: 24px;
+      padding-top: 12px;
+      border-top: 2px solid var(--primary);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 8.5pt;
+      color: var(--subtle);
+    }
+
+    .badge-inline-demo {
+      display: inline-block;
+      font-size: 7.5pt;
+      font-weight: 800;
+      color: #92400E;
+      background: var(--warning-soft);
+      border: 1px solid var(--warning);
+      border-radius: 4px;
+      padding: 1px 6px;
+      text-transform: uppercase;
+    }
+
+    /* Reglas de Impresión / PDF */
+    @page {
+      size: A4;
+      margin: 13mm 13mm 15mm 13mm;
+    }
+
+    @media print {
+      body {
+        background: #FFFFFF !important;
+        font-size: 9.8pt;
+      }
+
+      .no-print {
+        display: none !important;
+      }
+
+      .document {
+        margin: 0 !important;
+        max-width: 100% !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+      }
+
+      .cover {
+        padding: 10mm 12mm 12mm !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .sheet {
+        padding: 6mm 10mm 10mm !important;
+      }
+
+      th,
+      .section-num,
+      .demo-pill,
+      .demo-notice,
+      .callout,
+      .ui-btn,
+      .info-card,
+      .meta-box,
+      .brand-bar {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Barra de acciones para exportar a PDF -->
+  <div class="toolbar no-print">
+    <div class="toolbar-left">
+      <span class="toolbar-badge">VERSIÓN DEMO</span>
+      <div>
+        <div class="toolbar-title">Manual de Usuario — Plataforma Clínica CENDO</div>
+        <div class="toolbar-sub">Guía funcional punto por punto preparada para el Dr. Patrick José Jacinto Gomero</div>
+      </div>
+    </div>
+    <div class="toolbar-actions">
+      <span class="toolbar-tip">Tip PDF: En el cuadro de impresión elija <strong>"Guardar como PDF"</strong> y active <strong>"Gráficos de fondo"</strong></span>
+      <button type="button" class="btn-print" onclick="window.print()">
+        Descargar / Guardar como PDF
+      </button>
+    </div>
+  </div>
+
+  <div class="document">
+    <!-- PORTADA -->
+    <header class="cover">
+      <div class="cover-top">
+        <div class="brand-lockup">
+          <svg width="68" height="68" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M 13.80 32.57 A 41.13 41.13 0 1 1 84.05 70.03 A 40.03 40.03 0 1 0 13.80 32.57 Z" fill="#F59E0B" />
+            <path d="M 98.70 55.48 A 49.13 49.13 0 1 1 17.70 12.32 A 47.03 47.03 0 1 0 98.70 55.48 Z" fill="#0A4D68" />
+            <path fill-rule="evenodd" fill="#0A4D68" d="M 50.00 37.80 C 45.60 33.10, 38.20 29.85, 30.80 29.85 C 23.60 29.85, 19.50 33.70, 19.50 39.50 C 19.50 44.75, 23.40 48.35, 30.00 48.35 C 35.20 48.35, 41.45 47.30, 41.45 45.95 C 41.45 45.00, 40.40 44.65, 38.80 44.85 C 35.80 45.25, 33.20 45.35, 30.70 45.30 C 24.80 45.15, 22.00 42.85, 22.00 39.50 C 22.00 36.00, 25.40 33.75, 31.30 33.75 C 38.70 33.75, 45.30 37.25, 48.10 39.65 C 45.00 43.30, 41.45 49.20, 41.45 55.40 C 41.45 61.95, 44.80 67.95, 50.00 72.25 C 55.20 67.95, 58.55 61.95, 58.55 55.40 C 58.55 49.20, 55.00 43.30, 51.90 39.65 C 54.70 37.25, 61.30 33.75, 68.70 33.75 C 74.60 33.75, 78.00 36.00, 78.00 39.50 C 78.00 42.85, 75.20 45.15, 69.30 45.30 C 66.80 45.35, 64.20 45.25, 61.20 44.85 C 59.60 44.65, 58.55 45.00, 58.55 45.95 C 58.55 47.30, 64.80 48.35, 70.00 48.35 C 76.60 48.35, 80.50 44.75, 80.50 39.50 C 80.50 33.70, 76.40 29.85, 69.20 29.85 C 61.80 29.85, 54.40 33.10, 50.00 37.80 Z M 50.00 43.75 C 46.40 47.75, 45.00 51.60, 45.00 55.60 C 45.00 60.20, 46.75 64.45, 50.00 68.20 C 53.25 64.45, 55.00 60.20, 55.00 55.60 C 55.00 51.60, 53.60 47.75, 50.00 43.75 Z" />
+          </svg>
+          <div class="brand-wordmark">
+            <span class="brand-title">CENDO</span>
+            <span class="brand-bar"></span>
+            <span class="brand-sub">Centro de Endometriosis</span>
+          </div>
+        </div>
+
+        <div class="demo-pill">VERSIÓN DEMO • EVALUACIÓN</div>
+      </div>
+
+      <div class="cover-hero">
+        <div class="cover-kicker">Manual Operativo del Sistema Clínico Web</div>
+        <h1 class="cover-title">Guía Completa de Uso y Botonera Funcional</h1>
+        <p class="cover-desc">
+          Documento explicativo módulo por módulo sobre el funcionamiento de cada pantalla,
+          pestaña, formulario, puente clínico, generador PDF, compresor de archivos e importador
+          Word implementados para la gestión integral de pacientes de ginecología y obstetricia.
+        </p>
+      </div>
+
+      <div class="cover-meta-grid">
+        <div class="meta-box">
+          <div class="meta-label">Dirigido a</div>
+          <div class="meta-value">Dr. Patrick José Jacinto Gomero</div>
+          <div style="font-size: 8.8pt; color: var(--muted);">CMP 61693 • RNE 38657 — Ginecología y Obstetricia</div>
+        </div>
+        <div class="meta-box">
+          <div class="meta-label">Sede Configurada</div>
+          <div class="meta-value">CENDO — Sede Miraflores, Of. 405</div>
+          <div style="font-size: 8.8pt; color: var(--muted);">Lima, Perú • Horario oficial America/Lima</div>
+        </div>
+        <div class="meta-box">
+          <div class="meta-label">Alcance Documentado</div>
+          <div class="meta-value">Fases 1 a 5 (Sistema Completo + Migración Word)</div>
+          <div style="font-size: 8.8pt; color: var(--muted);">Agenda, HC, Chequeos, Dossier PDF, Procedimientos, Prenatal</div>
+        </div>
+        <div class="meta-box">
+          <div class="meta-label">Estado Actual del Entorno</div>
+          <div class="meta-value">DEMOSTRACIÓN FUNCIONAL (DEMO)</div>
+          <div style="font-size: 8.8pt; color: var(--muted);">Base de datos limpia, catálogos reales y firma precargada</div>
+        </div>
+      </div>
+
+      <div class="demo-notice">
+        <div class="demo-notice-title">Aviso Importante — Versión Demostrativa (DEMO)</div>
+        <p>
+          Esta plataforma se entrega actualmente en calidad de <strong>VERSIÓN DEMO (Demostración Funcional)</strong>
+          con el objetivo de que el Dr. Patrick y su equipo puedan probar todos los flujos reales de atención,
+          validar los formatos oficiales de impresión (A4/A5, Dossier PDF unificado, Carnet Prenatal MINSA/CLAP),
+          corroborar el importador de Historias y Ecografías desde Word y sugerir ajustes antes de acordar el
+          licenciamiento definitivo y el pase a producción permanente.
+        </p>
+      </div>
+    </header>
+
+    <main class="sheet">
+      <!-- ÍNDICE -->
+      <section class="section" style="margin-top: 6px; padding-top: 0;">
+        <div class="section-header">
+          <div class="section-title-wrap">
+            <span class="section-num">≡</span>
+            <h2>Índice de Contenidos</h2>
+          </div>
+          <span class="badge-inline-demo">DEMO CENDO</span>
+        </div>
+
+        <div class="toc-grid">
+          <a class="toc-item" href="#sec-1"><span class="toc-num">01</span><span>Acceso, Roles y Barra de Navegación</span></a>
+          <a class="toc-item" href="#sec-2"><span class="toc-num">02</span><span>Panel Principal — Resumen / Inicio</span></a>
+          <a class="toc-item" href="#sec-3"><span class="toc-num">03</span><span>Pacientes e Importador Word (.docx)</span></a>
+          <a class="toc-item" href="#sec-4"><span class="toc-num">04</span><span>Agenda y Citas Médicas</span></a>
+          <a class="toc-item" href="#sec-5"><span class="toc-num">05</span><span>Ficha Unificada y Resumen / Antecedentes</span></a>
+          <a class="toc-item" href="#sec-6"><span class="toc-num">06</span><span>Consultas Médicas y Puentes Rápidos</span></a>
+          <a class="toc-item" href="#sec-7"><span class="toc-num">07</span><span>Chequeos: Eco, Colposcopía y Dossier PDF</span></a>
+          <a class="toc-item" href="#sec-8"><span class="toc-num">08</span><span>Procedimientos Menores y Control Prenatal</span></a>
+          <a class="toc-item" href="#sec-9"><span class="toc-num">09</span><span>Recetas, Laboratorio y Cotizaciones</span></a>
+          <a class="toc-item" href="#sec-10"><span class="toc-num">10</span><span>Documentos Privados y Compresión PDF</span></a>
+          <a class="toc-item" href="#sec-11"><span class="toc-num">11</span><span>Catálogos Maestros y Configuración</span></a>
+          <a class="toc-item" href="#sec-12"><span class="toc-num">12</span><span>Impresión Oficial, Seguridad y Estado DEMO</span></a>
+        </div>
+      </section>
+
+      <!-- SECCIÓN 1 -->
+      <section class="section" id="sec-1">
+        <div class="section-header">
+          <div class="section-title-wrap">
+            <span class="section-num">01</span>
+            <h2>Acceso al Sistema, Roles y Navegación General</h2>
+          </div>
+          <span class="route-chip">/login • Barra &amp; Menú</span>
+        </div>
+
+        <h3>Ingreso y Seguridad de Sesión (<span class="route-chip">/login</span>)</h3>
+        <ul>
+          <li><strong>Correo y Contraseña:</strong> Validación cifrada de usuario activo y sede clínica.</li>
+          <li><span class="ui-btn">Recordar sesión</span>: Mantiene la sesión activa sin pedir clave repetidamente en su equipo personal.</li>
+          <li><span class="ui-btn">¿Olvidó su contraseña?</span>: Abre el asistente de recuperación/contacto con el administrador del sistema.</li>
+          <li><strong>Cierre automático por inactividad / sesión expirada:</strong> Si la sesión vence, el sistema redirige automáticamente al ingreso sin perder la ruta que estaba consultando.</li>
+        </ul>
+
+        <h3>Permisos por Rol del Equipo Clínico</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Rol en el Sistema</th>
+              <th>Qué puede hacer</th>
+              <th>Restricciones de Seguridad</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Director Médico (Admin)</strong><br /><em>Ej. Dr. Patrick Jacinto</em></td>
+              <td>Control total: atenciones, firmas digitales, precios, catálogos, plantillas, eliminación/archivo, creación de usuarios y auditoría.</td>
+              <td>Ninguna. Único rol que accede a <strong>Equipo Médico &amp; Usuarios</strong> y elimina plantillas oficiales CENDO.</td>
+            </tr>
+            <tr>
+              <td><strong>Médico Tratante (Moderator)</strong></td>
+              <td>Registra pacientes, atenciones, ecografías, colposcopías, recetas, órdenes, cotizaciones, procedimientos y sube su propia firma digital.</td>
+              <td>No administra usuarios ni elimina registros oficiales protegidos por Admin.</td>
+            </tr>
+            <tr>
+              <td><strong>Asistente / Recepción (User)</strong></td>
+              <td>Agenda citas, registra pacientes, busca tarifas/exámenes, envía listas de precios por WhatsApp y sube resultados PDF/imágenes externas (BIOLAQ/VINNO).</td>
+              <td><strong>No</strong> puede firmar actos médicos ni acceder al manejo de firmas médicas digitales ni borrar expedientes.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Barra Superior (siempre visible en toda la plataforma)</h3>
+        <ul>
+          <li><span class="ui-btn">Buscar pacientes, tarifas, vademécum o CIE-10... (Ctrl + K)</span>: Abre el <strong>Buscador Global Instantáneo</strong>. Desde cualquier pantalla permite saltar directo a la ficha de una paciente, consultar el precio de un examen, revisar dosis de un medicamento o copiar un código CIE-10.</li>
+          <li><strong>Indicador de Sede:</strong> <span class="ui-btn">Miraflores • Of. 405</span> confirma que está operando en la sede configurada.</li>
+          <li><span class="ui-btn">Botón Tema (Sol / Luna)</span>: Alterna entre <strong>Modo Claro Clínico</strong> y <strong>Modo Oscuro</strong> para reducir fatiga visual durante ecografías en consultorio con poca luz.</li>
+          <li><strong>Perfil Profesional:</strong> Muestra el nombre completo del usuario activo junto con su <strong>CMP</strong> y <strong>RNE</strong>.</li>
+        </ul>
+
+        <h3>Menú Lateral Izquierdo (Sidebar)</h3>
+        <div class="card-grid">
+          <div class="info-card">
+            <div class="info-card-title">Módulos Operativos Diarios</div>
+            <ul>
+              <li><strong>Resumen / Inicio:</strong> Tablero del día, citas y accesos rápidos.</li>
+              <li><strong>Pacientes e Historias:</strong> Directorio completo e importador Word.</li>
+              <li><strong>Agenda y Citas:</strong> Programación de horarios con control anti-cruces (muestra contador de citas de hoy).</li>
+            </ul>
+          </div>
+          <div class="info-card">
+            <div class="info-card-title">Catálogos Maestros y Ajustes</div>
+            <ul>
+              <li><strong>Tarifario de Exámenes (S/):</strong> 73 prestaciones reales y costos internos.</li>
+              <li><strong>Vademécum y Precios:</strong> Fármacos y marcas comerciales.</li>
+              <li><strong>Catálogo CIE-10:</strong> 57 diagnósticos gineco-obstétricos editables.</li>
+              <li><strong>Equipo Médico &amp; Usuarios:</strong> Solo Admin (cuentas del staff).</li>
+              <li><strong>Configuración &amp; Firma:</strong> Sello, firma digital, sede y contraseña.</li>
+            </ul>
+          </div>
+        </div>
+        <p style="font-size: 9pt; color: var(--muted);">
+          Nota: El botón <span class="ui-btn">&lt; / &gt;</span> arriba en el menú lateral permite <strong>colapsar o expandir</strong> la barra para ganar ancho útil de pantalla en laptops o monitores pequeños. En celular aparece como menú desplegable. Al pie se encuentra <span class="ui-btn-danger ui-btn">Cerrar Sesión</span>.
+        </p>
+      </section>
+
+      <!-- SECCIÓN 2 -->
+      <section class="section" id="sec-2">
+        <div class="section-header">
+          <div class="section-title-wrap">
+            <span class="section-num">02</span>
+            <h2>Panel Principal — Resumen / Inicio</h2>
+          </div>
+          <span class="route-chip">/dashboard</span>
+        </div>
+
+        <p>Es la pantalla de bienvenida al iniciar sesión. Muestra un resumen en tiempo real de la actividad de CENDO con acceso directo en un clic:</p>
+        <ul>
+          <li><span class="ui-btn">Buscar Paciente (Ctrl+K)</span>: Abre directamente la pestaña de pacientes dentro del buscador global.</li>
+          <li><span class="ui-btn">Agenda del Día</span>: Lleva al calendario completo de citas (`/agenda`).</li>
+          <li><span class="ui-btn ui-btn-solid">Directorio Pacientes</span>: Abre el listado maestro de historias clínicas (`/pacientes`).</li>
+          <li><strong>Bloque "Agenda de Hoy":</strong> Lista automáticamente las citas del día actual (hora exacta de Lima, nombre, documento, tipo de atención y estado). Al pulsar <span class="ui-btn">Abrir Ficha</span> entra directamente a la historia clínica de esa paciente.</li>
+          <li><strong>Tarjetas Complementarias:</strong> Resumen de últimas pacientes actualizadas, indicadores de conteo real (pacientes, estudios realizados, tarifas activas, medicamentos en vademécum) y accesos rápidos a tarifario y vademécum.</li>
+        </ul>
+      </section>
+
+      <!-- SECCIÓN 3 -->
+      <section class="section page-break" id="sec-3">
+        <div class="section-header">
+          <div class="section-title-wrap">
+            <span class="section-num">03</span>
+            <h2>Directorio de Pacientes e Importador Inteligente Word (.docx)</h2>
+          </div>
+          <span class="route-chip">/pacientes</span>
+        </div>
+
+        <h3>Botonera del Directorio Principal</h3>
+        <ul>
+          <li><span class="ui-btn ui-btn-solid">+ Registrar Paciente</span>: Abre la ficha de filiación para crear una nueva paciente (DNI/CE/Pasaporte, apellidos, nombres, fecha de nacimiento con cálculo automático de edad, teléfono, correo, dirección, distrito, estado civil, grado de instrucción, ocupación, lugar de nacimiento, religión y cobertura/seguro). Al guardar puede optar entre volver al directorio o abrir la historia recién creada.</li>
+          <li><span class="ui-btn">Importar Word (.docx)</span>: Lanza el <strong>Importador Dual en Lote</strong> (detallado abajo).</li>
+          <li><strong>Buscador rápido:</strong> Filtra en vivo por DNI, apellidos, nombres, teléfono o distrito.</li>
+          <li><strong>Selector de orden:</strong> <span class="ui-btn">Más recientes</span> o <span class="ui-btn">Alfabético (A-Z)</span>.</li>
+          <li><strong>Píldoras de filtro:</strong> <span class="ui-btn">Todas</span>, <span class="ui-btn">Particular</span>, <span class="ui-btn">Seguro / EPS</span> y <span class="ui-btn">Con Alergias</span> (con contador numérico en tiempo real).</li>
+          <li><strong>Acciones en cada fila:</strong>
+            <ul>
+              <li><span class="ui-btn">Historia</span> (o clic sobre el nombre): Ingresa a la Ficha Clínica Unificada (`/pacientes/[id]`).</li>
+              <li><span class="ui-btn">Editar (lápiz)</span>: Modifica datos de filiación sin perder el historial.</li>
+              <li><span class="ui-btn-danger ui-btn">Archivar (papelera)</span>: Solicita confirmación y realiza un borrado lógico auditado (solo Admin).</li>
+            </ul>
+          </li>
+          <li><strong>Paginación inferior:</strong> Permite elegir entre 10, 15, 25 o 50 pacientes por página.</li>
+        </ul>
+
+        <h3>Flujo Paso a Paso — Importador Inteligente de Word (<span class="ui-btn">.docx</span>)</h3>
+        <div class="callout callout-clinical">
+          <strong>Diseñado a medida para los archivos históricos de CENDO:</strong> Reconoce automáticamente las variaciones reales de las historias clínicas en Word del Dr. Patrick (<em>Estilo Completo</em>, <em>Estilo Compacto (Datos)</em> y <em>Estilo Compacto (Motivo)</em>) así como los informes de Ecografía Pélvica/TV, Mama Bilateral y Obstétrica.
+        </div>
+        <ol class="step-list">
+          <li><strong>Selección de archivos:</strong> Arrastre o seleccione hasta <strong>20 archivos <code>.docx</code></strong> a la vez (pueden mezclarse historias clínicas, ecografías e incluso carpetas de una o varias pacientes).</li>
+          <li><strong>Análisis y vista previa editable:</strong>
+            <ul>
+              <li>Si un documento es una <strong>plantilla vacía sin llenar</strong> (por ejemplo con <code>XXXXXXXXXX</code> o <code>(DNI)</code>), el sistema la marca como <em>Plantilla Vacía (Omitida)</em> y la desmarca automáticamente para no ensuciar la base de datos.</li>
+              <li>Si una fecha de nacimiento fue digitada por error dentro de <em>"Lugar de nacimiento"</em>, la rescata automáticamente y muestra un aviso informativo.</li>
+              <li>Empareja automáticamente las ecografías con su historia clínica mediante el <strong>DNI</strong> dentro del mismo lote o contra pacientes ya creadas en el sistema.</li>
+              <li>Antes de guardar, permite marcar/desmarcar archivos y corregir cualquier campo (DNI, nombre, fecha de nacimiento, teléfono, fechas de consulta o medidas).</li>
+            </ul>
+          </li>
+          <li><strong>Confirmación y respaldo:</strong> Al pulsar <span class="ui-btn ui-btn-solid">Confirmar Importación</span>, el sistema crea o actualiza la paciente, registra antecedentes, consultas cronológicas, ecografías y además <strong>archiva el Word <code>.docx</code> original</strong> dentro de la pestaña <strong>Documentos</strong> de la paciente (junto con su texto íntegro extraído).</li>
+        </ol>
+      </section>
+
+      <!-- SECCIÓN 4 -->
+      <section class="section" id="sec-4">
+        <div class="section-header">
+          <div class="section-title-wrap">
+            <span class="section-num">04</span>
+            <h2>Agenda y Citas Médicas</h2>
+          </div>
+          <span class="route-chip">/agenda</span>
+        </div>
+
+        <p>Calendario clínico operativo con validación en servidor para impedir que dos pacientes queden citadas a la misma hora con el mismo médico.</p>
+        <ul>
+          <li><span class="ui-btn ui-btn-solid">+ Nueva Cita</span>: Abre el modal para elegir paciente (o crearla en 10 segundos con el botón <strong>Registro Rápido de Paciente</strong> sin salir de la agenda), médico tratante, fecha, hora, tipo de atención y motivo. Si ya hay una cita en ese bloque horario, el sistema alerta el cruce y bloquea el doble agendamiento.</li>
+          <li><span class="ui-btn">Gestionar Tipos</span>: Permite agregar, editar o reordenar las categorías de cita (Consulta Ginecológica, Chequeo Preventivo, Colposcopía, Ecografía, Control Prenatal, Procedimiento).</li>
+          <li><strong>Filtros de Agenda:</strong> Vista por día, por rango, búsqueda por paciente/DNI y filtro por estado (<code>PROGRAMADA</code>, <code>CONFIRMADA</code>, <code>ATENDIDA</code>, <code>CANCELADA</code>).</li>
+          <li><strong>Botones por cada cita:</strong>
+            <ul>
+              <li><strong>Selector de Estado:</strong> Cambia el avance de la cita en 1 clic.</li>
+              <li><span class="ui-btn-wa ui-btn">WhatsApp</span>: Abre WhatsApp Web con un recordatorio limpio y corto de fecha, hora, dirección de Miraflores y el enlace corto de Google Maps configurado en el perfil del doctor (sin enlaces largos engorrosos).</li>
+              <li><span class="ui-btn">Calendario (.ics)</span>: Descarga el evento listo para agregar en Google Calendar, Apple Calendar u Outlook.</li>
+              <li><span class="ui-btn ui-btn-solid">Atender y registrar consulta</span>: Abre directamente la Ficha Clínica de la paciente en la pestaña <strong>Consultas</strong> lista para atenderla.</li>
+              <li><span class="ui-btn">Editar / Cancelar</span>: Reprograma fecha/hora o anula la reserva.</li>
+            </ul>
+          </li>
+        </ul>
+      </section>
+
+      <!-- SECCIÓN 5 -->
+      <section class="section" id="sec-5">
+        <div class="section-header">
+          <div class="section-title-wrap">
+            <span class="section-num">05</span>
+            <h2>Ficha Clínica Unificada y Pestaña Resumen / Antecedentes</h2>
+          </div>
+          <span class="route-chip">/pacientes/[id]</span>
+        </div>
+
+        <p>Toda la vida médica de la paciente vive dentro de una sola pantalla unificada organizada en <strong>8 pestañas</strong>, sin ventanas dispersas ni pérdida de contexto.</p>
+
+        <h3>Cabecera y Banner Clínico Permanente (visible en todas las pestañas)</h3>
+        <ul>
+          <li><span class="ui-btn">Volver al Directorio de Pacientes</span>: Regresa a `/pacientes`.</li>
+          <li><span class="ui-btn">Agendar Cita</span>: Abre `/agenda` con la paciente ya preseleccionada.</li>
+          <li><span class="ui-btn">Editar Filiación</span>: Actualiza DNI, teléfono, correo, seguro o fecha de nacimiento (muestra <em>"Edad / F. Nac. por completar"</em> si vino sin fecha en un Word antiguo).</li>
+          <li><span class="ui-btn ui-btn-solid">Actualizar Antecedentes</span>: Abre el formulario persistente de antecedentes gineco-obstétricos y patológicos.</li>
+          <li><strong>Banner de Alertas Críticas:</strong> Muestra en todo momento Nombre, DNI/CE, Seguro, Edad, Teléfono con enlace directo <span class="ui-btn-wa ui-btn">WhatsApp</span>, Distrito, <strong>Fórmula Obstétrica (G P0000)</strong>, <strong>FUR + semanas de amenorrea calculadas al día de hoy</strong> y etiquetas de alerta roja para <strong>RAM / Alergias</strong>, Diabetes (DM), Hipertensión (HTA) o Asma.</li>
+        </ul>
+
+        <h3>Pestaña 1: <span class="ui-btn">Resumen &amp; Antecedentes</span></h3>
+        <ul>
+          <li><strong>Columna Izquierda — Datos de Filiación:</strong> Fecha de nacimiento, edad actual, lugar de nacimiento, religión, grado de instrucción, estado civil, ocupación, dirección y distrito (con botón rápido <span class="ui-btn">Editar</span>).</li>
+          <li><strong>Columna Derecha — Antecedentes Gineco-Obstétricos Persistentes:</strong> Fórmula obstétrica, menarquia, inicio de relaciones sexuales (IRS), número de parejas, régimen catamenial, método anticonceptivo (MAC), FUR, antecedente de PAP y VPH, ITS, diabetes, hipertensión, asma, alergias, cirugías previas y antecedentes familiares.</li>
+        </ul>
+
+        <div class="callout callout-clinical">
+          <strong>Botón transversal <span class="ui-btn">Ver Antecedentes</span> en los modales clínicos:</strong> Dentro de Consultas, Recetas, Ecografías, Colposcopía y Procedimientos aparece el botón rápido <strong>Ver Antecedentes</strong> en la cabecera. Al pulsarlo se despliega al instante un panel con alertas de alergias, FUR + amenorrea, paridad/MAC, PAP/VPH, cirugías y último estudio sin salir de lo que está escribiendo.
+        </div>
+      </section>
+      <!-- SECCIÓN 6 -->
+      <section class="section page-break" id="sec-6">
+        <div class="section-header">
+          <div class="section-title-wrap">
+            <span class="section-num">06</span>
+            <h2>Pestaña 2: Consultas Médicas y Puentes Rápidos</h2>
+          </div>
+          <span class="route-chip">Tab: Consultas</span>
+        </div>
+
+        <ul>
+          <li><span class="ui-btn ui-btn-solid">+ Nueva Consulta</span>: Registra el acto médico completo:
+            <ul>
+              <li><strong>Fecha y Motivo de Consulta:</strong> Catálogo dinámico editable en cascada con botón <span class="ui-btn">Gestionar Motivos</span>.</li>
+              <li><strong>Anamnesis y Signos Vitales:</strong> PA, FC, Temperatura, Peso (kg), Talla (cm) y cálculo automático de <strong>IMC</strong> con validación fisiológica en servidor.</li>
+              <li><strong>Examen Físico Ginecológico:</strong> Examen general, mamas, genitales externos, especuloscopía, tacto bimanual y abdomen.</li>
+              <li><strong>Diagnóstico + Código CIE-10:</strong> Autocompletado instantáneo conectado en vivo al catálogo real de <strong>57 diagnósticos CIE-10</strong> gineco-obstétricos.</li>
+              <li><strong>Acciones Atómicas al Guardar (opcionales):</strong> Desde la misma consulta puede marcar en 1 clic si desea cerrar la cita de hoy como <em>ATENDIDA</em>, generar la receta o emitir una orden de laboratorio simultáneamente.</li>
+            </ul>
+          </li>
+          <li><strong>Botones en cada Consulta registrada:</strong>
+            <ul>
+              <li><span class="ui-btn">Imprimir / PDF A4</span>: Genera la nota médica oficial con membrete CENDO, carátula opcional y firma digital.</li>
+              <li><span class="ui-btn-wa ui-btn">WhatsApp</span>: Envía resumen clínico o indicaciones al WhatsApp de la paciente.</li>
+              <li><span class="ui-btn">Emitir Receta</span>: Abre el módulo de <strong>Recetas</strong> pre-llenado con el diagnóstico y vínculo a esta consulta (mostrando insignia <code>Receta (N)</code>).</li>
+              <li><span class="ui-btn">Orden Lab</span>: Crea una orden de laboratorio vinculada a la consulta (insignia <code>Lab (N)</code>).</li>
+              <li><span class="ui-btn">Cotizar</span>: Lleva los exámenes al módulo de presupuestos.</li>
+              <li><span class="ui-btn">Editar / Eliminar</span>: Modifica o archiva el registro (con confirmación).</li>
+            </ul>
+          </li>
+        </ul>
+      </section>
+
+      <!-- SECCIÓN 7 -->
+      <section class="section" id="sec-7">
+        <div class="section-header">
+          <div class="section-title-wrap">
+            <span class="section-num">07</span>
+            <h2>Pestaña 3: Chequeos (Ecografías, Colposcopía IFCPC y Dossier PDF)</h2>
+          </div>
+          <span class="route-chip">Tab: Chequeos (3 Sub-tabs)</span>
+        </div>
+
+        <h3>Sub-tab A: <span class="ui-btn">Ecografías (IDEA / BI-RADS)</span></h3>
+        <ul>
+          <li><span class="ui-btn ui-btn-solid">+ Nueva Ecografía</span>: Soporta <strong>6 modalidades</strong> (Pélvica/Transvaginal, Protocolo IDEA de Endometriosis, Mama Bilateral con clasificación <strong>ACR BI-RADS</strong>, Obstétrica I/II/III Trimestre, Abdominal/Renal y Doppler).</li>
+          <li><strong>Cálculos y Seguridad Automática:</strong> Calcula automáticamente el <strong>volumen elipsoidal en cm³ (cc)</strong> de útero, ovarios y lesiones al ingresar sus 3 diámetros. Permite subir capturas ecográficas comprimidas al Storage privado.</li>
+          <li><strong>Plantillas Clínicas Editables:</strong> Selector de plantillas oficiales y propias (7 presets base precargados), botón <span class="ui-btn">Guardar como plantilla</span> desde el propio informe y botón <span class="ui-btn">Gestionar Plantillas</span> para crear/editar plantillas clínicas sin escribir desde cero.</li>
+          <li><strong>Acciones por estudio:</strong> <span class="ui-btn">Ver / Imprimir A4</span> (título ampliado en cabecera + firma digital + anexos automáticos de hasta 6 fotos por página), <span class="ui-btn-wa ui-btn">WhatsApp</span>, <span class="ui-btn">Editar</span> y <span class="ui-btn-danger ui-btn">Eliminar</span>.</li>
+        </ul>
+
+        <h3>Sub-tab B: <span class="ui-btn">Colposcopía Digital IFCPC</span></h3>
+        <ul>
+          <li><span class="ui-btn ui-btn-solid">+ Nueva Colposcopía</span>: Clasificación estandarizada <strong>IFCPC Río 2011</strong>.</li>
+          <li><span class="ui-btn">Marcar Normales</span>: Rellena en 1 clic los campos basales como hallazgo normal para editar solo las zonas con hallazgos positivos.</li>
+          <li><strong>Reloj Cervical Interactivo (SVG):</strong> Haga clic sobre las horas del reloj (1 a 12) para marcar exactamente los sitios de <strong>biopsia</strong> o lesión; el servidor ordena y limpia los horarios automáticamente.</li>
+          <li><strong>Clasificador Inteligente:</strong> Sugiere automáticamente la categoría IFCPC (<em>Normal</em>, <em>Grado 1</em>, <em>Grado 2</em>, <em>Sospecha Invasión</em>) y el <strong>CIE-10</strong> sugerido según los hallazgos marcados.</li>
+          <li><strong>Puente 1-Clic a Biopsia:</strong> Botón directo para emitir una <strong>Orden de Anatomía Patológica</strong> pre-llenada con las horas marcadas en el reloj cervical.</li>
+          <li><strong>Informe Oficial de 2 Páginas:</strong> Página 1 con Filiación, Antecedentes complementarios (casillas PAP/VPH) y Secciones I a VII IFCPC destacando positivos; Página 2 con Reloj Cervical/Biopsia, Diagnóstico y Plan lado a lado, fotos colposcópicas (4/página) y firma digital. Incluye botón <span class="ui-btn-wa ui-btn">WhatsApp</span>.</li>
+        </ul>
+
+        <h3>Sub-tab C: <span class="ui-btn">Chequeo Integral &amp; Dossier PDF</span></h3>
+        <div class="callout callout-success">
+          <strong>Automatización clave del flujo CENDO:</strong> Reemplaza la unión manual lenta de Word + PDFs pesados de 30 MB por un expediente unificado liviano generado automáticamente en el servidor.
+        </div>
+        <ul>
+          <li><span class="ui-btn ui-btn-solid">+ Nuevo Chequeo</span>: Permite seleccionar y enlazar en un solo expediente las <strong>Ecografías</strong>, <strong>Colposcopías</strong>, resultados de <strong>PAP / VPH / BI-RADS</strong> y cualquier <strong>PDF o imagen externa</strong> previamente cargada en <em>Documentos</em>.</li>
+          <li><span class="ui-btn ui-btn-solid">Dossier PDF</span>: Descarga un único archivo PDF profesional listo para enviar a la paciente, compuesto por: Carátula oficial CENDO (membrete y cenefa), hoja resumen ejecutiva opcional, reportes vectoriales de Ecografías y Colposcopía (formato oficial 2 páginas) con sus fotografías y firma digital del Dr. Patrick, más todos los PDFs e imágenes externas enlazadas fusionados sin pérdida y comprimidos con <em>Object Streams</em>.</li>
+          <li><strong>Acciones adicionales:</strong> <span class="ui-btn">Vista Previa / Imprimir Todo</span>, <span class="ui-btn-wa ui-btn">WhatsApp</span>, <span class="ui-btn">Editar</span> y <span class="ui-btn-danger ui-btn">Eliminar</span>.</li>
+        </ul>
+      </section>
+
+      <!-- SECCIÓN 8 -->
+      <section class="section page-break" id="sec-8">
+        <div class="section-header">
+          <div class="section-title-wrap">
+            <span class="section-num">08</span>
+            <h2>Pestañas 4 y 5: Procedimientos Menores y Control Prenatal MINSA / CLAP</h2>
+          </div>
+          <span class="route-chip">Tabs: Procedimientos • Prenatal</span>
+        </div>
+
+        <h3>Pestaña 4: <span class="ui-btn">Procedimientos</span> (Consultorio &amp; Patología)</h3>
+        <ul>
+          <li><span class="ui-btn ui-btn-solid">+ Nuevo Procedimiento</span>: Incluye <strong>9 protocolos quirúrgicos oficiales CENDO</strong> precargados (Biopsia Cervical, Biopsia Endometrial, Cono LEEP, Polipectomía, Inserción DIU, Retiro DIU, Inserción Implante, Retiro Implante y Otro), totalmente editables desde el gestor de plantillas.</li>
+          <li><span class="ui-btn">Importar de Colposcopía</span>: Hala automáticamente el diagnóstico, CIE-10 y horas de biopsia de la última colposcopía de la paciente.</li>
+          <li><strong>Trazabilidad Clínica y Legal:</strong> Control de <strong>Anatomía Patológica</strong> (<code>PENDIENTE</code> / <code>RECIBIDO</code> con resultado histopatológico BIOLAQ), trazabilidad de dispositivo para DIU/Implante (marca, lote, vencimiento), constancia de <strong>Consentimiento Informado (NTS 139-MINSA)</strong> y actualización automática opcional del Método Anticonceptivo (MAC) en antecedentes.</li>
+          <li><strong>Puentes 1-Clic:</strong> <span class="ui-btn">Orden Anatomía Patológica</span> (crea orden lista con datos de muestra), <span class="ui-btn">Receta Post-Op</span>, <span class="ui-btn">Imprimir Protocolo A4</span> (con firma digital) y <span class="ui-btn-wa ui-btn">WhatsApp Post-Op</span>.</li>
+        </ul>
+
+        <h3>Pestaña 5: <span class="ui-btn">Control Prenatal</span> (Carnet Perinatal MINSA / CLAP)</h3>
+        <ul>
+          <li><span class="ui-btn ui-btn-solid">Aperturar / Editar Carnet Prenatal</span>: Registra el expediente obstétrico completo fiel al carnet físico oficial MINSA / CLAP:
+            <ul>
+              <li><strong>Antecedentes Basales y ARO:</strong> 13 antecedentes familiares, 28 personales en 3 columnas (auto-marca cirugía pélvico-uterina ante cesárea previa), árbol obstétrico con 4 alertas (<code>0 ó +3</code>, <code>&lt;2500g</code>, <code>Múltiple</code>, <code>&lt;37 sem</code>), RN de mayor peso, gestación anterior, vacunas/antitetánica, grupo sanguíneo, FUM, FPP Naegele y 1.ª ecografía.</li>
+              <li><strong>Exámenes por Trimestre:</strong> Fechas y resultados independientes para <code>1°T</code>, <code>2°T</code>, <code>3°T</code> y <code>Alta</code> + tamizajes especiales MINSA.</li>
+            </ul>
+          </li>
+          <li><strong>Editor de Controles (<span class="ui-btn">Atención 1</span> a <span class="ui-btn">Atención 9</span>):</strong> Alterna entre <strong>Formulario Clínico por Atención</strong> (campos listos para llenar sin columnas bloqueadas) y <strong>Matriz de 9 Columnas</strong>. Calcula automáticamente Edad Gestacional por FUM, ganancia de peso materno, alertas por PA ≥ 140/90 o FCF fuera de rango, e incluye atajos de próxima cita (<span class="ui-btn">+4 sem</span>, <span class="ui-btn">+2 sem</span>, <span class="ui-btn">+1 sem</span>).</li>
+          <li><strong>Botones de Integración Clínica en 1 clic:</strong>
+            <ul>
+              <li><span class="ui-btn">Jalar Signos Vitales de Consulta</span>: Trae PA, peso y datos desde la última consulta.</li>
+              <li><span class="ui-btn">Jalar EG/FCF de Ecografía</span>: Copia edad gestacional y latidos desde la última eco obstétrica.</li>
+              <li><span class="ui-btn">Receta Prenatal</span> y <span class="ui-btn">Batería Prenatal</span>: Envían directo a prescripción o batería de laboratorio obstétrica.</li>
+            </ul>
+          </li>
+          <li><span class="ui-btn">Imprimir Carnet A4 (2 Caras)</span>: Genera exactamente el <strong>Anverso y Reverso oficial MINSA / CLAP</strong> listo para impresión física o PDF (sin botón WhatsApp en este módulo, según preferencia clínica).</li>
+        </ul>
+      </section>
+
+      <!-- SECCIÓN 9 -->
+      <section class="section" id="sec-9">
+        <div class="section-header">
+          <div class="section-title-wrap">
+            <span class="section-num">09</span>
+            <h2>Pestañas 6 y 7: Recetas Médicas, Órdenes de Laboratorio y Cotizaciones</h2>
+          </div>
+          <span class="route-chip">Tabs: Recetas • Laboratorio &amp; Cotiz.</span>
+        </div>
+
+        <h3>Pestaña 6: <span class="ui-btn">Recetas</span></h3>
+        <ul>
+          <li><span class="ui-btn ui-btn-solid">+ Nueva Receta</span>: Conectada al Vademécum real, muestra en rojo <strong>alertas de RAM / Alergias</strong> de la paciente antes de prescribir. Incluye presets ginecológicos en 1 clic.</li>
+          <li><strong>Botones por Receta:</strong> <span class="ui-btn">Imprimir A4 / A5</span> (elige tamaño hoja carta o media hoja A5 con firma digital y carátula opcional), <span class="ui-btn-wa ui-btn">WhatsApp</span>, <span class="ui-btn">Renovar / Duplicar</span> (repite tratamiento actualizado en segundos), <span class="ui-btn">Editar</span> y <span class="ui-btn-danger ui-btn">Eliminar</span>.</li>
+        </ul>
+
+        <h3>Pestaña 7 — Sub-tab A: <span class="ui-btn">Órdenes de Laboratorio</span></h3>
+        <ul>
+          <li><span class="ui-btn ui-btn-solid">+ Nueva Orden</span>: Precargada con 5 plantillas base (incluyendo <strong>Anatomía Patológica unificada</strong> con muestra, médico solicitante y auto-hidratación de FUR/MAC/paridad).</li>
+          <li><span class="ui-btn">Gestionar Plantillas Lab</span>: Permite crear o editar baterías propias de laboratorio.</li>
+          <li><strong>Botones por Orden:</strong> <span class="ui-btn">Cotizar</span> (convierte la orden en presupuesto económico en 1 clic), <span class="ui-btn">Imprimir A4</span> (con cadena de custodia), <span class="ui-btn">Editar</span> y <span class="ui-btn-danger ui-btn">Eliminar</span>.</li>
+        </ul>
+
+        <h3>Pestaña 7 — Sub-tab B: <span class="ui-btn">Cotizaciones</span></h3>
+        <ul>
+          <li><span class="ui-btn ui-btn-solid">+ Nueva Cotización</span>: Conectada al <strong>Tarifario real de 73 prestaciones CENDO</strong> con cálculo de totales y vigencia en servidor.</li>
+          <li><strong>Selector Interno de Proveedor &amp; Margen Oculto:</strong> En cada examen permite escoger internamente el laboratorio proveedor/variante (por ejemplo <code>BIOLINK</code>, <code>BIOLAQ</code>, o en PAP Base Líquida: <em>Solo</em> vs <em>Dentro de VPH</em> vs <em>BIOLAQ</em>) y calcula la <strong>ganancia neta interna del consultorio</strong>. Ese margen interno es visible solo en pantalla para el equipo y queda <strong>totalmente oculto</strong> en el PDF y en el WhatsApp que recibe la paciente.</li>
+          <li><strong>Botones por Cotización:</strong> <span class="ui-btn">Imprimir Presupuesto A4</span>, <span class="ui-btn-wa ui-btn">WhatsApp</span>, <span class="ui-btn">Renovar Vigencia</span>, <span class="ui-btn">Editar</span> y <span class="ui-btn-danger ui-btn">Eliminar</span>.</li>
+        </ul>
+      </section>
+
+      <!-- SECCIÓN 10 -->
+      <section class="section page-break" id="sec-10">
+        <div class="section-header">
+          <div class="section-title-wrap">
+            <span class="section-num">10</span>
+            <h2>Pestaña 8: Documentos Privados, Imágenes RMN y Compresión PDF</h2>
+          </div>
+          <span class="route-chip">Tab: Documentos</span>
+        </div>
+
+        <div class="card-grid">
+          <div class="info-card">
+            <div class="info-card-title">Bloque 1: Documentos Externos (Storage Privado)</div>
+            <p>Centraliza archivos enviados por laboratorios o equipos externos para visualizarlos o incluirlos luego en cualquier <strong>Dossier PDF</strong>.</p>
+            <ul>
+              <li><strong>Tipos soportados:</strong> PDFs de laboratorio/placas (<code>BIOLAQ PAP/VPH</code>, <code>VINNO</code>, hasta <strong>25 MB</strong>) e imágenes JPG/PNG/WebP como <strong>Resonancias Magnéticas (RMN)</strong> o fotos externas (hasta <strong>15 MB</strong>).</li>
+              <li><strong>Interruptor <span class="ui-btn-warn ui-btn">Comprimir PDF pesado (&gt; 3 MB)</span>:</strong> Activo por defecto; optimiza automáticamente en el propio navegador PDFs grandes del ecógrafo antes de subirlos sin perder legibilidad clínica.</li>
+              <li><strong>Filtros rápidos:</strong> <span class="ui-btn">Todos</span>, <span class="ui-btn">Lab PAP/VPH</span>, <span class="ui-btn">Placas Eco</span>, <span class="ui-btn">Imágenes / RMN</span> y <span class="ui-btn">Otros</span>.</li>
+              <li><strong>Acciones:</strong> <span class="ui-btn">Ver / Abrir</span> (visor inline para imágenes o nueva pestaña para PDF), <span class="ui-btn">Descargar</span> y <span class="ui-btn-danger ui-btn">Eliminar</span>.</li>
+            </ul>
+          </div>
+          <div class="info-card">
+            <div class="info-card-title">Bloque 2: Historias Word Migradas (.docx)</div>
+            <p>Guarda el archivo histórico original de cada Word importado para respaldo médico-legal completo.</p>
+            <ul>
+              <li><span class="ui-btn">Importar Word (.docx)</span>: Permite importar más archivos Word directamente vinculándolos dentro de la ficha.</li>
+              <li><span class="ui-btn">Leer Texto Extraído</span>: Abre un modal limpio para leer todo el contenido del Word antiguo dentro del sistema sin abrir Microsoft Word.</li>
+              <li><span class="ui-btn">Descargar .docx</span>: Descarga el documento original de respaldo.</li>
+              <li><span class="ui-btn-danger ui-btn">Eliminar</span>: Retira el respaldo (Admin/Médico con confirmación).</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECCIÓN 11 -->
+      <section class="section" id="sec-11">
+        <div class="section-header">
+          <div class="section-title-wrap">
+            <span class="section-num">11</span>
+            <h2>Catálogos Maestros, Equipo Médico y Configuración de Firma</h2>
+          </div>
+          <span class="route-chip">Menú Lateral</span>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Módulo / Ruta</th>
+              <th>Qué contiene</th>
+              <th>Botones y Funciones Clave</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Tarifario de Exámenes</strong><br /><code>/tarifario</code></td>
+              <td><strong>73 prestaciones reales</strong> CENDO organizadas por áreas, con precios al público y matriz de costos de laboratorio (<code>provider_costs</code>).</td>
+              <td><span class="ui-btn ui-btn-solid">+ Nueva Tarifa</span>, <span class="ui-btn">Gestionar Categorías</span>, <span class="ui-btn-wa ui-btn">WhatsApp 1-Clic</span> por examen y <strong>selección múltiple</strong> para enviar varios precios juntos por WhatsApp (habilitado para todo el equipo incluida asistente).</td>
+            </tr>
+            <tr>
+              <td><strong>Vademécum y Precios</strong><br /><code>/vademecum</code></td>
+              <td>Principios activos, códigos ATC, grupo terapéutico y múltiples marcas comerciales con presentación y precio referencial.</td>
+              <td><span class="ui-btn ui-btn-solid">+ Nuevo Fármaco</span>, buscador instantáneo, filtro por grupo terapéutico, edición y archivo (Admin/Médico).</td>
+            </tr>
+            <tr>
+              <td><strong>Catálogo CIE-10</strong><br /><code>/cie-10</code></td>
+              <td><strong>57 códigos diagnósticos</strong> gineco-obstétricos reales divididos en 8 áreas clínicas. Sincronizado con Consultas y Buscador Global.</td>
+              <td><span class="ui-btn ui-btn-solid">+ Nuevo CIE-10</span>, <span class="ui-btn-warn ui-btn">★ Favorito</span>, filtro <span class="ui-btn">Solo Frecuentes</span>, botón <span class="ui-btn">Copiar Código</span>, edición y eliminación lógica.</td>
+            </tr>
+            <tr>
+              <td><strong>Equipo Médico &amp; Usuarios</strong><br /><code>/usuarios</code></td>
+              <td>Gestión de cuentas de médicos y asistentes de la sede (exclusivo <strong>Admin</strong>).</td>
+              <td><span class="ui-btn ui-btn-solid">+ Nuevo Usuario</span>, edición de rol/CMP/RNE, activación/desactivación de acceso.</td>
+            </tr>
+            <tr>
+              <td><strong>Configuración &amp; Firma</strong><br /><code>/configuracion</code></td>
+              <td>Perfil profesional, sello, dirección exacta y <strong>enlace corto de Google Maps</strong> para los WhatsApps de citas.</td>
+              <td><strong>Subir imagen de firma</strong> (elimina fondo blanco automáticamente), <strong>Pad de dibujo de firma</strong> en pantalla, vista previa en vivo, interruptor <span class="ui-btn">Incluir firma por defecto</span> y tarjeta segura para <strong>Cambiar Contraseña</strong>.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- SECCIÓN 12 -->
+      <section class="section" id="sec-12">
+        <div class="section-header">
+          <div class="section-title-wrap">
+            <span class="section-num">12</span>
+            <h2>Controles de Impresión, Seguridad Clínica y Alcance de la Versión DEMO</h2>
+          </div>
+          <span class="route-chip">Calidad &amp; Privacidad</span>
+        </div>
+
+        <div class="card-grid">
+          <div class="info-card">
+            <div class="info-card-title">Switches Universales antes de Imprimir o Exportar</div>
+            <p>En las vistas previas de Consultas, Recetas, Ecografías, Colposcopía, Órdenes, Cotizaciones, Procedimientos, Chequeos y Prenatal dispone de:</p>
+            <ul>
+              <li><span class="ui-btn">Incluir Carátula CENDO</span>: Añade o quita la portada institucional con membrete azul petróleo y cenefa dorada.</li>
+              <li><span class="ui-btn">Incluir Firma Digital</span>: Activa o desactiva el sello y la firma digital privada del médico al pie del informe.</li>
+            </ul>
+          </div>
+          <div class="info-card">
+            <div class="info-card-title">Seguridad Zero Trust y Auditoría</div>
+            <ul>
+              <li><strong>Archivos Clínicos Privados:</strong> Fotos de ecografías/colposcopías, PDFs externos, `.docx` y firma digital se almacenan en buckets privados accesibles únicamente bajo sesión autenticada.</li>
+              <li><strong>Bitácora Clínica (<code>clinical_audit_logs</code>):</strong> Registra automáticamente quién creó, modificó o archivó cada registro médico.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="demo-notice">
+          <div class="demo-notice-title">Nota Final sobre esta Entrega en Versión DEMO</div>
+          <p>
+            La plataforma se entrega actualmente en calidad de <strong>DEMO funcional</strong> (con la base de pacientes limpia de registros de prueba, catálogos reales de CENDO precargados y la firma digital del Dr. Patrick lista para probar) para validar comodidad de uso, redacción de informes impresos e importación real de archivos Word históricos. Cualquier ajuste fino de textos, orden de campos o personalizaciones visuales solicitadas durante esta revisión se incorporará en la versión final de producción tras definir el acuerdo comercial.
+          </p>
+        </div>
+
+        <footer class="doc-footer">
+          <div><strong>CENDO — Centro de Endometriosis</strong> • Miraflores, Lima - Perú</div>
+          <div>Manual de Usuario • <strong>VERSIÓN DEMO</strong></div>
+        </footer>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { pgUuidSchema } from "@/features/configuracion/configuracion.schema";
 import type { UserRole } from "@/lib/security/action-guard";
 
 export const DOCTOR_TITLES = ["Dr.", "Dra.", "Lic."] as const;
@@ -85,7 +86,7 @@ export const createDoctorSchema = z
 
 export const updateDoctorSchema = z
   .object({
-    id: z.string().uuid("ID de especialista inválido."),
+    id: pgUuidSchema("ID de especialista inválido."),
     fullName: z.string().trim().min(3).max(150),
     doctorTitle: z.enum(DOCTOR_TITLES),
     specialty: z.string().trim().min(3).max(180),
@@ -117,7 +118,7 @@ export const updateDoctorSchema = z
 
 export const deleteDoctorSchema = z
   .object({
-    id: z.string().uuid("ID de especialista inválido."),
+    id: pgUuidSchema("ID de especialista inválido."),
   })
   .strict();
 

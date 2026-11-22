@@ -343,7 +343,7 @@ export const wordImportCommitItemSchema = z.object({
   birthPlace: z.string().trim().max(120),
   address: z.string().trim().max(250),
   religion: z.string().trim().max(80),
-  existingPatientId: z.string().uuid().nullable().optional(),
+  existingPatientId: pgUuidSchema("ID de paciente inválido.").nullable().optional(),
   extractedText: z.string().max(65000),
   background: parsedBackgroundCommitSchema.optional(),
   consultations: z.array(parsedConsultationCommitSchema).max(30),

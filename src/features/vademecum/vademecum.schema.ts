@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { pgUuidSchema } from "@/features/configuracion/configuracion.schema";
 
 export interface CommercialBrandItem {
   brandName: string;
@@ -62,13 +63,13 @@ export const vademecumInputSchema = z
 
 export const updateVademecumSchema = vademecumInputSchema
   .extend({
-    id: z.string().uuid("ID de fármaco inválido."),
+    id: pgUuidSchema("ID de fármaco inválido."),
   })
   .strict();
 
 export const deleteVademecumSchema = z
   .object({
-    id: z.string().uuid("ID de fármaco inválido."),
+    id: pgUuidSchema("ID de fármaco inválido."),
   })
   .strict();
 

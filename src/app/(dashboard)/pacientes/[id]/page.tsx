@@ -49,32 +49,42 @@ export default async function PacienteDetailPage({
     notFound();
   }
 
-  const [consultations, consultationReasons, prescriptions] = await Promise.all([
+  const [
+    consultations,
+    consultationReasons,
+    prescriptions,
+    labOrders,
+    labTemplates,
+    quotes,
+    ultrasounds,
+    colposcopies,
+  ] = await Promise.all([
     listConsultationsByPatient(doctor.tenantId, parsedId.data),
     listCategories(doctor.tenantId, "consultation_reason"),
     listPrescriptionsByPatient(doctor.tenantId, parsedId.data),
-  ]);
-  const [labOrders, labTemplates, quotes] = await Promise.all([
     listLabOrdersByPatient(doctor.tenantId, parsedId.data),
     listLabTemplates(doctor.tenantId),
     listQuotesByPatient(doctor.tenantId, parsedId.data),
-  ]);
-  const [ultrasounds, colposcopies, clinicalTemplates] = await Promise.all([
     listUltrasoundsByPatient(doctor.tenantId, parsedId.data),
     listColposcopiesByPatient(doctor.tenantId, parsedId.data),
-    listClinicalTemplates(doctor.tenantId),
   ]);
-  const consultationFormContext = await getConsultationFormContext(
-    doctor.tenantId,
-    parsedId.data
-  );
-  const [checkups, patientDocuments, wordHistories, tariffs] = await Promise.all([
+
+  const [
+    clinicalTemplates,
+    consultationFormContext,
+    checkups,
+    patientDocuments,
+    wordHistories,
+    tariffs,
+    minorProcedures,
+    prenatalCard,
+  ] = await Promise.all([
+    listClinicalTemplates(doctor.tenantId),
+    getConsultationFormContext(doctor.tenantId, parsedId.data),
     listCheckupsByPatient(doctor.tenantId, parsedId.data),
     listPatientDocumentsByPatient(doctor.tenantId, parsedId.data),
     listWordHistoriesByPatient(doctor.tenantId, parsedId.data),
     listTariffs(doctor.tenantId),
-  ]);
-  const [minorProcedures, prenatalCard] = await Promise.all([
     listMinorProceduresByPatient(doctor.tenantId, parsedId.data),
     getPrenatalCardByPatient(doctor.tenantId, parsedId.data),
   ]);

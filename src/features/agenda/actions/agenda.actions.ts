@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getSessionDoctorProfile } from "@/features/auth/services/auth.service";
+import { pgUuidSchema } from "@/features/configuracion/configuracion.schema";
 import { guardedAction } from "@/lib/security/action-guard";
 import { mutationLimiter } from "@/lib/security/rate-limit";
 import {
@@ -36,7 +37,7 @@ const listFilterSchema = z
       .optional(),
     doctorId: z.string().optional(),
     status: z.enum([...APPOINTMENT_STATUSES, "ALL"]).optional(),
-    patientId: z.string().uuid().optional(),
+    patientId: pgUuidSchema("ID de paciente inválido.").optional(),
   })
   .strict();
 

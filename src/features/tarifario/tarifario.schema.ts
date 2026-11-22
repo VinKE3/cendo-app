@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { pgUuidSchema } from "@/features/configuracion/configuracion.schema";
 import type { TariffProviderCostRecord } from "@/db/schema/catalogs";
 
 export type { TariffProviderCostRecord };
@@ -111,13 +112,13 @@ export const tariffInputSchema = z
 
 export const updateTariffSchema = tariffInputSchema
   .extend({
-    id: z.string().uuid("ID de tarifa inválido."),
+    id: pgUuidSchema("ID de tarifa inválido."),
   })
   .strict();
 
 export const deleteTariffSchema = z
   .object({
-    id: z.string().uuid("ID de tarifa inválido."),
+    id: pgUuidSchema("ID de tarifa inválido."),
   })
   .strict();
 
