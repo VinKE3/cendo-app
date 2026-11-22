@@ -18,7 +18,10 @@ import {
   type WordImportPreviewItem,
 } from "@/features/documentos/documentos.schema";
 import { saveWordHistoryDocument } from "@/features/documentos/services/documentos.service";
-import { calculateEllipsoidVolumeCc } from "@/features/ecografias/ecografias.schema";
+import {
+  calculateEllipsoidVolumeCc,
+  ULTRASOUND_TYPE_SHORT_LABELS,
+} from "@/features/ecografias/ecografias.schema";
 import { recordAuditLog } from "@/lib/audit/audit-log";
 import { DomainError, type SessionPayload } from "@/lib/security/action-guard";
 import { getPeruDateString } from "@/lib/utils";
@@ -28,6 +31,43 @@ import {
   parseWordHistoryDocx,
   parseWordUltrasoundDocx,
 } from "@/lib/word-parser";
+
+async function archiveOriginalWordDocIfMissing(params: {
+  ctx: SessionPayload;
+  actorName: string;
+  tenantId: string;
+  patientId: string;
+  fileName: string;
+  docxBytes?: Uint8Array;
+  extractedText: string;
+  notes: string;
+}): Promise<boolean> {
+  if (!params.docxBytes || params.docxBytes.byteLength === 0) return false;
+
+  const [existingWord] = await db
+    .select({ id: wordHistoryDocuments.id })
+    .from(wordHistoryDocuments)
+    .where(
+      and(
+        eq(wordHistoryDocuments.tenantId, params.tenantId),
+        eq(wordHistoryDocuments.patientId, params.patientId),
+        eq(wordHistoryDocuments.fileName, params.fileName),
+        isNull(wordHistoryDocuments.deletedAt)
+      )
+    )
+    .limit(1);
+
+  if (existingWord) return false;
+
+  await saveWordHistoryDocument(params.ctx, params.actorName, {
+    patientId: params.patientId,
+    fileName: params.fileName,
+    fileBytes: params.docxBytes,
+    extractedText: params.extractedText,
+    notes: params.notes,
+  });
+  return true;
+}
 
 /**
  * Parsea un lote de hasta 20 archivos .docx para vista previa editable antes de guardar.
@@ -640,31 +680,18 @@ export async function commitWordImportBatch(
     }
 
     // Respaldo íntegro del .docx en word_history_documents
-    const docxBytes = params.filesByKey.get(item.fileKey);
-    if (docxBytes && docxBytes.byteLength > 0) {
-      const [existingWord] = await db
-        .select({ id: wordHistoryDocuments.id })
-        .from(wordHistoryDocuments)
-        .where(
-          and(
-            eq(wordHistoryDocuments.tenantId, tenantId),
-            eq(wordHistoryDocuments.patientId, patientRow.id),
-            eq(wordHistoryDocuments.fileName, item.fileName),
-            isNull(wordHistoryDocuments.deletedAt)
-          )
-        )
-        .limit(1);
-
-      if (!existingWord) {
-        await saveWordHistoryDocument(ctx, actorName, {
-          patientId: patientRow.id,
-          fileName: item.fileName,
-          fileBytes: docxBytes,
-          extractedText: item.extractedText,
-          notes: "Importado desde archivo histórico Word (.docx)",
-        });
-        summary.wordDocsArchived += 1;
-      }
+    const archivedHistory = await archiveOriginalWordDocIfMissing({
+      ctx,
+      actorName,
+      tenantId,
+      patientId: patientRow.id,
+      fileName: item.fileName,
+      docxBytes: params.filesByKey.get(item.fileKey),
+      extractedText: item.extractedText,
+      notes: "Historia Clínica importada desde archivo histórico Word (.docx)",
+    });
+    if (archivedHistory) {
+      summary.wordDocsArchived += 1;
     }
   }
 
@@ -693,6 +720,8 @@ export async function commitWordImportBatch(
 
     const reportDate = eco.reportDate || getPeruDateString();
     const ultrasoundType = eco.ultrasoundType ?? "TRANSVAGINAL";
+    const ultrasoundShortLabel =
+      ULTRASOUND_TYPE_SHORT_LABELS[ultrasoundType] ?? ultrasoundType;
     const conclusion =
       eco.conclusion?.trim() || "Estudio ecográfico importado desde Word.";
 
@@ -717,34 +746,49 @@ export async function commitWordImportBatch(
         e.ultrasoundType === ultrasoundType &&
         e.conclusion.trim().toLowerCase() === conclusion.toLowerCase()
     );
-    if (dupEco) {
-      summary.skippedItems.push({
-        fileName: eco.fileName,
-        reason: "Ecografía idéntica ya registrada para esa fecha.",
+
+    if (!dupEco) {
+      await db.insert(ultrasoundReports).values({
+        tenantId,
+        patientId: patientRow.id,
+        doctorId: doctor.id,
+        doctorName: doctorDisplayName,
+        doctorCmp: doctor.cmp,
+        doctorRne: doctor.rne ?? null,
+        reportDate,
+        ultrasoundType,
+        indication: eco.indication?.trim() || "Evaluación ecográfica",
+        findings: enrichUltrasoundFindings(eco.findings),
+        conclusion,
+        recommendations:
+          eco.recommendations?.trim() || "Correlación clínica y control médico.",
+        images: [],
+        createdBy: ctx.userId,
+        updatedBy: ctx.userId,
       });
-      continue;
+
+      summary.ultrasoundsCreated += 1;
     }
 
-    await db.insert(ultrasoundReports).values({
+    // Archivar también el .docx original de la ecografía como respaldo ligero
+    const archivedEco = await archiveOriginalWordDocIfMissing({
+      ctx,
+      actorName,
       tenantId,
       patientId: patientRow.id,
-      doctorId: doctor.id,
-      doctorName: doctorDisplayName,
-      doctorCmp: doctor.cmp,
-      doctorRne: doctor.rne ?? null,
-      reportDate,
-      ultrasoundType,
-      indication: eco.indication?.trim() || "Evaluación ecográfica",
-      findings: enrichUltrasoundFindings(eco.findings),
-      conclusion,
-      recommendations:
-        eco.recommendations?.trim() || "Correlación clínica y control médico.",
-      images: [],
-      createdBy: ctx.userId,
-      updatedBy: ctx.userId,
+      fileName: eco.fileName,
+      docxBytes: params.filesByKey.get(eco.fileKey),
+      extractedText: eco.extractedText,
+      notes: `Ecografía (${ultrasoundShortLabel}) importada desde Word (.docx)`,
     });
-
-    summary.ultrasoundsCreated += 1;
+    if (archivedEco) {
+      summary.wordDocsArchived += 1;
+    } else if (dupEco) {
+      summary.skippedItems.push({
+        fileName: eco.fileName,
+        reason: "Ecografía y respaldo .docx idénticos ya registrados para esa fecha.",
+      });
+    }
   }
 
   summary.affectedPatients = Array.from(affectedMap.values());

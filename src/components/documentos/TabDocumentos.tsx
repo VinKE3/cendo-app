@@ -34,6 +34,7 @@ import {
 import {
   buildPatientDocumentViewUrl,
   buildWordHistoryViewUrl,
+  PATIENT_DOCUMENT_SHORT_LABELS,
   type PatientDocumentItem,
   type PatientDocumentType,
   type WordHistoryDocumentItem,
@@ -53,6 +54,26 @@ interface TabDocumentosProps {
 }
 
 type DocumentFilter = "ALL" | "LAB" | "ECO" | "IMAGE" | "OTHER";
+type WordArchiveFilter = "ALL" | "HC" | "ECO";
+
+function classifyWordHistoryDoc(
+  word: WordHistoryDocumentItem
+): { kind: "HC" | "ECO"; label: string } {
+  const notes = word.notes || "";
+  const lowerNotes = notes.toLowerCase();
+  const lowerName = word.fileName.toLowerCase();
+  if (lowerNotes.startsWith("ecograf") || lowerName.includes("eco")) {
+    const match = notes.match(/^Ecografía\s*\(([^)]+)\)/i);
+    return {
+      kind: "ECO",
+      label: match?.[1] ? `Ecografía • ${match[1]}` : "Ecografía",
+    };
+  }
+  return {
+    kind: "HC",
+    label: "Historia Clínica",
+  };
+}
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -72,6 +93,7 @@ export function TabDocumentos({
   onOpenWordImport,
 }: TabDocumentosProps) {
   const [filter, setFilter] = useState<DocumentFilter>("ALL");
+  const [wordFilter, setWordFilter] = useState<WordArchiveFilter>("ALL");
   const [isUploading, setIsUploading] = useState(false);
   const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
 
@@ -143,7 +165,10 @@ export function TabDocumentos({
       }
 
       onDocumentsChange([json.data, ...documents]);
-      toast.success(`"${json.data.title}" guardado en el expediente.`);
+      toast.success("Documento agregado correctamente", {
+        description: `"${json.data.title}" (${PATIENT_DOCUMENT_SHORT_LABELS[json.data.documentType]} • ${formatBytes(json.data.fileSize)}) guardado y listo para el Dossier PDF.`,
+        duration: 4500,
+      });
       return { success: true, data: json.data };
     } catch {
       toast.error("Error de red al subir el documento.");
@@ -213,6 +238,32 @@ export function TabDocumentos({
     { id: "OTHER", label: "Otros", icon: FileText },
   ];
 
+  const wordCounts = useMemo(() => {
+    let hc = 0;
+    let eco = 0;
+    for (const word of wordHistories) {
+      if (classifyWordHistoryDoc(word).kind === "ECO") {
+        eco += 1;
+      } else {
+        hc += 1;
+      }
+    }
+    return { total: wordHistories.length, hc, eco };
+  }, [wordHistories]);
+
+  const filteredWordHistories = useMemo(() => {
+    if (wordFilter === "ALL") return wordHistories;
+    return wordHistories.filter(
+      (word) => classifyWordHistoryDoc(word).kind === wordFilter
+    );
+  }, [wordHistories, wordFilter]);
+
+  const wordFilterPills: Array<{ id: WordArchiveFilter; label: string }> = [
+    { id: "ALL", label: `Todos (${wordCounts.total})` },
+    { id: "HC", label: `Historias Clínicas (${wordCounts.hc})` },
+    { id: "ECO", label: `Ecografías (${wordCounts.eco})` },
+  ];
+
   return (
     <div className="space-y-6">
       {/* 1. Repositorio de Documentos Externos (PDFs e Imágenes Clínicas) */}
@@ -273,19 +324,19 @@ export function TabDocumentos({
         </CardContent>
       </Card>
 
-      {/* 2. Historias Clínicas Word Migradas (.docx) */}
+      {/* 2. Archivos Word Migrados (.docx) */}
       <Card className="border border-border bg-card">
         <CardHeader className="border-b border-border pb-4">
           <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
             <div className="space-y-1">
               <CardTitle className="flex items-center gap-2 text-base font-semibold">
                 <FileText className="size-4 text-primary" />
-                Historias Clínicas Word Migradas (.docx)
+                Archivos Word Migrados (.docx)
               </CardTitle>
               <CardDescription>
-                Respaldo original de los archivos Word importados para{" "}
+                Respaldo original de Historias Clínicas y Ecografías importadas para{" "}
                 <strong>{patient.fullName}</strong>. Puede leer el texto íntegro
-                o descargar el documento original.
+                o descargar el archivo original.
               </CardDescription>
             </div>
 
@@ -306,6 +357,26 @@ export function TabDocumentos({
               ) : null}
             </div>
           </div>
+
+          {wordHistories.length > 0 ? (
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              {wordFilterPills.map((pill) => (
+                <button
+                  key={pill.id}
+                  type="button"
+                  onClick={() => setWordFilter(pill.id)}
+                  className={cn(
+                    "inline-flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                    wordFilter === pill.id
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-background text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {pill.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </CardHeader>
 
         <CardContent className="pt-4">
@@ -313,68 +384,86 @@ export function TabDocumentos({
             <div className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-6 text-center text-xs text-muted-foreground">
               Esta paciente no tiene archivos Word (.docx) importados aún.
             </div>
+          ) : filteredWordHistories.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-6 text-center text-xs text-muted-foreground">
+              No hay archivos Word en esta categoría.
+            </div>
           ) : (
             <div className="space-y-2">
-              {wordHistories.map((word) => (
-                <div
-                  key={word.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background p-3 text-xs"
-                >
-                  <div className="min-w-0 flex-1 space-y-0.5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="truncate font-semibold text-foreground">
-                        {word.fileName}
+              {filteredWordHistories.map((word) => {
+                const wordMeta = classifyWordHistoryDoc(word);
+                return (
+                  <div
+                    key={word.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background p-3 text-xs"
+                  >
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate font-semibold text-foreground">
+                          {word.fileName}
+                        </p>
+                        <Badge
+                          variant={wordMeta.kind === "ECO" ? "outline" : "default"}
+                          className={cn(
+                            "text-[10px]",
+                            wordMeta.kind === "ECO"
+                              ? "border-warning/50 bg-warning/10 text-foreground"
+                              : ""
+                          )}
+                        >
+                          {wordMeta.label}
+                        </Badge>
+                        <Badge variant="secondary" className="font-mono text-[10px]">
+                          DOCX • {formatBytes(word.fileSize)}
+                        </Badge>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Archivado el {formatPeruDateDisplay(word.createdAt.slice(0, 10))}
+                        {word.notes ? ` • ${word.notes}` : ""}
                       </p>
-                      <Badge variant="secondary" className="font-mono text-[10px]">
-                        DOCX • {formatBytes(word.fileSize)}
-                      </Badge>
                     </div>
-                    <p className="text-[11px] text-muted-foreground">
-                      Archivado el {formatPeruDateDisplay(word.createdAt.slice(0, 10))}
-                      {word.notes ? ` • ${word.notes}` : ""}
-                    </p>
-                  </div>
 
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="xs"
-                      onClick={() => setReadingWordDoc(word)}
-                    >
-                      <Eye className="size-3" />
-                      Leer Texto
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="xs"
-                      onClick={() =>
-                        window.open(
-                          buildWordHistoryViewUrl(word.id, true),
-                          "_blank",
-                          "noopener,noreferrer"
-                        )
-                      }
-                    >
-                      <Download className="size-3" />
-                      Descargar
-                    </Button>
-                    {canEdit || canDelete ? (
+                    <div className="flex shrink-0 items-center gap-1.5">
                       <Button
                         type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        onClick={() => setDeleteWordTarget(word)}
-                        aria-label={`Archivar ${word.fileName}`}
-                        className="text-muted-foreground hover:text-destructive"
+                        variant="outline"
+                        size="xs"
+                        onClick={() => setReadingWordDoc(word)}
                       >
-                        <Trash2 className="size-3.5" />
+                        <Eye className="size-3" />
+                        Leer Texto
                       </Button>
-                    ) : null}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="xs"
+                        onClick={() =>
+                          window.open(
+                            buildWordHistoryViewUrl(word.id, true),
+                            "_blank",
+                            "noopener,noreferrer"
+                          )
+                        }
+                      >
+                        <Download className="size-3" />
+                        Descargar
+                      </Button>
+                      {canEdit || canDelete ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={() => setDeleteWordTarget(word)}
+                          aria-label={`Archivar ${word.fileName}`}
+                          className="text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -444,7 +533,7 @@ export function TabDocumentos({
           <DialogHeader>
             <DialogTitle>{readingWordDoc?.fileName}</DialogTitle>
             <DialogDescription>
-              Contenido íntegro extraído de la Historia Clínica Word original.
+              Contenido íntegro extraído del documento Word (.docx) original.
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-border bg-muted/20 p-4">

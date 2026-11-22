@@ -593,7 +593,10 @@ export function useChequeos({
         form.setValue("dossierConfig.items", updated, { shouldDirty: true });
       }
 
-      toast.success(`PDF "${uploadedDoc.title}" guardado en Storage privado.`);
+      toast.success("Documento agregado correctamente", {
+        description: `"${uploadedDoc.title}" guardado en Storage privado.`,
+        duration: 4500,
+      });
       return { success: true, data: uploadedDoc };
     } catch {
       toast.error("Error de red subiendo el archivo PDF.");

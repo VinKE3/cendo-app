@@ -275,7 +275,57 @@ export function WordImportModal({
 
       setSummary(json.data);
       setStep("DONE");
-      toast.success("Importación Word completada.");
+
+      const {
+        patientsCreated,
+        consultationsCreated,
+        ultrasoundsCreated,
+        wordDocsArchived,
+        skippedItems,
+      } = json.data;
+
+      if (
+        ultrasoundsCreated > 0 &&
+        patientsCreated === 0 &&
+        consultationsCreated === 0
+      ) {
+        toast.success(
+          ultrasoundsCreated === 1
+            ? "Ecografía Word importada correctamente"
+            : `${ultrasoundsCreated} ecografías Word importadas correctamente`,
+          {
+            description: `Se registró en Chequeos y se archivó ${wordDocsArchived === 1 ? "el respaldo .docx" : `${wordDocsArchived} respaldos .docx`} en Documentos.`,
+            duration: 5000,
+          }
+        );
+      } else {
+        const parts: string[] = [];
+        if (patientsCreated > 0) parts.push(`${patientsCreated} paciente(s)`);
+        if (consultationsCreated > 0)
+          parts.push(`${consultationsCreated} consulta(s)`);
+        if (ultrasoundsCreated > 0)
+          parts.push(`${ultrasoundsCreated} ecografía(s)`);
+        if (wordDocsArchived > 0) parts.push(`${wordDocsArchived} respaldo(s) .docx`);
+
+        toast.success("Importación Word completada", {
+          description:
+            parts.length > 0
+              ? `Guardado: ${parts.join(", ")}.`
+              : "Lote procesado.",
+          duration: 5000,
+        });
+      }
+
+      if (skippedItems.length > 0) {
+        toast.warning(
+          `${skippedItems.length} archivo(s) omitido(s) durante la importación`,
+          {
+            description: skippedItems[0]?.reason,
+            duration: 5500,
+          }
+        );
+      }
+
       onImportCompleted?.(json.data);
     } catch {
       toast.error("Error de red confirmando importación Word.");
