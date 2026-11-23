@@ -36,6 +36,15 @@ interface PrescriptionPrintModalProps {
   onClose: () => void;
 }
 
+const PAPER_FORMAT_OPTIONS: Array<{
+  value: PrescriptionPaperFormat;
+  label: string;
+}> = [
+  { value: "A4", label: "A4 Vertical" },
+  { value: "A5", label: "A5 Vertical" },
+  { value: "A5_LANDSCAPE", label: "A5 Horizontal" },
+];
+
 export function PrescriptionPrintModal({
   prescription,
   patient,
@@ -76,8 +85,8 @@ export function PrescriptionPrintModal({
         <DialogHeader>
           <DialogTitle>Vista Previa de Receta Médica Oficial (CENDO)</DialogTitle>
           <DialogDescription>
-            Formato oficial A4/A5 listo para imprimir, guardar en PDF o enviar
-            por WhatsApp.
+            Formato oficial A4, A5 vertical o A5 horizontal listo para imprimir,
+            guardar en PDF o enviar por WhatsApp.
           </DialogDescription>
         </DialogHeader>
 
@@ -100,18 +109,18 @@ export function PrescriptionPrintModal({
 
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="inline-flex items-center rounded-md border border-border bg-card p-0.5 text-xs">
-              {(["A4", "A5"] as const).map((fmt) => (
+              {PAPER_FORMAT_OPTIONS.map((option) => (
                 <button
-                  key={fmt}
+                  key={option.value}
                   type="button"
-                  onClick={() => onPaperFormatChange(fmt)}
+                  onClick={() => onPaperFormatChange(option.value)}
                   className={
-                    paperFormat === fmt
+                    paperFormat === option.value
                       ? "rounded px-2.5 py-1 font-mono font-bold bg-primary text-primary-foreground"
                       : "rounded px-2.5 py-1 font-mono text-muted-foreground hover:text-foreground"
                   }
                 >
-                  {fmt}
+                  {option.label}
                 </button>
               ))}
             </div>

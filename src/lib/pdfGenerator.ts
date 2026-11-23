@@ -50,7 +50,28 @@ export async function readFileAsUint8Array(file: Blob): Promise<Uint8Array> {
   return new Uint8Array(arrayBuffer);
 }
 
-export type PrintPaperFormat = "A4" | "A5";
+export type PrintPaperFormat = "A4" | "A5" | "A5_LANDSCAPE";
+
+const PAPER_DIMENSIONS: Record<
+  PrintPaperFormat,
+  { pageSize: string; sheetWidth: string; sheetMinHeight: string }
+> = {
+  A4: {
+    pageSize: "A4 portrait",
+    sheetWidth: "210mm",
+    sheetMinHeight: "296.5mm",
+  },
+  A5: {
+    pageSize: "A5 portrait",
+    sheetWidth: "148mm",
+    sheetMinHeight: "209.5mm",
+  },
+  A5_LANDSCAPE: {
+    pageSize: "A5 landscape",
+    sheetWidth: "210mm",
+    sheetMinHeight: "147.5mm",
+  },
+};
 
 /**
  * Abre una ventana de impresión A4/A5 limpia para el elemento HTML indicado,
@@ -68,9 +89,7 @@ export function printHtmlElement(
   if (!printWindow) return false;
 
   const format: PrintPaperFormat = options?.paperFormat ?? "A4";
-  const pageSize = format === "A5" ? "A5 portrait" : "A4 portrait";
-  const sheetWidth = format === "A5" ? "148mm" : "210mm";
-  const sheetMinHeight = format === "A5" ? "209.5mm" : "296.5mm";
+  const { pageSize, sheetWidth, sheetMinHeight } = PAPER_DIMENSIONS[format];
 
   const styleNodes = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
     .map((node) => node.outerHTML)

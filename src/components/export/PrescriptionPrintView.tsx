@@ -8,9 +8,10 @@ import { BrandLogo } from "@/components/layout/BrandLogo";
 import { useSignatureSettings } from "@/components/providers/SignatureSettingsProvider";
 import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
 import type { MedicalPrescriptionItem } from "@/features/recetas/recetas.schema";
+import type { PrintPaperFormat } from "@/lib/pdfGenerator";
 import { cn, formatPeruDateDisplay } from "@/lib/utils";
 
-export type PrescriptionPaperFormat = "A4" | "A5";
+export type PrescriptionPaperFormat = PrintPaperFormat;
 
 interface PrescriptionPrintViewProps {
   prescription: MedicalPrescriptionItem;
@@ -68,16 +69,36 @@ export function PrescriptionPrintView({
     .filter(Boolean)
     .join(" • ");
 
-  const isA5 = paperFormat === "A5";
+  const isA5Portrait = paperFormat === "A5";
+  const isA5Landscape = paperFormat === "A5_LANDSCAPE";
+  const isCompactHeight = isA5Portrait || isA5Landscape;
   const showAllergyAlert = hasPositiveAllergy(patientAllergies);
   const isSpaciousLayout = prescription.items.length <= 3;
+
+  const thTextSizeClass = isA5Landscape
+    ? "pb-1.5 text-[11px]"
+    : isA5Portrait
+      ? "pb-1.5 text-[10px]"
+      : "pb-2 text-[12px]";
+
+  const tdRowClass = isA5Landscape
+    ? isSpaciousLayout
+      ? "py-2.5 text-[12.5px] leading-snug"
+      : "py-1.5 text-[11px] leading-snug"
+    : isA5Portrait
+      ? isSpaciousLayout
+        ? "py-3 text-[11px] leading-snug"
+        : "py-2 text-[10px] leading-snug"
+      : isSpaciousLayout
+        ? "py-4 text-[14px] leading-snug"
+        : "py-2.5 text-[12.5px] leading-snug";
 
   return (
     <div
       id="prescription-print-sheet"
       className={cn(
         "mx-auto space-y-6 bg-card font-sans text-xs text-foreground print:space-y-0",
-        isA5 ? "max-w-[148mm]" : "max-w-[210mm]"
+        isA5Portrait ? "max-w-[148mm]" : "max-w-[210mm]"
       )}
     >
       {showCoverPage ? (
@@ -98,29 +119,46 @@ export function PrescriptionPrintView({
       <section
         className={cn(
           "page-sheet box-border flex flex-col justify-between overflow-hidden rounded-xl border border-border bg-card shadow-sm print:rounded-none print:border-none print:shadow-none",
-          isA5
-            ? "min-h-[210mm] w-[148mm] text-xs"
-            : "min-h-[297mm] w-[210mm] text-[13px]"
+          isA5Landscape
+            ? "min-h-[147.5mm] w-[210mm] text-[12px]"
+            : isA5Portrait
+              ? "min-h-[209.5mm] w-[148mm] text-xs"
+              : "min-h-[296.5mm] w-[210mm] text-[13px]"
         )}
       >
         <div
           className={cn(
             "flex flex-1 flex-col justify-between",
-            isA5
-              ? "gap-3 px-[10mm] pt-[7mm] pb-2"
-              : "gap-4 px-[14mm] pt-[10mm] pb-3"
+            isA5Landscape
+              ? "gap-2 px-[10mm] pt-[5mm] pb-1"
+              : isA5Portrait
+                ? "gap-2.5 px-[10mm] pt-[7mm] pb-2"
+                : "gap-4 px-[14mm] pt-[10mm] pb-3"
           )}
         >
-          <div className={cn(isA5 ? "space-y-2.5" : "space-y-4")}>
+          <div
+            className={cn(
+              isA5Landscape
+                ? "space-y-1.5"
+                : isA5Portrait
+                  ? "space-y-2.5"
+                  : "space-y-4"
+            )}
+          >
             {/* 1. Membrete Institucional */}
-            <header className="flex items-start justify-between gap-3 border-b-2 border-primary pb-2.5">
+            <header
+              className={cn(
+                "flex items-start justify-between gap-3 border-b-2 border-primary",
+                isA5Landscape ? "pb-1.5" : "pb-2.5"
+              )}
+            >
               <div className="flex items-center gap-2.5">
-                <BrandLogo size={isA5 ? "sm" : "md"} showText={false} />
+                <BrandLogo size={isCompactHeight ? "sm" : "md"} showText={false} />
                 <div>
                   <h1
                     className={cn(
                       "font-sans font-extrabold tracking-tight text-primary",
-                      isA5 ? "text-base" : "text-lg"
+                      isCompactHeight ? "text-base" : "text-lg"
                     )}
                   >
                     CENDO • CENTRO DE ENDOMETRIOSIS
@@ -148,7 +186,12 @@ export function PrescriptionPrintView({
             </header>
 
             {/* 2. Filiación de la Paciente */}
-            <div className="grid grid-cols-12 items-center gap-2 rounded-lg border border-border bg-muted/30 p-2.5">
+            <div
+              className={cn(
+                "grid grid-cols-12 items-center rounded-lg border border-border bg-muted/30",
+                isA5Landscape ? "gap-1.5 p-2" : "gap-2 p-2.5"
+              )}
+            >
               <div className="col-span-6">
                 <span className="block text-[9px] font-semibold text-muted-foreground uppercase">
                   Paciente
@@ -198,7 +241,12 @@ export function PrescriptionPrintView({
 
             {/* Alerta de Alergias / RAMs si existen */}
             {showAllergyAlert ? (
-              <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
+              <div
+                className={cn(
+                  "flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 text-[11px] text-destructive",
+                  isA5Landscape ? "py-1.5" : "py-2"
+                )}
+              >
                 <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
                 <div>
                   <strong className="uppercase">Alerta de Alergias / RAMs: </strong>
@@ -208,13 +256,18 @@ export function PrescriptionPrintView({
             ) : null}
           </div>
 
-          {/* 3. Cuerpo Rp/ — Amplio, legible y distribuido como receta física */}
+          {/* 3. Cuerpo Rp/ — Tabla abierta de 6 columnas (estilo recetario clínico) */}
           <div className="flex flex-1 flex-col justify-start pt-1">
-            <div className="flex items-baseline gap-2.5 border-b-2 border-primary/35 pb-1.5">
+            <div
+              className={cn(
+                "flex items-baseline gap-2.5",
+                isA5Landscape ? "mb-1.5" : isA5Portrait ? "mb-2" : "mb-3"
+              )}
+            >
               <span
                 className={cn(
                   "font-serif font-bold italic text-primary select-none",
-                  isA5 ? "text-2xl" : "text-3xl"
+                  isCompactHeight ? "text-2xl" : "text-3xl"
                 )}
               >
                 Rp/
@@ -222,127 +275,152 @@ export function PrescriptionPrintView({
               <span
                 className={cn(
                   "font-bold tracking-wider text-muted-foreground uppercase",
-                  isA5 ? "text-[10.5px]" : "text-xs"
+                  isCompactHeight ? "text-[10.5px]" : "text-xs"
                 )}
               >
                 Prescripción Médica e Indicaciones de Administración
               </span>
             </div>
 
-            <div
-              className={cn(
-                "mt-3 flex-1",
-                isSpaciousLayout
-                  ? isA5
-                    ? "space-y-3.5"
-                    : "space-y-5"
-                  : isA5
-                    ? "space-y-2"
-                    : "space-y-3"
-              )}
-            >
-              {prescription.items.map((item, idx) => (
-                <div
-                  key={item.id}
-                  className={cn(
-                    "break-inside-avoid rounded-lg border border-border/80 bg-card",
-                    isSpaciousLayout
-                      ? isA5
-                        ? "space-y-1.5 p-3"
-                        : "space-y-2 p-4"
-                      : isA5
-                        ? "space-y-1 p-2.5"
-                        : "space-y-1.5 p-3"
-                  )}
-                >
-                  <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border/60 pb-1.5">
-                    <div className="flex items-baseline gap-2.5">
-                      <span
+            <div className="flex-1">
+              <table className="w-full table-fixed border-collapse">
+                <thead>
+                  <tr className="border-b border-foreground/40 text-foreground">
+                    <th
+                      className={cn(
+                        "w-[23%] pr-2 text-left font-bold",
+                        thTextSizeClass
+                      )}
+                    >
+                      N. / Genérico
+                    </th>
+                    <th
+                      className={cn(
+                        "w-[18%] px-1.5 text-center font-bold",
+                        thTextSizeClass
+                      )}
+                    >
+                      Presentación
+                    </th>
+                    <th
+                      className={cn(
+                        "w-[25%] px-1.5 text-center font-bold",
+                        thTextSizeClass
+                      )}
+                    >
+                      Dosis
+                    </th>
+                    <th
+                      className={cn(
+                        "w-[13%] px-1.5 text-center font-bold",
+                        thTextSizeClass
+                      )}
+                    >
+                      Frecuencia
+                    </th>
+                    <th
+                      className={cn(
+                        "w-[9%] px-1.5 text-center font-bold",
+                        thTextSizeClass
+                      )}
+                    >
+                      Vía
+                    </th>
+                    <th
+                      className={cn(
+                        "w-[12%] pl-1.5 text-center font-bold",
+                        thTextSizeClass
+                      )}
+                    >
+                      Días / Tto.
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {prescription.items.map((item) => (
+                    <tr
+                      key={item.id}
+                      className="break-inside-avoid border-b border-border/40 align-top last:border-b-0"
+                    >
+                      <td
                         className={cn(
-                          "inline-flex shrink-0 items-center justify-center rounded bg-primary font-mono font-bold text-primary-foreground",
-                          isA5 ? "size-5 text-[11px]" : "size-6 text-xs"
-                        )}
-                      >
-                        {idx + 1}
-                      </span>
-                      <strong
-                        className={cn(
-                          "font-extrabold tracking-tight text-foreground",
-                          isA5
-                            ? isSpaciousLayout
-                              ? "text-[13.5px]"
-                              : "text-xs"
-                            : isSpaciousLayout
-                              ? "text-[16px]"
-                              : "text-[14px]"
+                          "pr-2 text-left font-semibold break-words text-foreground",
+                          tdRowClass
                         )}
                       >
                         {item.medicationName}
-                      </strong>
-                    </div>
-
-                    <div
-                      className={cn(
-                        "flex shrink-0 items-center gap-1.5",
-                        isA5 ? "text-[10px]" : "text-[11px]"
-                      )}
-                    >
-                      <span className="rounded border border-border bg-muted px-2 py-0.5 font-mono font-semibold text-foreground">
-                        {item.presentation}
-                      </span>
-                      {item.quantity ? (
-                        <span className="rounded border border-primary/30 bg-primary/10 px-2 py-0.5 font-mono font-bold text-primary">
-                          Cant.: {item.quantity}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  <div
-                    className={cn(
-                      "space-y-1 text-foreground",
-                      isA5 ? "pl-7" : "pl-8.5",
-                      isA5
-                        ? isSpaciousLayout
-                          ? "text-[12px] leading-relaxed"
-                          : "text-[11px] leading-snug"
-                        : isSpaciousLayout
-                          ? "text-[14px] leading-relaxed"
-                          : "text-[12.5px] leading-snug"
-                    )}
-                  >
-                    <p>
-                      <strong className="text-primary">Administrar:</strong>{" "}
-                      {item.dosage} —{" "}
-                      <span className="font-semibold">{item.route}</span> —{" "}
-                      {item.frequency} — {item.duration}.
-                    </p>
-                    {item.instructions ? (
-                      <p className="italic text-muted-foreground">
-                        <strong className="not-italic text-foreground">Nota:</strong>{" "}
-                        {item.instructions}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
+                      </td>
+                      <td
+                        className={cn(
+                          "px-1.5 text-center break-words text-foreground",
+                          tdRowClass
+                        )}
+                      >
+                        <span>{item.presentation}</span>
+                        {item.quantity ? (
+                          <span className="mt-0.5 block font-mono text-[10px] text-muted-foreground">
+                            Cant.: {item.quantity}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td
+                        className={cn(
+                          "px-1.5 text-center break-words text-foreground",
+                          tdRowClass
+                        )}
+                      >
+                        <span>{item.dosage}</span>
+                        {item.instructions ? (
+                          <span className="mt-0.5 block text-muted-foreground">
+                            {item.instructions}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td
+                        className={cn(
+                          "px-1.5 text-center break-words text-foreground",
+                          tdRowClass
+                        )}
+                      >
+                        {item.frequency}
+                      </td>
+                      <td
+                        className={cn(
+                          "px-1.5 text-center break-words text-foreground",
+                          tdRowClass
+                        )}
+                      >
+                        {item.route}
+                      </td>
+                      <td
+                        className={cn(
+                          "pl-1.5 text-center break-words text-foreground",
+                          tdRowClass
+                        )}
+                      >
+                        {item.duration}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
 
           {/* 4. Indicaciones Generales y Próxima Cita (Parte inferior antes de firma) */}
           {prescription.generalIndications || prescription.nextAppointmentDate ? (
-            <div className="space-y-2.5 pt-1">
+            <div className={cn("pt-1", isA5Landscape ? "space-y-1.5" : "space-y-2")}>
               {prescription.generalIndications ? (
                 <div
                   className={cn(
-                    "space-y-1 rounded-lg border border-border bg-muted/30",
-                    isA5 ? "p-2.5 text-[11px]" : "p-3.5 text-[13px]"
+                    "border-t border-border/70 pt-2 leading-relaxed text-foreground",
+                    isCompactHeight ? "text-[11px]" : "text-[12.5px]"
                   )}
                 >
-                  <strong className="block text-[10px] font-bold tracking-wider text-primary uppercase">
-                    Indicaciones Generales y Cuidados Clínicos
-                  </strong>
-                  <p className="leading-relaxed whitespace-pre-line text-foreground">
+                  <p className="whitespace-pre-line">
+                    <strong className="font-bold text-primary">
+                      Indicaciones generales:{" "}
+                    </strong>
                     {prescription.generalIndications}
                   </p>
                 </div>
@@ -351,8 +429,9 @@ export function PrescriptionPrintView({
               {prescription.nextAppointmentDate ? (
                 <div
                   className={cn(
-                    "flex items-center justify-between rounded-lg border border-primary/25 bg-primary/5 px-3.5 py-2 text-foreground",
-                    isA5 ? "text-[11px]" : "text-xs"
+                    "flex items-center justify-between text-foreground",
+                    !prescription.generalIndications && "border-t border-border/70 pt-2",
+                    isCompactHeight ? "text-[11px]" : "text-xs"
                   )}
                 >
                   <span className="flex items-center gap-1.5 font-semibold text-primary">
@@ -369,11 +448,15 @@ export function PrescriptionPrintView({
         </div>
 
         {/* 5. Pie Legal + Firma anclados siempre al pie de página */}
-        <div className="shrink-0 break-inside-avoid pt-2">
+        <div className="shrink-0 break-inside-avoid pt-1.5">
           <div
             className={cn(
-              "flex items-end justify-between gap-4 border-t border-border pt-2.5 pb-2",
-              isA5 ? "px-[10mm]" : "px-[14mm]"
+              "flex items-end justify-between gap-4 border-t border-border",
+              isA5Landscape
+                ? "px-[10mm] pt-1.5 pb-1"
+                : isA5Portrait
+                  ? "px-[10mm] pt-2 pb-1.5"
+                  : "px-[14mm] pt-2.5 pb-2"
             )}
           >
             <div className="max-w-xs space-y-0.5 font-mono text-[8.5px] text-muted-foreground">
@@ -387,7 +470,7 @@ export function PrescriptionPrintView({
               doctorCredentials={credentials || "CMP 61693 • RNE 38657"}
               signatureSrc={resolvedSignatureSrc}
               showDigitalSignature={resolvedShowDigitalSignature}
-              compact={isA5}
+              compact={isCompactHeight}
             />
           </div>
 
@@ -395,7 +478,8 @@ export function PrescriptionPrintView({
             address={clinicAddress}
             email={clinicEmail}
             phone={clinicPhone}
-            compact={isA5}
+            compact={isA5Portrait}
+            slim={isA5Landscape}
           />
         </div>
       </section>

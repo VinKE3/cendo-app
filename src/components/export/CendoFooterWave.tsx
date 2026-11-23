@@ -7,6 +7,7 @@ interface CendoFooterWaveProps {
   email?: string;
   phone?: string;
   compact?: boolean;
+  slim?: boolean;
   className?: string;
 }
 
@@ -15,6 +16,7 @@ export function CendoFooterWave({
   email = "cendoperu@gmail.com",
   phone = "985 945 697",
   compact = false,
+  slim = false,
   className,
 }: CendoFooterWaveProps) {
   return (
@@ -23,7 +25,10 @@ export function CendoFooterWave({
         viewBox="0 0 1200 170"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        className={cn("block w-full", compact ? "h-[18mm]" : "h-[34mm]")}
+        className={cn(
+          "block w-full",
+          slim ? "h-[10mm]" : compact ? "h-[18mm]" : "h-[34mm]"
+        )}
         preserveAspectRatio="none"
         aria-hidden="true"
       >
@@ -40,7 +45,11 @@ export function CendoFooterWave({
       <div
         className={cn(
           "bg-primary text-primary-foreground",
-          compact ? "px-8 pb-2.5 pt-0.5" : "px-8 pb-4 pt-1"
+          slim
+            ? "px-6 pb-1.5 pt-0.5"
+            : compact
+              ? "px-8 pb-2.5 pt-0.5"
+              : "px-8 pb-4 pt-1"
         )}
       >
         <div className="mx-auto flex flex-wrap items-center justify-between gap-3 text-[10px] font-medium tracking-tight">
