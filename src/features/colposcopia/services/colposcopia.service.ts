@@ -3,6 +3,7 @@ import { db } from "@/db";
 import {
   colposcopyReports,
   medicalConsultations,
+  patientBackgrounds,
   patients,
   profiles,
 } from "@/db/schema";
@@ -11,10 +12,12 @@ import { recordAuditLog } from "@/lib/audit/audit-log";
 import { isValidPatientClinicalImagePath } from "@/lib/clinical-images";
 import { DomainError, type SessionPayload } from "@/lib/security/action-guard";
 import { deletePrivateStorageObject } from "@/lib/supabase/storage";
-import type {
-  ColposcopyReportItem,
-  CreateColposcopyInput,
-  UpdateColposcopyInput,
+import {
+  buildColposcopyBackgroundSyncPatch,
+  normalizeScjVisibility,
+  type ColposcopyReportItem,
+  type CreateColposcopyInput,
+  type UpdateColposcopyInput,
 } from "../colposcopia.schema";
 
 export function mapColposcopyRow(
@@ -30,7 +33,9 @@ export function mapColposcopyRow(
     doctorRne: row.doctorRne ?? "",
     reportDate: row.reportDate,
     adequateColposcopy: row.adequateColposcopy,
-    squamocolumnarJunctionVisible: row.squamocolumnarJunctionVisible,
+    squamocolumnarJunctionVisible: normalizeScjVisibility(
+      row.squamocolumnarJunctionVisible
+    ),
     transformationZoneType: row.transformationZoneType,
     matureSquamousEpithelium: row.matureSquamousEpithelium,
     ectopy: row.ectopy,
@@ -70,7 +75,15 @@ function normalizeExtendedFindings(
   adequateColposcopy: boolean,
   raw: CreateColposcopyInput["extendedFindings"]
 ): ColposcopyExtendedFindingsRecord {
+  const cleanedAdditional = (raw.additionalDiagnoses ?? [])
+    .filter((d) => d.diagnosis.trim().length > 0)
+    .map((d) => ({
+      diagnosis: d.diagnosis.trim(),
+      ...(d.cie10Code?.trim() ? { cie10Code: d.cie10Code.trim().toUpperCase() } : {}),
+    }));
+
   const cleaned: ColposcopyExtendedFindingsRecord = {
+    atrophicSquamousEpithelium: Boolean(raw.atrophicSquamousEpithelium),
     nabothCyst: Boolean(raw.nabothCyst),
     cryptOpenings: Boolean(raw.cryptOpenings),
     deciduosis: Boolean(raw.deciduosis),
@@ -85,15 +98,37 @@ function normalizeExtendedFindings(
     irregularSurface: Boolean(raw.irregularSurface),
     exophyticLesion: Boolean(raw.exophyticLesion),
     necrosis: Boolean(raw.necrosis),
+    necroticUlceration: Boolean(raw.necroticUlceration),
     nodularTumor: Boolean(raw.nodularTumor),
     congenitalTZ: Boolean(raw.congenitalTZ),
     condyloma: Boolean(raw.condyloma),
     polyp: Boolean(raw.polyp),
     inflammation: Boolean(raw.inflammation),
     stenosis: Boolean(raw.stenosis),
+    congenitalAnomaly: Boolean(raw.congenitalAnomaly),
     postTreatmentAnomaly: Boolean(raw.postTreatmentAnomaly),
     endometriosisFoci: Boolean(raw.endometriosisFoci),
   };
+
+  if (raw.nps?.trim()) cleaned.nps = raw.nps.trim();
+  if (raw.irs?.trim()) cleaned.irs = raw.irs.trim();
+  if (raw.fur?.trim()) cleaned.fur = raw.fur.trim();
+  if (raw.obstetricFormula?.trim()) {
+    cleaned.obstetricFormula = raw.obstetricFormula.trim().toUpperCase();
+  }
+  if (raw.mac?.trim()) cleaned.mac = raw.mac.trim();
+  if (raw.papResult?.trim()) {
+    cleaned.papResult = raw.papResult.trim();
+    if (raw.papOther?.trim()) {
+      cleaned.papOther = raw.papOther.trim();
+    }
+  }
+  if (raw.vphResult?.trim()) {
+    cleaned.vphResult = raw.vphResult.trim();
+    if (cleaned.vphResult === "Positivo" && raw.vphSerotype?.trim()) {
+      cleaned.vphSerotype = raw.vphSerotype.trim();
+    }
+  }
 
   if (!adequateColposcopy && raw.inadequateReason?.trim()) {
     cleaned.inadequateReason = raw.inadequateReason.trim();
@@ -101,8 +136,98 @@ function normalizeExtendedFindings(
   if (raw.otherFindings?.trim()) {
     cleaned.otherFindings = raw.otherFindings.trim();
   }
+  if (cleanedAdditional.length > 0) {
+    cleaned.additionalDiagnoses = cleanedAdditional;
+  }
 
   return cleaned;
+}
+
+async function syncPatientBackgroundFromColposcopy(
+  ctx: SessionPayload,
+  patientId: string,
+  ext: ColposcopyExtendedFindingsRecord
+): Promise<void> {
+  if (!ctx.tenantId) return;
+
+  const patch = buildColposcopyBackgroundSyncPatch(ext);
+  const dbFields: Partial<typeof patientBackgrounds.$inferInsert> = {};
+
+  if (patch.obstetricFormula !== undefined) {
+    dbFields.obstetricFormula = patch.obstetricFormula;
+  }
+  if (patch.lastMenstrualPeriod !== undefined) {
+    dbFields.lastMenstrualPeriod = patch.lastMenstrualPeriod || null;
+  }
+  if (patch.contraceptiveMethod !== undefined) {
+    dbFields.contraceptiveMethod = patch.contraceptiveMethod;
+  }
+  if (patch.sexualDebutAge !== undefined) {
+    dbFields.sexualDebutAge = patch.sexualDebutAge;
+  }
+  if (patch.sexualPartnersCount !== undefined) {
+    dbFields.sexualPartnersCount = patch.sexualPartnersCount;
+  }
+  if (patch.papHistory !== undefined) {
+    dbFields.papHistory = patch.papHistory;
+  }
+  if (patch.vphTestHistory !== undefined) {
+    dbFields.vphTestHistory = patch.vphTestHistory;
+  }
+
+  if (Object.keys(dbFields).length === 0) return;
+
+  const [existingBg] = await db
+    .select({ id: patientBackgrounds.id })
+    .from(patientBackgrounds)
+    .where(
+      and(
+        eq(patientBackgrounds.tenantId, ctx.tenantId),
+        eq(patientBackgrounds.patientId, patientId),
+        isNull(patientBackgrounds.deletedAt)
+      )
+    )
+    .limit(1);
+
+  if (existingBg) {
+    await db
+      .update(patientBackgrounds)
+      .set({
+        ...dbFields,
+        updatedBy: ctx.userId,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(patientBackgrounds.id, existingBg.id),
+          eq(patientBackgrounds.tenantId, ctx.tenantId)
+        )
+      );
+    return;
+  }
+
+  await db.insert(patientBackgrounds).values({
+    tenantId: ctx.tenantId,
+    patientId,
+    obstetricFormula: dbFields.obstetricFormula ?? "G0 P0000",
+    contraceptiveMethod: dbFields.contraceptiveMethod ?? "Ninguno",
+    lastMenstrualPeriod: dbFields.lastMenstrualPeriod ?? null,
+    sexualDebutAge: dbFields.sexualDebutAge ?? null,
+    sexualPartnersCount: dbFields.sexualPartnersCount ?? null,
+    papHistory: dbFields.papHistory ?? "No refiere",
+    vphTestHistory: dbFields.vphTestHistory ?? "No realizado",
+    catamenialRegimen: "28/4",
+    stiHistory: "Niega ITS",
+    hasDiabetes: "Niega",
+    hasHypertension: "Niega",
+    hasAsthma: "Niega",
+    medicalAllergies: "Niega",
+    surgeriesHistory: "Niega",
+    familyHistory: "No refiere",
+    otherPathologies: "Niega",
+    createdBy: ctx.userId,
+    updatedBy: ctx.userId,
+  });
 }
 
 function validateAndNormalizeImages(
@@ -314,6 +439,10 @@ export async function createColposcopy(
     },
   });
 
+  if (input.syncBackgroundToHistory) {
+    await syncPatientBackgroundFromColposcopy(ctx, input.patientId, normalizedExt);
+  }
+
   return mapColposcopyRow(created);
 }
 
@@ -438,6 +567,10 @@ export async function updateColposcopy(
       orphanedCleaned: orphanedPaths.length,
     },
   });
+
+  if (input.syncBackgroundToHistory) {
+    await syncPatientBackgroundFromColposcopy(ctx, input.patientId, normalizedExt);
+  }
 
   return mapColposcopyRow(updated);
 }

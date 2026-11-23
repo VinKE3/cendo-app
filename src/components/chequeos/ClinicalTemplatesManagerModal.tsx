@@ -52,6 +52,8 @@ import {
   type ProcedureType,
 } from "@/features/procedimientos/procedimientos.schema";
 import {
+  COLPOSCOPY_DIAGNOSIS_PRESETS,
+  normalizeScjVisibility,
   SCHILLER_TEST_OPTIONS,
   SCJ_VISIBILITY_OPTIONS,
   TRANSFORMATION_ZONE_OPTIONS,
@@ -203,7 +205,7 @@ function ecoPayloadToDraft(
 function buildDefaultColpoPayload(): ColposcopyTemplatePayload {
   return {
     adequateColposcopy: true,
-    squamocolumnarJunctionVisible: "Visible",
+    squamocolumnarJunctionVisible: "Completamente visible",
     transformationZoneType: "Tipo 1",
     matureSquamousEpithelium: true,
     ectopy: false,
@@ -217,6 +219,7 @@ function buildDefaultColpoPayload(): ColposcopyTemplatePayload {
     atypicalVessels: false,
     extendedFindings: {
       inadequateReason: "",
+      atrophicSquamousEpithelium: false,
       nabothCyst: false,
       cryptOpenings: false,
       deciduosis: false,
@@ -231,15 +234,18 @@ function buildDefaultColpoPayload(): ColposcopyTemplatePayload {
       irregularSurface: false,
       exophyticLesion: false,
       necrosis: false,
+      necroticUlceration: false,
       nodularTumor: false,
       congenitalTZ: false,
       condyloma: false,
       polyp: false,
       inflammation: false,
       stenosis: false,
+      congenitalAnomaly: false,
       postTreatmentAnomaly: false,
       endometriosisFoci: false,
       otherFindings: "",
+      additionalDiagnoses: [],
     },
     schillerTest: SCHILLER_TEST_OPTIONS[0],
     cervicalBiopsyTaken: false,
@@ -247,6 +253,28 @@ function buildDefaultColpoPayload(): ColposcopyTemplatePayload {
     cie10Code: "Z01.4",
     diagnosis: "",
     planRecommendations: "",
+  };
+}
+
+function hydrateColpoTemplateDraft(
+  payload: ColposcopyTemplatePayload
+): ColposcopyTemplatePayload {
+  const base = buildDefaultColpoPayload();
+  return {
+    ...structuredClone(payload),
+    squamocolumnarJunctionVisible: normalizeScjVisibility(
+      payload.squamocolumnarJunctionVisible
+    ),
+    extendedFindings: {
+      ...base.extendedFindings,
+      ...(payload.extendedFindings ?? {}),
+      additionalDiagnoses: (
+        payload.extendedFindings?.additionalDiagnoses ?? []
+      ).map((d) => ({
+        diagnosis: d.diagnosis,
+        cie10Code: d.cie10Code ?? "",
+      })),
+    },
   };
 }
 
@@ -278,68 +306,262 @@ function optionalInt(raw: string): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-const COLPO_PRIMARY_FLAGS: Array<{
-  key: keyof Pick<
-    ColposcopyTemplatePayload,
-    | "matureSquamousEpithelium"
-    | "ectopy"
-    | "thinAcetowhiteEpithelium"
-    | "irregularBorder"
-    | "fineMosaic"
-    | "finePunctation"
-    | "denseAcetowhiteEpithelium"
-    | "coarseMosaic"
-    | "coarsePunctation"
-    | "atypicalVessels"
-  >;
-  label: string;
-}> = [
-  { key: "matureSquamousEpithelium", label: "Epitelio escamoso maduro" },
-  { key: "ectopy", label: "Ectopia / Epitelio columnar" },
-  { key: "thinAcetowhiteEpithelium", label: "Acetoblanco tenue (G1)" },
-  { key: "irregularBorder", label: "Borde irregular (G1)" },
-  { key: "fineMosaic", label: "Mosaico fino (G1)" },
-  { key: "finePunctation", label: "Punteado fino (G1)" },
-  { key: "denseAcetowhiteEpithelium", label: "Acetoblanco denso (G2)" },
-  { key: "coarseMosaic", label: "Mosaico grueso (G2)" },
-  { key: "coarsePunctation", label: "Punteado grueso (G2)" },
-  { key: "atypicalVessels", label: "Vasos atípicos (Invasión)" },
-];
+type ColpoPrimaryFlagKey = keyof Pick<
+  ColposcopyTemplatePayload,
+  | "matureSquamousEpithelium"
+  | "ectopy"
+  | "thinAcetowhiteEpithelium"
+  | "irregularBorder"
+  | "fineMosaic"
+  | "finePunctation"
+  | "denseAcetowhiteEpithelium"
+  | "coarseMosaic"
+  | "coarsePunctation"
+  | "atypicalVessels"
+>;
 
-const COLPO_EXTENDED_FLAGS: Array<{
-  key: keyof Pick<
-    NonNullable<ColposcopyTemplatePayload["extendedFindings"]>,
-    | "nabothCyst"
-    | "cryptOpenings"
-    | "rapidAcetowhite"
-    | "sharpBorders"
-    | "innerBorderSign"
-    | "ridgeSign"
-    | "thickenedGlands"
-    | "leukoplakia"
-    | "erosion"
-    | "fragileVessels"
-    | "inflammation"
-    | "polyp"
-    | "condyloma"
-    | "endometriosisFoci"
-  >;
-  label: string;
+type ColpoExtendedFlagKey = keyof Pick<
+  NonNullable<ColposcopyTemplatePayload["extendedFindings"]>,
+  | "atrophicSquamousEpithelium"
+  | "nabothCyst"
+  | "cryptOpenings"
+  | "deciduosis"
+  | "rapidAcetowhite"
+  | "thickenedGlands"
+  | "sharpBorders"
+  | "innerBorderSign"
+  | "ridgeSign"
+  | "leukoplakia"
+  | "erosion"
+  | "fragileVessels"
+  | "irregularSurface"
+  | "exophyticLesion"
+  | "necrosis"
+  | "necroticUlceration"
+  | "nodularTumor"
+  | "congenitalTZ"
+  | "condyloma"
+  | "polyp"
+  | "inflammation"
+  | "stenosis"
+  | "congenitalAnomaly"
+  | "postTreatmentAnomaly"
+  | "endometriosisFoci"
+>;
+
+type ColpoTemplateFlagEntry =
+  | { source: "primary"; key: ColpoPrimaryFlagKey; label: string }
+  | { source: "extended"; key: ColpoExtendedFlagKey; label: string };
+
+const COLPO_TEMPLATE_FLAG_GROUPS: Array<{
+  title: string;
+  items: ColpoTemplateFlagEntry[];
 }> = [
-  { key: "nabothCyst", label: "Quistes de Naboth" },
-  { key: "cryptOpenings", label: "Aberturas glandulares" },
-  { key: "rapidAcetowhite", label: "Acetoblanco rápido (G2)" },
-  { key: "sharpBorders", label: "Bordes netos (G2)" },
-  { key: "innerBorderSign", label: "Signo límite interno (G2)" },
-  { key: "ridgeSign", label: "Signo de la cresta (G2)" },
-  { key: "thickenedGlands", label: "Orificios engrosados (G2)" },
-  { key: "leukoplakia", label: "Leucoplasia" },
-  { key: "erosion", label: "Erosión epitelial" },
-  { key: "fragileVessels", label: "Vasos frágiles" },
-  { key: "inflammation", label: "Inflamación / Cervicitis" },
-  { key: "polyp", label: "Pólipo cervical" },
-  { key: "condyloma", label: "Condiloma" },
-  { key: "endometriosisFoci", label: "Foco endometriosis" },
+  {
+    title: "Hallazgos Colposcópicos Normales",
+    items: [
+      {
+        source: "primary",
+        key: "matureSquamousEpithelium",
+        label: "Epitelio escamoso: Maduro",
+      },
+      {
+        source: "extended",
+        key: "atrophicSquamousEpithelium",
+        label: "Epitelio escamoso: Atrófico",
+      },
+      {
+        source: "primary",
+        key: "ectopy",
+        label: "Epitelio columnar: Ectopía",
+      },
+      {
+        source: "extended",
+        key: "nabothCyst",
+        label: "Quistes de Naboth",
+      },
+      {
+        source: "extended",
+        key: "cryptOpenings",
+        label: "Aberturas / criptas glandulares",
+      },
+      {
+        source: "extended",
+        key: "deciduosis",
+        label: "Deciduosis en el embarazo",
+      },
+    ],
+  },
+  {
+    title: "Hallazgos Anormales • Grado 1 (Menor)",
+    items: [
+      {
+        source: "primary",
+        key: "thinAcetowhiteEpithelium",
+        label: "Epitelio acetoblanco delgado",
+      },
+      {
+        source: "primary",
+        key: "irregularBorder",
+        label: "Borde irregular",
+      },
+      {
+        source: "primary",
+        key: "fineMosaic",
+        label: "Mosaico fino",
+      },
+      {
+        source: "primary",
+        key: "finePunctation",
+        label: "Puntillado fino",
+      },
+    ],
+  },
+  {
+    title: "Hallazgos Anormales • Grado 2 (Mayor)",
+    items: [
+      {
+        source: "primary",
+        key: "denseAcetowhiteEpithelium",
+        label: "Epitelio acetoblanco denso",
+      },
+      {
+        source: "extended",
+        key: "rapidAcetowhite",
+        label: "Aparición rápida acetoblanco",
+      },
+      {
+        source: "extended",
+        key: "thickenedGlands",
+        label: "Orificios glandulares engrosados",
+      },
+      {
+        source: "primary",
+        key: "coarseMosaic",
+        label: "Mosaico grueso",
+      },
+      {
+        source: "primary",
+        key: "coarsePunctation",
+        label: "Puntillado grueso",
+      },
+      {
+        source: "extended",
+        key: "sharpBorders",
+        label: "Bordes delimitados",
+      },
+      {
+        source: "extended",
+        key: "innerBorderSign",
+        label: "Signo límite borde interno",
+      },
+      {
+        source: "extended",
+        key: "ridgeSign",
+        label: "Signo de cresta o sobreelevado",
+      },
+    ],
+  },
+  {
+    title: "Hallazgos No Específicos",
+    items: [
+      {
+        source: "extended",
+        key: "leukoplakia",
+        label: "Leucoplasia (hiperqueratosis)",
+      },
+      {
+        source: "extended",
+        key: "erosion",
+        label: "Erosión epitelial",
+      },
+    ],
+  },
+  {
+    title: "Sospecha de Invasión",
+    items: [
+      {
+        source: "primary",
+        key: "atypicalVessels",
+        label: "Vasos atípicos",
+      },
+      {
+        source: "extended",
+        key: "fragileVessels",
+        label: "Vasos delgados",
+      },
+      {
+        source: "extended",
+        key: "irregularSurface",
+        label: "Superficie irregular",
+      },
+      {
+        source: "extended",
+        key: "exophyticLesion",
+        label: "Lesión exofítica",
+      },
+      {
+        source: "extended",
+        key: "necrosis",
+        label: "Necrosis",
+      },
+      {
+        source: "extended",
+        key: "necroticUlceration",
+        label: "Ulceración necrótica",
+      },
+      {
+        source: "extended",
+        key: "nodularTumor",
+        label: "Tumoración nodular",
+      },
+    ],
+  },
+  {
+    title: "Hallazgos Varios",
+    items: [
+      {
+        source: "extended",
+        key: "congenitalTZ",
+        label: "ZT congénita",
+      },
+      {
+        source: "extended",
+        key: "condyloma",
+        label: "Condiloma",
+      },
+      {
+        source: "extended",
+        key: "polyp",
+        label: "Pólipo (exocervical/endocervical)",
+      },
+      {
+        source: "extended",
+        key: "inflammation",
+        label: "Inflamación",
+      },
+      {
+        source: "extended",
+        key: "stenosis",
+        label: "Estenosis",
+      },
+      {
+        source: "extended",
+        key: "congenitalAnomaly",
+        label: "Anomalía congénita",
+      },
+      {
+        source: "extended",
+        key: "postTreatmentAnomaly",
+        label: "Anomalías pos tratamiento",
+      },
+      {
+        source: "extended",
+        key: "endometriosisFoci",
+        label: "Endometriosis",
+      },
+    ],
+  },
 ];
 
 export function ClinicalTemplatesManagerModal({
@@ -424,7 +646,7 @@ export function ClinicalTemplatesManagerModal({
     } else if (item.scope === "PROCEDURE") {
       setProcDraft(structuredClone(item.payload));
     } else {
-      setColpoDraft(structuredClone(item.payload));
+      setColpoDraft(hydrateColpoTemplateDraft(item.payload));
     }
     setFormMode(true);
   };
@@ -439,7 +661,7 @@ export function ClinicalTemplatesManagerModal({
     } else if (item.scope === "PROCEDURE") {
       setProcDraft(structuredClone(item.payload));
     } else {
-      setColpoDraft(structuredClone(item.payload));
+      setColpoDraft(hydrateColpoTemplateDraft(item.payload));
     }
     setFormMode(true);
   };
@@ -610,8 +832,25 @@ export function ClinicalTemplatesManagerModal({
       return;
     }
 
+    const cleanAddDiag = (colpoDraft.extendedFindings?.additionalDiagnoses ?? [])
+      .filter((d) => d.diagnosis.trim().length > 0)
+      .map((d) => ({
+        diagnosis: d.diagnosis.trim(),
+        ...(d.cie10Code?.trim() ? { cie10Code: d.cie10Code.trim().toUpperCase() } : {}),
+      }));
+
     const parsedColpo = colposcopyTemplatePayloadSchema.safeParse({
       ...colpoDraft,
+      squamocolumnarJunctionVisible: normalizeScjVisibility(
+        colpoDraft.squamocolumnarJunctionVisible
+      ),
+      extendedFindings: {
+        ...colpoDraft.extendedFindings,
+        inadequateReason: colpoDraft.adequateColposcopy
+          ? ""
+          : colpoDraft.extendedFindings?.inadequateReason?.trim() ?? "",
+        additionalDiagnoses: cleanAddDiag,
+      },
       biopsyClockHours: colpoDraft.cervicalBiopsyTaken
         ? colpoDraft.biopsyClockHours
         : [],
@@ -1370,25 +1609,31 @@ export function ClinicalTemplatesManagerModal({
               ) : scope === "COLPOSCOPY" ? (
                 <div className="space-y-3 rounded-xl border border-border bg-card p-3.5">
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
-                    <div className="flex items-end pb-1">
-                      <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-foreground">
-                        <input
-                          type="checkbox"
-                          className="size-4 accent-primary"
-                          checked={colpoDraft.adequateColposcopy}
-                          onChange={(e) =>
-                            setColpoDraft((prev) => ({
-                              ...prev,
-                              adequateColposcopy: e.target.checked,
-                            }))
-                          }
-                        />
-                        Colposcopía Adecuada
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-foreground">
+                        1. Colposcopía
                       </label>
+                      <select
+                        value={
+                          colpoDraft.adequateColposcopy
+                            ? "ADECUADA"
+                            : "INADECUADA"
+                        }
+                        onChange={(e) =>
+                          setColpoDraft((prev) => ({
+                            ...prev,
+                            adequateColposcopy: e.target.value === "ADECUADA",
+                          }))
+                        }
+                        className={selectClassName}
+                      >
+                        <option value="ADECUADA">Adecuada</option>
+                        <option value="INADECUADA">Inadecuada</option>
+                      </select>
                     </div>
                     <div className="space-y-1">
                       <label className="block text-xs font-semibold text-foreground">
-                        ZSC
+                        2. Unión Escamocolumnar (UEC)
                       </label>
                       <select
                         value={colpoDraft.squamocolumnarJunctionVisible}
@@ -1410,7 +1655,7 @@ export function ClinicalTemplatesManagerModal({
                     </div>
                     <div className="space-y-1">
                       <label className="block text-xs font-semibold text-foreground">
-                        Zona Transformación
+                        3. Zona Transformación
                       </label>
                       <select
                         value={colpoDraft.transformationZoneType}
@@ -1432,7 +1677,7 @@ export function ClinicalTemplatesManagerModal({
                     </div>
                     <div className="space-y-1">
                       <label className="block text-xs font-semibold text-foreground">
-                        Test de Schiller
+                        Test de Schiller (Lugol)
                       </label>
                       <select
                         value={colpoDraft.schillerTest}
@@ -1453,59 +1698,101 @@ export function ClinicalTemplatesManagerModal({
                     </div>
                   </div>
 
-                  <div className="space-y-2 border-t border-border pt-3">
+                  {!colpoDraft.adequateColposcopy ? (
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-warning">
+                        Motivo de Colposcopía Inadecuada
+                      </label>
+                      <Input
+                        value={colpoDraft.extendedFindings?.inadequateReason ?? ""}
+                        onChange={(e) =>
+                          setColpoDraft((prev) => ({
+                            ...prev,
+                            extendedFindings: {
+                              ...prev.extendedFindings,
+                              inadequateReason: e.target.value,
+                            },
+                          }))
+                        }
+                        placeholder="Ej. Sangrado abundante, cervicitis severa..."
+                      />
+                    </div>
+                  ) : null}
+
+                  <div className="space-y-3 border-t border-border pt-3">
                     <span className="block text-xs font-semibold text-foreground">
-                      Hallazgos IFCPC Pre-marcados
+                      Hallazgos IFCPC Pre-marcados (100% Excel)
                     </span>
-                    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
-                      {COLPO_PRIMARY_FLAGS.map((item) => (
-                        <label
-                          key={item.key}
-                          className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-muted/20 px-2.5 py-1.5 text-xs text-foreground"
-                        >
-                          <input
-                            type="checkbox"
-                            className="size-3.5 accent-primary"
-                            checked={Boolean(colpoDraft[item.key])}
-                            onChange={(e) =>
-                              setColpoDraft((prev) => ({
-                                ...prev,
-                                [item.key]: e.target.checked,
-                              }))
-                            }
-                          />
-                          <span>{item.label}</span>
-                        </label>
-                      ))}
-                      {COLPO_EXTENDED_FLAGS.map((item) => (
-                        <label
-                          key={item.key}
-                          className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-muted/20 px-2.5 py-1.5 text-xs text-foreground"
-                        >
-                          <input
-                            type="checkbox"
-                            className="size-3.5 accent-primary"
-                            checked={Boolean(
-                              colpoDraft.extendedFindings?.[item.key]
-                            )}
-                            onChange={(e) =>
-                              setColpoDraft((prev) => ({
-                                ...prev,
-                                extendedFindings: {
-                                  ...prev.extendedFindings,
-                                  [item.key]: e.target.checked,
-                                },
-                              }))
-                            }
-                          />
-                          <span>{item.label}</span>
-                        </label>
-                      ))}
+                    {COLPO_TEMPLATE_FLAG_GROUPS.map((group) => (
+                      <div key={group.title} className="space-y-1.5">
+                        <p className="font-mono text-[10.5px] font-bold text-primary uppercase">
+                          {group.title}
+                        </p>
+                        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
+                          {group.items.map((item) => {
+                            const checked =
+                              item.source === "primary"
+                                ? Boolean(colpoDraft[item.key])
+                                : Boolean(
+                                    colpoDraft.extendedFindings?.[item.key]
+                                  );
+                            return (
+                              <label
+                                key={item.key}
+                                className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-muted/20 px-2.5 py-1.5 text-xs text-foreground"
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="size-3.5 accent-primary"
+                                  checked={checked}
+                                  onChange={(e) => {
+                                    const nextVal = e.target.checked;
+                                    if (item.source === "primary") {
+                                      setColpoDraft((prev) => ({
+                                        ...prev,
+                                        [item.key]: nextVal,
+                                      }));
+                                    } else {
+                                      setColpoDraft((prev) => ({
+                                        ...prev,
+                                        extendedFindings: {
+                                          ...prev.extendedFindings,
+                                          [item.key]: nextVal,
+                                        },
+                                      }));
+                                    }
+                                  }}
+                                />
+                                <span>{item.label}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+
+                    <div className="space-y-1 pt-1">
+                      <label className="block text-xs font-semibold text-foreground">
+                        Otros Hallazgos (Varios / Observaciones)
+                      </label>
+                      <Input
+                        value={colpoDraft.extendedFindings?.otherFindings ?? ""}
+                        onChange={(e) =>
+                          setColpoDraft((prev) => ({
+                            ...prev,
+                            extendedFindings: {
+                              ...prev.extendedFindings,
+                              otherFindings: e.target.value,
+                            },
+                          }))
+                        }
+                        placeholder="Otros hallazgos predeterminados..."
+                      />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 border-t border-border pt-3 sm:grid-cols-12">
-                    <div className="flex flex-col items-center space-y-2 sm:col-span-5">
+                    <div className="flex flex-col items-center space-y-2 sm:col-span-4">
                       <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-foreground">
                         <input
                           type="checkbox"
@@ -1541,8 +1828,82 @@ export function ClinicalTemplatesManagerModal({
                       />
                     </div>
 
-                    <div className="space-y-2.5 sm:col-span-7">
+                    <div className="space-y-2.5 sm:col-span-8">
+                      <div className="grid grid-cols-1 gap-2 rounded-lg border border-border bg-muted/20 p-2.5 sm:grid-cols-2">
+                        <div className="space-y-1">
+                          <label className="block text-[11px] font-semibold text-foreground">
+                            Diagnóstico 1 (sin CIE-10)
+                          </label>
+                          <select
+                            value={
+                              colpoDraft.adequateColposcopy
+                                ? "ADECUADA"
+                                : "INADECUADA"
+                            }
+                            onChange={(e) =>
+                              setColpoDraft((prev) => ({
+                                ...prev,
+                                adequateColposcopy:
+                                  e.target.value === "ADECUADA",
+                              }))
+                            }
+                            className={selectClassName}
+                          >
+                            <option value="ADECUADA">
+                              Colposcopía adecuada
+                            </option>
+                            <option value="INADECUADA">
+                              Colposcopía inadecuada
+                            </option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="block text-[11px] font-semibold text-foreground">
+                            Diagnóstico 2 (sin CIE-10)
+                          </label>
+                          <select
+                            value={colpoDraft.transformationZoneType}
+                            onChange={(e) =>
+                              setColpoDraft((prev) => ({
+                                ...prev,
+                                transformationZoneType: e.target
+                                  .value as (typeof TRANSFORMATION_ZONE_OPTIONS)[number],
+                              }))
+                            }
+                            className={selectClassName}
+                          >
+                            {TRANSFORMATION_ZONE_OPTIONS.map((opt) => (
+                              <option key={opt} value={opt}>
+                                Zona de Transformación {opt}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1">
+                        {COLPOSCOPY_DIAGNOSIS_PRESETS.map((preset) => (
+                          <button
+                            key={preset.shortLabel}
+                            type="button"
+                            onClick={() =>
+                              setColpoDraft((prev) => ({
+                                ...prev,
+                                diagnosis: preset.diagnosis,
+                                cie10Code: preset.cie10Code,
+                              }))
+                            }
+                            className="cursor-pointer rounded border border-border bg-muted/20 px-1.5 py-0.5 text-[10.5px] text-foreground hover:border-primary/40 hover:bg-primary/10"
+                          >
+                            {preset.shortLabel}
+                          </button>
+                        ))}
+                      </div>
+
                       <Cie10Autocomplete
+                        label="Diagnóstico 3 (Principal con CIE-10)"
+                        inputId="tpl-colpo-dx3"
                         diagnosis={colpoDraft.diagnosis}
                         cie10Code={colpoDraft.cie10Code}
                         onChange={(diag, code) =>
@@ -1556,7 +1917,7 @@ export function ClinicalTemplatesManagerModal({
                       />
                       <div className="space-y-1">
                         <label className="block text-xs font-semibold text-foreground">
-                          Diagnóstico Colposcópico *
+                          Texto Completo Diagnóstico 3 *
                         </label>
                         <Textarea
                           rows={2}
@@ -1569,6 +1930,93 @@ export function ClinicalTemplatesManagerModal({
                           }
                         />
                       </div>
+
+                      {(
+                        colpoDraft.extendedFindings?.additionalDiagnoses ?? []
+                      ).map((addItem, idx) => (
+                        <div
+                          key={`tpl-add-dx-${idx}`}
+                          className="space-y-1.5 rounded-lg border border-border bg-muted/15 p-2.5"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono text-[10.5px] font-bold text-primary uppercase">
+                              Diagnóstico {4 + idx} (Adicional)
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="xs"
+                              onClick={() =>
+                                setColpoDraft((prev) => ({
+                                  ...prev,
+                                  extendedFindings: {
+                                    ...prev.extendedFindings,
+                                    additionalDiagnoses: (
+                                      prev.extendedFindings
+                                        ?.additionalDiagnoses ?? []
+                                    ).filter((_, i) => i !== idx),
+                                  },
+                                }))
+                              }
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </Button>
+                          </div>
+                          <Cie10Autocomplete
+                            label={`Diagnóstico ${4 + idx} (con CIE-10)`}
+                            inputId={`tpl-colpo-dx-add-${idx}`}
+                            diagnosis={addItem.diagnosis}
+                            cie10Code={addItem.cie10Code ?? ""}
+                            onChange={(diag, code) =>
+                              setColpoDraft((prev) => ({
+                                ...prev,
+                                extendedFindings: {
+                                  ...prev.extendedFindings,
+                                  additionalDiagnoses: (
+                                    prev.extendedFindings
+                                      ?.additionalDiagnoses ?? []
+                                  ).map((row, i) =>
+                                    i === idx
+                                      ? { diagnosis: diag, cie10Code: code }
+                                      : row
+                                  ),
+                                },
+                              }))
+                            }
+                          />
+                        </div>
+                      ))}
+
+                      <div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="xs"
+                          onClick={() =>
+                            setColpoDraft((prev) => {
+                              const current =
+                                prev.extendedFindings?.additionalDiagnoses ??
+                                [];
+                              if (current.length >= 8) return prev;
+                              return {
+                                ...prev,
+                                extendedFindings: {
+                                  ...prev.extendedFindings,
+                                  additionalDiagnoses: [
+                                    ...current,
+                                    { diagnosis: "", cie10Code: "" },
+                                  ],
+                                },
+                              };
+                            })
+                          }
+                        >
+                          <Plus className="size-3 text-primary" />
+                          Agregar otro diagnóstico
+                        </Button>
+                      </div>
+
                       <div className="space-y-1">
                         <label className="block text-xs font-semibold text-foreground">
                           Plan / Recomendaciones *

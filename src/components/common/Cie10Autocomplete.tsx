@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { Search, Sparkles } from "lucide-react";
 import { useCie10Catalog } from "@/components/providers/Cie10CatalogProvider";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,9 @@ interface Cie10AutocompleteProps {
   onChange: (diagnosis: string, cie10Code: string) => void;
   required?: boolean;
   diagnosisError?: string;
+  label?: string;
+  inputId?: string;
+  placeholder?: string;
 }
 
 export function Cie10Autocomplete({
@@ -25,7 +28,12 @@ export function Cie10Autocomplete({
   onChange,
   required = false,
   diagnosisError,
+  label = "Diagnóstico Clínico",
+  inputId,
+  placeholder = "Escriba diagnóstico o código CIE-10 (ej. Endometriosis, N80.3, Z34.0)...",
 }: Cie10AutocompleteProps) {
+  const reactId = useId();
+  const resolvedInputId = inputId || `cie10-diagnosis-${reactId}`;
   const { catalog } = useCie10Catalog();
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -49,10 +57,10 @@ export function Cie10Autocomplete({
       {/* Presets rápidos frecuentes CENDO */}
       <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
         <label
-          htmlFor="cie10-diagnosis-input"
+          htmlFor={resolvedInputId}
           className="flex items-center gap-1.5 text-xs font-medium"
         >
-          Diagnóstico Clínico {required ? <span className="text-destructive">*</span> : null}
+          {label} {required ? <span className="text-destructive">*</span> : null}
         </label>
 
         <div className="flex items-center gap-1.5">
@@ -85,7 +93,7 @@ export function Cie10Autocomplete({
         <div className="relative sm:col-span-9">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
-            id="cie10-diagnosis-input"
+            id={resolvedInputId}
             value={diagnosis}
             onFocus={() => setDropdownOpen(true)}
             onBlur={() => {
@@ -96,7 +104,7 @@ export function Cie10Autocomplete({
               onChange(e.target.value, cie10Code);
               setDropdownOpen(true);
             }}
-            placeholder="Escriba diagnóstico o código CIE-10 (ej. Endometriosis, N80.3, Z34.0)..."
+            placeholder={placeholder}
             className="pl-8"
             aria-invalid={Boolean(diagnosisError)}
           />

@@ -317,6 +317,39 @@ export function PatientDetailView({
     );
   };
 
+  const handleBackgroundSyncedFromColposcopy = (
+    patch: Partial<NonNullable<typeof background>>
+  ) => {
+    setBackground((prev) =>
+      prev
+        ? { ...prev, ...patch, updatedAt: new Date().toISOString() }
+        : {
+            id: "temp-bg",
+            patientId: patient.id,
+            obstetricFormula: patch.obstetricFormula || "G0 P0000",
+            obstetricFormulaDetails: "",
+            menarche: null,
+            sexualDebutAge: patch.sexualDebutAge ?? null,
+            sexualPartnersCount: patch.sexualPartnersCount ?? null,
+            catamenialRegimen: "28/4",
+            stiHistory: "Niega ITS",
+            contraceptiveMethod: patch.contraceptiveMethod || "Ninguno",
+            lastMenstrualPeriod: patch.lastMenstrualPeriod ?? "",
+            papHistory: patch.papHistory || "No refiere",
+            vphTestHistory: patch.vphTestHistory || "No realizado",
+            hasDiabetes: "Niega",
+            hasHypertension: "Niega",
+            hasAsthma: "Niega",
+            medicalAllergies: "Niega",
+            surgeriesHistory: "Niega",
+            familyHistory: "No refiere",
+            otherPathologies: "Niega",
+            notes: "",
+            updatedAt: new Date().toISOString(),
+          }
+    );
+  };
+
   const handleFurSyncedFromPrenatal = (newFur: string) => {
     setBackground((prev) =>
       prev ? { ...prev, lastMenstrualPeriod: newFur } : prev
@@ -967,6 +1000,7 @@ export function PatientDetailView({
           canEdit={canEdit}
           canDelete={canDelete}
           onEmitBiopsyOrderFromColposcopy={handleEmitBiopsyOrderFromColposcopy}
+          onBackgroundSynced={handleBackgroundSyncedFromColposcopy}
         />
       </div>
 

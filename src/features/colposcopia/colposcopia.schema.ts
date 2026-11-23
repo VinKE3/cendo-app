@@ -6,16 +6,367 @@ import type {
 import { pgUuidSchema } from "@/features/configuracion/configuracion.schema";
 
 export const SCJ_VISIBILITY_OPTIONS = [
-  "Visible",
-  "No visible",
+  "Completamente visible",
   "Parcialmente visible",
+  "No visible",
 ] as const;
+
+export function normalizeScjVisibility(
+  raw?: string | null
+): (typeof SCJ_VISIBILITY_OPTIONS)[number] {
+  if (raw === "Parcialmente visible" || raw === "No visible") return raw;
+  return "Completamente visible";
+}
 
 export const TRANSFORMATION_ZONE_OPTIONS = [
   "Tipo 1",
   "Tipo 2",
   "Tipo 3",
 ] as const;
+
+export const COLPOSCOPY_PAP_OPTIONS = [
+  "Negativo / NILM",
+  "ASC-US",
+  "ASC-H",
+  "LIE-BG",
+  "LIE-AG",
+  "CA in situ",
+  "En proceso",
+  "No se realizó",
+  "Otros",
+] as const;
+
+export type ColposcopyPapOption = (typeof COLPOSCOPY_PAP_OPTIONS)[number];
+
+export const COLPOSCOPY_VPH_OPTIONS = [
+  "Negativo",
+  "Positivo",
+  "En proceso",
+  "No se realizó",
+] as const;
+
+export type ColposcopyVphOption = (typeof COLPOSCOPY_VPH_OPTIONS)[number];
+
+export const COLPOSCOPY_DIAGNOSIS_PRESETS = [
+  {
+    shortLabel: "Hallazgos normales (Z01.4)",
+    diagnosis: "Hallazgos colposcópicos normales (Colposcopía sin alteraciones)",
+    cie10Code: "Z01.4",
+  },
+  {
+    shortLabel: "Probable VPH (B97.7)",
+    diagnosis: "Probable infección por virus del papiloma humano (VPH)",
+    cie10Code: "B97.7",
+  },
+  {
+    shortLabel: "Displasia leve / NIC I (N87.0)",
+    diagnosis: "Displasia cervical leve (NIC I / LIE-BG)",
+    cie10Code: "N87.0",
+  },
+  {
+    shortLabel: "Displasia moderada / NIC II (N87.1)",
+    diagnosis: "Displasia cervical moderada (NIC II / LIE-AG)",
+    cie10Code: "N87.1",
+  },
+  {
+    shortLabel: "Displasia severa / NIC III (N87.2)",
+    diagnosis: "Displasia cervical severa (NIC III / LIE-AG)",
+    cie10Code: "N87.2",
+  },
+  {
+    shortLabel: "Carcinoma in situ (D06.9)",
+    diagnosis: "Carcinoma in situ del cuello uterino",
+    cie10Code: "D06.9",
+  },
+] as const;
+
+/**
+ * Convierte el texto libre de Historial PAP a las opciones estructuradas del informe Excel.
+ */
+export function parseBackgroundPapToColposcopy(rawPap?: string | null): {
+  papResult: string;
+  papOther: string;
+} {
+  const clean = (rawPap ?? "").trim();
+  if (!clean) return { papResult: "", papOther: "" };
+
+  const lower = clean.toLowerCase();
+  if (
+    lower === "no refiere" ||
+    lower === "sin antecedentes" ||
+    lower === "na" ||
+    lower === "n/a" ||
+    lower === "-"
+  ) {
+    return { papResult: "", papOther: "" };
+  }
+
+  const upper = clean.toUpperCase();
+  if (upper.startsWith("OTROS")) {
+    const match = clean.match(/^otros\s*(?::|\()\s*(.+?)\)?$/i);
+    return {
+      papResult: "Otros",
+      papOther: match?.[1]?.trim() ?? "",
+    };
+  }
+
+  if (upper.includes("EN PROCESO") || upper.includes("PENDIENTE")) {
+    return { papResult: "En proceso", papOther: "" };
+  }
+  if (
+    upper.includes("NO SE REALIZ") ||
+    upper.includes("NO REALIZ") ||
+    upper.includes("NUNCA")
+  ) {
+    return { papResult: "No se realizó", papOther: "" };
+  }
+  if (upper.includes("ASC-US") || upper.includes("ASCUS")) {
+    return { papResult: "ASC-US", papOther: "" };
+  }
+  if (upper.includes("ASC-H") || upper.includes("ASCH")) {
+    return { papResult: "ASC-H", papOther: "" };
+  }
+  if (
+    upper.includes("LIE-BG") ||
+    upper.includes("LIEBG") ||
+    upper.includes("NIC I") ||
+    upper.includes("BAJO GRADO")
+  ) {
+    return { papResult: "LIE-BG", papOther: "" };
+  }
+  if (
+    upper.includes("LIE-AG") ||
+    upper.includes("LIEAG") ||
+    upper.includes("NIC II") ||
+    upper.includes("NIC III") ||
+    upper.includes("ALTO GRADO")
+  ) {
+    return { papResult: "LIE-AG", papOther: "" };
+  }
+  if (upper.includes("CA IN SITU") || upper.includes("CARCINOMA")) {
+    return { papResult: "CA in situ", papOther: "" };
+  }
+  if (
+    upper.includes("NEGATIVO") ||
+    upper.includes("NILM") ||
+    upper.includes("NORMAL")
+  ) {
+    return { papResult: "Negativo / NILM", papOther: "" };
+  }
+
+  return { papResult: "Otros", papOther: clean };
+}
+
+/**
+ * Convierte el texto libre de Test VPH a las opciones del Excel (incluyendo Serotipo y En proceso).
+ */
+export function parseBackgroundVphToColposcopy(rawVph?: string | null): {
+  vphResult: string;
+  vphSerotype: string;
+} {
+  const clean = (rawVph ?? "").trim();
+  if (!clean) return { vphResult: "", vphSerotype: "" };
+
+  const lower = clean.toLowerCase();
+  if (
+    lower === "no refiere" ||
+    lower === "sin registro" ||
+    lower === "na" ||
+    lower === "n/a" ||
+    lower === "-"
+  ) {
+    return { vphResult: "", vphSerotype: "" };
+  }
+
+  const upper = clean.toUpperCase();
+  if (upper.includes("EN PROCESO") || upper.includes("PENDIENTE")) {
+    return { vphResult: "En proceso", vphSerotype: "" };
+  }
+  if (upper.includes("NO SE REALIZ") || upper.includes("NO REALIZ")) {
+    return { vphResult: "No se realizó", vphSerotype: "" };
+  }
+  if (upper.includes("NEGATIVO") || upper.includes("NO DETECTADO")) {
+    return { vphResult: "Negativo", vphSerotype: "" };
+  }
+  if (
+    upper.includes("POSITIVO") ||
+    upper.includes("DETECTADO") ||
+    upper.includes("SEROTIPO") ||
+    upper.includes("GENOTIPO")
+  ) {
+    const match = clean.match(/(?:serotipo|genotipo)\s*[:\-]?\s*([^)]+)/i);
+    return {
+      vphResult: "Positivo",
+      vphSerotype: match?.[1]?.trim() ?? "",
+    };
+  }
+
+  return { vphResult: "", vphSerotype: "" };
+}
+
+export function formatPapForHistory(
+  papResult?: string,
+  papOther?: string
+): string | null {
+  const cleanResult = (papResult ?? "").trim();
+  if (!cleanResult) return null;
+  const cleanOther = (papOther ?? "").trim();
+  if (cleanResult === "Otros") {
+    return cleanOther ? `Otros: ${cleanOther}` : "Otros";
+  }
+  return cleanOther ? `${cleanResult} (${cleanOther})` : cleanResult;
+}
+
+export function formatVphForHistory(
+  vphResult?: string,
+  vphSerotype?: string
+): string | null {
+  const cleanResult = (vphResult ?? "").trim();
+  if (!cleanResult) return null;
+  const cleanSerotype = (vphSerotype ?? "").trim();
+  if (cleanResult === "Positivo" && cleanSerotype) {
+    return `Positivo (Serotipo: ${cleanSerotype})`;
+  }
+  return cleanResult;
+}
+
+export interface ColposcopyBackgroundSyncPatch {
+  obstetricFormula?: string;
+  lastMenstrualPeriod?: string;
+  contraceptiveMethod?: string;
+  sexualDebutAge?: number;
+  sexualPartnersCount?: number;
+  papHistory?: string;
+  vphTestHistory?: string;
+}
+
+/**
+ * Extrae el subconjunto válido de Antecedentes/PAP/VPH para sincronizar con la Historia Clínica.
+ */
+export function buildColposcopyBackgroundSyncPatch(
+  ext?: Partial<ColposcopyExtendedFindingsRecord> | null
+): ColposcopyBackgroundSyncPatch {
+  if (!ext) return {};
+  const patch: ColposcopyBackgroundSyncPatch = {};
+
+  const cleanFormula = ext.obstetricFormula?.trim().toUpperCase() ?? "";
+  if (cleanFormula.length >= 2 && cleanFormula.length <= 30) {
+    patch.obstetricFormula = cleanFormula;
+  }
+
+  if (ext.fur !== undefined) {
+    const cleanFur = ext.fur.trim();
+    if (cleanFur === "" || /^\d{4}-\d{2}-\d{2}$/.test(cleanFur)) {
+      patch.lastMenstrualPeriod = cleanFur;
+    }
+  }
+
+  const cleanMac = ext.mac?.trim() ?? "";
+  if (cleanMac) {
+    patch.contraceptiveMethod = cleanMac.slice(0, 150);
+  }
+
+  const cleanIrs = ext.irs?.trim() ?? "";
+  if (cleanIrs) {
+    const parsedIrs = Number.parseInt(cleanIrs, 10);
+    if (
+      String(parsedIrs) === cleanIrs &&
+      parsedIrs >= 10 &&
+      parsedIrs <= 45
+    ) {
+      patch.sexualDebutAge = parsedIrs;
+    }
+  }
+
+  const cleanNps = ext.nps?.trim() ?? "";
+  if (cleanNps) {
+    const parsedNps = Number.parseInt(cleanNps, 10);
+    if (
+      String(parsedNps) === cleanNps &&
+      parsedNps >= 0 &&
+      parsedNps <= 100
+    ) {
+      patch.sexualPartnersCount = parsedNps;
+    }
+  }
+
+  const formattedPap = formatPapForHistory(ext.papResult, ext.papOther);
+  if (formattedPap) {
+    patch.papHistory = formattedPap.slice(0, 300);
+  }
+
+  const formattedVph = formatVphForHistory(ext.vphResult, ext.vphSerotype);
+  if (formattedVph) {
+    patch.vphTestHistory = formattedVph.slice(0, 300);
+  }
+
+  return patch;
+}
+
+export interface ColposcopyBackgroundFallback {
+  obstetricFormula?: string | null;
+  lastMenstrualPeriod?: string | null;
+  contraceptiveMethod?: string | null;
+  sexualDebutAge?: number | null;
+  sexualPartnersCount?: number | null;
+  papHistory?: string | null;
+  vphTestHistory?: string | null;
+}
+
+/**
+ * Resuelve los antecedentes, PAP y VPH para impresión dando prioridad al snapshot del informe.
+ */
+export function resolveColposcopyComplementaryData(
+  ext: Partial<ColposcopyExtendedFindingsRecord> | null | undefined,
+  background?: ColposcopyBackgroundFallback | null
+) {
+  const e = ext ?? {};
+  const parsedBgPap = parseBackgroundPapToColposcopy(background?.papHistory);
+  const parsedBgVph = parseBackgroundVphToColposcopy(background?.vphTestHistory);
+
+  const hasSavedPap = Boolean(e.papResult?.trim() || e.papOther?.trim());
+  const papResult = hasSavedPap ? (e.papResult?.trim() ?? "") : parsedBgPap.papResult;
+  const papOther = hasSavedPap ? (e.papOther?.trim() ?? "") : parsedBgPap.papOther;
+
+  const hasSavedVph = Boolean(e.vphResult?.trim() || e.vphSerotype?.trim());
+  const vphResult = hasSavedVph ? (e.vphResult?.trim() ?? "") : parsedBgVph.vphResult;
+  const vphSerotype = hasSavedVph
+    ? (e.vphSerotype?.trim() ?? "")
+    : parsedBgVph.vphSerotype;
+
+  return {
+    nps:
+      e.nps?.trim() ||
+      (background?.sexualPartnersCount != null
+        ? String(background.sexualPartnersCount)
+        : "NA"),
+    irs:
+      e.irs?.trim() ||
+      (background?.sexualDebutAge != null ? `${background.sexualDebutAge} años` : "NA"),
+    fur: e.fur?.trim() || background?.lastMenstrualPeriod || "",
+    obstetricFormula:
+      e.obstetricFormula?.trim() || background?.obstetricFormula || "G0 P0000",
+    mac: e.mac?.trim() || background?.contraceptiveMethod || "Ninguno",
+    papResult,
+    papOther,
+    vphResult,
+    vphSerotype,
+  };
+}
+
+export function formatColposcopyPapLabel(
+  papResult: string,
+  papOther: string
+): string {
+  return formatPapForHistory(papResult, papOther) || "No refiere";
+}
+
+export function formatColposcopyVphLabel(
+  vphResult: string,
+  vphSerotype: string
+): string {
+  return formatVphForHistory(vphResult, vphSerotype) || "No se realizó";
+}
 
 export const SCHILLER_TEST_OPTIONS = [
   "Negativo (Lugol Caoba Homogéneo)",
@@ -107,7 +458,11 @@ export interface ColposcopyClassificationInput {
   coarseMosaic?: boolean;
   coarsePunctation?: boolean;
   atypicalVessels?: boolean;
-  extendedFindings?: Partial<ColposcopyExtendedFindingsRecord>;
+  extendedFindings?: Partial<
+    Omit<ColposcopyExtendedFindingsRecord, "additionalDiagnoses"> & {
+      additionalDiagnoses?: Array<{ diagnosis?: string; cie10Code?: string }>;
+    }
+  >;
 }
 
 /**
@@ -124,6 +479,7 @@ export function classifyColposcopyFindings(
       ext.irregularSurface ||
       ext.exophyticLesion ||
       ext.necrosis ||
+      ext.necroticUlceration ||
       ext.nodularTumor
   );
 
@@ -189,7 +545,7 @@ export function classifyColposcopyFindings(
     label: "Colposcopía Normal / Sin Atipias",
     tone: "normal",
     suggestedDiagnosis:
-      "Colposcopía adecuada satisfactoria sin lesiones intraepiteliales (Cérvix sano)",
+      "Hallazgos colposcópicos normales (Colposcopía sin alteraciones)",
     suggestedCie10: "Z01.4",
     suggestedPlan:
       "Continuar control ginecológico preventivo periódico y tamizaje citológico / VPH según norma vigente.",
@@ -204,9 +560,26 @@ const clinicalImageSchema = z
   })
   .strict();
 
+const colposcopyAdditionalDiagnosisSchema = z
+  .object({
+    diagnosis: z.string().trim().max(500),
+    cie10Code: z.string().trim().max(15).optional(),
+  })
+  .strict();
+
 export const colposcopyExtendedFindingsSchema = z
   .object({
     inadequateReason: z.string().trim().max(300).optional(),
+    nps: z.string().trim().max(40).optional(),
+    irs: z.string().trim().max(40).optional(),
+    fur: z.string().trim().max(20).optional(),
+    obstetricFormula: z.string().trim().max(40).optional(),
+    mac: z.string().trim().max(150).optional(),
+    papResult: z.string().trim().max(60).optional(),
+    papOther: z.string().trim().max(200).optional(),
+    vphResult: z.string().trim().max(60).optional(),
+    vphSerotype: z.string().trim().max(120).optional(),
+    atrophicSquamousEpithelium: z.boolean().optional(),
     nabothCyst: z.boolean().optional(),
     cryptOpenings: z.boolean().optional(),
     deciduosis: z.boolean().optional(),
@@ -221,15 +594,21 @@ export const colposcopyExtendedFindingsSchema = z
     irregularSurface: z.boolean().optional(),
     exophyticLesion: z.boolean().optional(),
     necrosis: z.boolean().optional(),
+    necroticUlceration: z.boolean().optional(),
     nodularTumor: z.boolean().optional(),
     congenitalTZ: z.boolean().optional(),
     condyloma: z.boolean().optional(),
     polyp: z.boolean().optional(),
     inflammation: z.boolean().optional(),
     stenosis: z.boolean().optional(),
+    congenitalAnomaly: z.boolean().optional(),
     postTreatmentAnomaly: z.boolean().optional(),
     endometriosisFoci: z.boolean().optional(),
     otherFindings: z.string().trim().max(800).optional(),
+    additionalDiagnoses: z
+      .array(colposcopyAdditionalDiagnosisSchema)
+      .max(8, "Máximo 8 diagnósticos adicionales.")
+      .optional(),
   })
   .strict();
 
@@ -273,6 +652,7 @@ const baseColposcopySchema = z.object({
     .min(3, "El plan / recomendaciones son obligatorios.")
     .max(1500),
   cie10Code: z.string().trim().min(2, "Código CIE-10 requerido.").max(15),
+  syncBackgroundToHistory: z.boolean().optional(),
 });
 
 export const createColposcopySchema = baseColposcopySchema.strict();

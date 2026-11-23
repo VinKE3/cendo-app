@@ -4,12 +4,16 @@ import { useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
-import type { ClinicalImageRecord } from "@/db/schema/specialty";
+import type {
+  ClinicalImageRecord,
+  ColposcopyAdditionalDiagnosisRecord,
+} from "@/db/schema/specialty";
 import type {
   ColposcopyClinicalTemplateItem,
   ColposcopyTemplatePayload,
 } from "@/features/clinical-templates/clinical-templates.schema";
 import type { MedicalConsultationItem } from "@/features/consultas/consultas.schema";
+import type { PatientBackgroundItem } from "@/features/pacientes/pacientes.schema";
 import { usePagination } from "@/hooks/use-pagination";
 import { compressClinicalImageFile } from "@/lib/image-compressor";
 import { getPeruDateString } from "@/lib/utils";
@@ -19,9 +23,16 @@ import {
   updateColposcopyAction,
 } from "../actions/colposcopia.actions";
 import {
+  buildColposcopyBackgroundSyncPatch,
   classifyColposcopyFindings,
   COLPOSCOPY_CAPTION_PRESETS,
+  COLPOSCOPY_DIAGNOSIS_PRESETS,
+  COLPOSCOPY_PAP_OPTIONS,
+  COLPOSCOPY_VPH_OPTIONS,
   createColposcopySchema,
+  normalizeScjVisibility,
+  parseBackgroundPapToColposcopy,
+  parseBackgroundVphToColposcopy,
   SCHILLER_TEST_OPTIONS,
   SCJ_VISIBILITY_OPTIONS,
   TRANSFORMATION_ZONE_OPTIONS,
@@ -33,23 +44,53 @@ import {
 
 export interface UseColposcopiaParams {
   patientId: string;
+  background?: PatientBackgroundItem | null;
+  onBackgroundSynced?: (patch: Partial<PatientBackgroundItem>) => void;
   colposcopies: ColposcopyReportItem[];
   onColposcopiesChange: (next: ColposcopyReportItem[]) => void;
   consultations: MedicalConsultationItem[];
   templates?: ColposcopyClinicalTemplateItem[];
 }
 
+function buildComplementaryDefaultsFromBackground(
+  background?: PatientBackgroundItem | null
+) {
+  const parsedPap = parseBackgroundPapToColposcopy(background?.papHistory);
+  const parsedVph = parseBackgroundVphToColposcopy(background?.vphTestHistory);
+
+  return {
+    nps:
+      background?.sexualPartnersCount != null
+        ? String(background.sexualPartnersCount)
+        : "",
+    irs:
+      background?.sexualDebutAge != null
+        ? String(background.sexualDebutAge)
+        : "",
+    fur: background?.lastMenstrualPeriod ?? "",
+    obstetricFormula: background?.obstetricFormula ?? "",
+    mac: background?.contraceptiveMethod ?? "",
+    papResult: parsedPap.papResult,
+    papOther: parsedPap.papOther,
+    vphResult: parsedVph.vphResult,
+    vphSerotype: parsedVph.vphSerotype,
+  };
+}
+
 function buildDefaultColposcopyValues(
   patientId: string,
   todayStr: string,
-  consultationId = ""
+  consultationId = "",
+  background?: PatientBackgroundItem | null
 ): CreateColposcopyInput {
+  const comp = buildComplementaryDefaultsFromBackground(background);
+
   return {
     patientId,
     consultationId,
     reportDate: todayStr,
     adequateColposcopy: true,
-    squamocolumnarJunctionVisible: "Visible",
+    squamocolumnarJunctionVisible: "Completamente visible",
     transformationZoneType: "Tipo 1",
     matureSquamousEpithelium: true,
     ectopy: false,
@@ -63,6 +104,8 @@ function buildDefaultColposcopyValues(
     atypicalVessels: false,
     extendedFindings: {
       inadequateReason: "",
+      ...comp,
+      atrophicSquamousEpithelium: false,
       nabothCyst: false,
       cryptOpenings: false,
       deciduosis: false,
@@ -77,30 +120,36 @@ function buildDefaultColposcopyValues(
       irregularSurface: false,
       exophyticLesion: false,
       necrosis: false,
+      necroticUlceration: false,
       nodularTumor: false,
       congenitalTZ: false,
       condyloma: false,
       polyp: false,
       inflammation: false,
       stenosis: false,
+      congenitalAnomaly: false,
       postTreatmentAnomaly: false,
       endometriosisFoci: false,
       otherFindings: "",
+      additionalDiagnoses: [],
     },
     schillerTest: SCHILLER_TEST_OPTIONS[0],
     cervicalBiopsyTaken: false,
     biopsyClockHours: [],
     images: [],
     diagnosis:
-      "Colposcopía adecuada satisfactoria sin lesiones intraepiteliales (Cérvix sano)",
+      "Hallazgos colposcópicos normales (Colposcopía sin alteraciones)",
     planRecommendations:
       "Continuar control ginecológico preventivo periódico y tamizaje citológico / VPH según norma vigente.",
     cie10Code: "Z01.4",
+    syncBackgroundToHistory: true,
   };
 }
 
 export function useColposcopia({
   patientId,
+  background = null,
+  onBackgroundSynced,
   colposcopies,
   onColposcopiesChange,
   consultations,
@@ -204,7 +253,8 @@ export function useColposcopia({
       buildDefaultColposcopyValues(
         patientId,
         todayStr,
-        consultations[0]?.id ?? ""
+        consultations[0]?.id ?? "",
+        background
       )
     );
     setDialogOpen(true);
@@ -216,11 +266,7 @@ export function useColposcopia({
     setSaveAndPrintIntent(false);
     setDraftImages(item.images.map((img) => ({ ...img })));
 
-    const scj = (SCJ_VISIBILITY_OPTIONS as readonly string[]).includes(
-      item.squamocolumnarJunctionVisible
-    )
-      ? (item.squamocolumnarJunctionVisible as (typeof SCJ_VISIBILITY_OPTIONS)[number])
-      : "Visible";
+    const scj = normalizeScjVisibility(item.squamocolumnarJunctionVisible);
 
     const tz = (TRANSFORMATION_ZONE_OPTIONS as readonly string[]).includes(
       item.transformationZoneType
@@ -233,6 +279,11 @@ export function useColposcopia({
         h
       )
     );
+
+    const compDefaults = buildComplementaryDefaultsFromBackground(background);
+    const ext = item.extendedFindings ?? {};
+    const hasSavedPap = Boolean(ext.papResult?.trim() || ext.papOther?.trim());
+    const hasSavedVph = Boolean(ext.vphResult?.trim() || ext.vphSerotype?.trim());
 
     form.reset({
       patientId: item.patientId,
@@ -252,32 +303,48 @@ export function useColposcopia({
       coarsePunctation: item.coarsePunctation,
       atypicalVessels: item.atypicalVessels,
       extendedFindings: {
-        inadequateReason: item.extendedFindings.inadequateReason ?? "",
-        nabothCyst: Boolean(item.extendedFindings.nabothCyst),
-        cryptOpenings: Boolean(item.extendedFindings.cryptOpenings),
-        deciduosis: Boolean(item.extendedFindings.deciduosis),
-        rapidAcetowhite: Boolean(item.extendedFindings.rapidAcetowhite),
-        thickenedGlands: Boolean(item.extendedFindings.thickenedGlands),
-        sharpBorders: Boolean(item.extendedFindings.sharpBorders),
-        innerBorderSign: Boolean(item.extendedFindings.innerBorderSign),
-        ridgeSign: Boolean(item.extendedFindings.ridgeSign),
-        leukoplakia: Boolean(item.extendedFindings.leukoplakia),
-        erosion: Boolean(item.extendedFindings.erosion),
-        fragileVessels: Boolean(item.extendedFindings.fragileVessels),
-        irregularSurface: Boolean(item.extendedFindings.irregularSurface),
-        exophyticLesion: Boolean(item.extendedFindings.exophyticLesion),
-        necrosis: Boolean(item.extendedFindings.necrosis),
-        nodularTumor: Boolean(item.extendedFindings.nodularTumor),
-        congenitalTZ: Boolean(item.extendedFindings.congenitalTZ),
-        condyloma: Boolean(item.extendedFindings.condyloma),
-        polyp: Boolean(item.extendedFindings.polyp),
-        inflammation: Boolean(item.extendedFindings.inflammation),
-        stenosis: Boolean(item.extendedFindings.stenosis),
-        postTreatmentAnomaly: Boolean(
-          item.extendedFindings.postTreatmentAnomaly
-        ),
-        endometriosisFoci: Boolean(item.extendedFindings.endometriosisFoci),
-        otherFindings: item.extendedFindings.otherFindings ?? "",
+        inadequateReason: ext.inadequateReason ?? "",
+        nps: ext.nps ?? compDefaults.nps,
+        irs: ext.irs ?? compDefaults.irs,
+        fur: ext.fur ?? compDefaults.fur,
+        obstetricFormula: ext.obstetricFormula ?? compDefaults.obstetricFormula,
+        mac: ext.mac ?? compDefaults.mac,
+        papResult: hasSavedPap ? (ext.papResult ?? "") : compDefaults.papResult,
+        papOther: hasSavedPap ? (ext.papOther ?? "") : compDefaults.papOther,
+        vphResult: hasSavedVph ? (ext.vphResult ?? "") : compDefaults.vphResult,
+        vphSerotype: hasSavedVph
+          ? (ext.vphSerotype ?? "")
+          : compDefaults.vphSerotype,
+        atrophicSquamousEpithelium: Boolean(ext.atrophicSquamousEpithelium),
+        nabothCyst: Boolean(ext.nabothCyst),
+        cryptOpenings: Boolean(ext.cryptOpenings),
+        deciduosis: Boolean(ext.deciduosis),
+        rapidAcetowhite: Boolean(ext.rapidAcetowhite),
+        thickenedGlands: Boolean(ext.thickenedGlands),
+        sharpBorders: Boolean(ext.sharpBorders),
+        innerBorderSign: Boolean(ext.innerBorderSign),
+        ridgeSign: Boolean(ext.ridgeSign),
+        leukoplakia: Boolean(ext.leukoplakia),
+        erosion: Boolean(ext.erosion),
+        fragileVessels: Boolean(ext.fragileVessels),
+        irregularSurface: Boolean(ext.irregularSurface),
+        exophyticLesion: Boolean(ext.exophyticLesion),
+        necrosis: Boolean(ext.necrosis),
+        necroticUlceration: Boolean(ext.necroticUlceration),
+        nodularTumor: Boolean(ext.nodularTumor),
+        congenitalTZ: Boolean(ext.congenitalTZ),
+        condyloma: Boolean(ext.condyloma),
+        polyp: Boolean(ext.polyp),
+        inflammation: Boolean(ext.inflammation),
+        stenosis: Boolean(ext.stenosis),
+        congenitalAnomaly: Boolean(ext.congenitalAnomaly),
+        postTreatmentAnomaly: Boolean(ext.postTreatmentAnomaly),
+        endometriosisFoci: Boolean(ext.endometriosisFoci),
+        otherFindings: ext.otherFindings ?? "",
+        additionalDiagnoses: (ext.additionalDiagnoses ?? []).map((d) => ({
+          diagnosis: d.diagnosis,
+          cie10Code: d.cie10Code ?? "",
+        })),
       },
       schillerTest: item.schillerTest,
       cervicalBiopsyTaken: item.cervicalBiopsyTaken,
@@ -286,6 +353,7 @@ export function useColposcopia({
       diagnosis: item.diagnosis,
       planRecommendations: item.planRecommendations,
       cie10Code: item.cie10Code,
+      syncBackgroundToHistory: true,
     });
     setDialogOpen(true);
   };
@@ -326,11 +394,7 @@ export function useColposcopia({
     payload: ColposcopyTemplatePayload,
     label: string
   ) => {
-    const scj = (SCJ_VISIBILITY_OPTIONS as readonly string[]).includes(
-      payload.squamocolumnarJunctionVisible
-    )
-      ? payload.squamocolumnarJunctionVisible
-      : "Visible";
+    const scj = normalizeScjVisibility(payload.squamocolumnarJunctionVisible);
     const tz = (TRANSFORMATION_ZONE_OPTIONS as readonly string[]).includes(
       payload.transformationZoneType
     )
@@ -346,6 +410,7 @@ export function useColposcopia({
       : [];
 
     const cleanExt = payload.extendedFindings ?? {};
+    const currentExt = form.getValues("extendedFindings") ?? {};
 
     form.setValue("adequateColposcopy", payload.adequateColposcopy, {
       shouldDirty: true,
@@ -381,7 +446,17 @@ export function useColposcopia({
     form.setValue(
       "extendedFindings",
       {
+        nps: currentExt.nps ?? "",
+        irs: currentExt.irs ?? "",
+        fur: currentExt.fur ?? "",
+        obstetricFormula: currentExt.obstetricFormula ?? "",
+        mac: currentExt.mac ?? "",
+        papResult: currentExt.papResult ?? "",
+        papOther: currentExt.papOther ?? "",
+        vphResult: currentExt.vphResult ?? "",
+        vphSerotype: currentExt.vphSerotype ?? "",
         inadequateReason: cleanExt.inadequateReason ?? "",
+        atrophicSquamousEpithelium: Boolean(cleanExt.atrophicSquamousEpithelium),
         nabothCyst: Boolean(cleanExt.nabothCyst),
         cryptOpenings: Boolean(cleanExt.cryptOpenings),
         deciduosis: Boolean(cleanExt.deciduosis),
@@ -396,15 +471,21 @@ export function useColposcopia({
         irregularSurface: Boolean(cleanExt.irregularSurface),
         exophyticLesion: Boolean(cleanExt.exophyticLesion),
         necrosis: Boolean(cleanExt.necrosis),
+        necroticUlceration: Boolean(cleanExt.necroticUlceration),
         nodularTumor: Boolean(cleanExt.nodularTumor),
         congenitalTZ: Boolean(cleanExt.congenitalTZ),
         condyloma: Boolean(cleanExt.condyloma),
         polyp: Boolean(cleanExt.polyp),
         inflammation: Boolean(cleanExt.inflammation),
         stenosis: Boolean(cleanExt.stenosis),
+        congenitalAnomaly: Boolean(cleanExt.congenitalAnomaly),
         postTreatmentAnomaly: Boolean(cleanExt.postTreatmentAnomaly),
         endometriosisFoci: Boolean(cleanExt.endometriosisFoci),
         otherFindings: cleanExt.otherFindings ?? "",
+        additionalDiagnoses: (cleanExt.additionalDiagnoses ?? []).map((d) => ({
+          diagnosis: d.diagnosis,
+          cie10Code: d.cie10Code ?? "",
+        })),
       },
       { shouldDirty: true }
     );
@@ -433,7 +514,12 @@ export function useColposcopia({
       return;
     }
 
-    const defaults = buildDefaultColposcopyValues(patientId, todayStr);
+    const defaults = buildDefaultColposcopyValues(
+      patientId,
+      todayStr,
+      "",
+      background
+    );
     applyTemplatePayload(
       {
         adequateColposcopy: defaults.adequateColposcopy,
@@ -463,6 +549,14 @@ export function useColposcopia({
 
   const buildTemplatePayloadFromForm = (): ColposcopyTemplatePayload => {
     const vals = form.getValues();
+    const ext = vals.extendedFindings ?? {};
+    const cleanAdditional = (ext.additionalDiagnoses ?? [])
+      .filter((d) => d.diagnosis.trim().length > 0)
+      .map((d) => ({
+        diagnosis: d.diagnosis.trim(),
+        ...(d.cie10Code?.trim() ? { cie10Code: d.cie10Code.trim().toUpperCase() } : {}),
+      }));
+
     return {
       adequateColposcopy: vals.adequateColposcopy,
       squamocolumnarJunctionVisible: vals.squamocolumnarJunctionVisible,
@@ -477,7 +571,36 @@ export function useColposcopia({
       finePunctation: vals.finePunctation,
       coarsePunctation: vals.coarsePunctation,
       atypicalVessels: vals.atypicalVessels,
-      extendedFindings: vals.extendedFindings,
+      extendedFindings: {
+        inadequateReason: vals.adequateColposcopy ? "" : ext.inadequateReason ?? "",
+        atrophicSquamousEpithelium: Boolean(ext.atrophicSquamousEpithelium),
+        nabothCyst: Boolean(ext.nabothCyst),
+        cryptOpenings: Boolean(ext.cryptOpenings),
+        deciduosis: Boolean(ext.deciduosis),
+        rapidAcetowhite: Boolean(ext.rapidAcetowhite),
+        thickenedGlands: Boolean(ext.thickenedGlands),
+        sharpBorders: Boolean(ext.sharpBorders),
+        innerBorderSign: Boolean(ext.innerBorderSign),
+        ridgeSign: Boolean(ext.ridgeSign),
+        leukoplakia: Boolean(ext.leukoplakia),
+        erosion: Boolean(ext.erosion),
+        fragileVessels: Boolean(ext.fragileVessels),
+        irregularSurface: Boolean(ext.irregularSurface),
+        exophyticLesion: Boolean(ext.exophyticLesion),
+        necrosis: Boolean(ext.necrosis),
+        necroticUlceration: Boolean(ext.necroticUlceration),
+        nodularTumor: Boolean(ext.nodularTumor),
+        congenitalTZ: Boolean(ext.congenitalTZ),
+        condyloma: Boolean(ext.condyloma),
+        polyp: Boolean(ext.polyp),
+        inflammation: Boolean(ext.inflammation),
+        stenosis: Boolean(ext.stenosis),
+        congenitalAnomaly: Boolean(ext.congenitalAnomaly),
+        postTreatmentAnomaly: Boolean(ext.postTreatmentAnomaly),
+        endometriosisFoci: Boolean(ext.endometriosisFoci),
+        otherFindings: ext.otherFindings ?? "",
+        additionalDiagnoses: cleanAdditional,
+      },
       schillerTest: vals.schillerTest,
       cervicalBiopsyTaken: vals.cervicalBiopsyTaken,
       biopsyClockHours: vals.cervicalBiopsyTaken
@@ -487,6 +610,43 @@ export function useColposcopia({
       diagnosis: vals.diagnosis,
       planRecommendations: vals.planRecommendations,
     };
+  };
+
+  const addAdditionalDiagnosis = () => {
+    const current = form.getValues("extendedFindings.additionalDiagnoses") ?? [];
+    if (current.length >= 8) {
+      toast.error("Máximo 8 diagnósticos adicionales.");
+      return;
+    }
+    const next: ColposcopyAdditionalDiagnosisRecord[] = [
+      ...current,
+      { diagnosis: "", cie10Code: "" },
+    ];
+    form.setValue("extendedFindings.additionalDiagnoses", next, {
+      shouldDirty: true,
+    });
+  };
+
+  const updateAdditionalDiagnosis = (
+    index: number,
+    diagnosis: string,
+    cie10Code: string
+  ) => {
+    const current = form.getValues("extendedFindings.additionalDiagnoses") ?? [];
+    const next = current.map((item, idx) =>
+      idx === index ? { diagnosis, cie10Code } : item
+    );
+    form.setValue("extendedFindings.additionalDiagnoses", next, {
+      shouldDirty: true,
+    });
+  };
+
+  const removeAdditionalDiagnosis = (index: number) => {
+    const current = form.getValues("extendedFindings.additionalDiagnoses") ?? [];
+    const next = current.filter((_, idx) => idx !== index);
+    form.setValue("extendedFindings.additionalDiagnoses", next, {
+      shouldDirty: true,
+    });
   };
 
   const handleUploadFiles = async (files: FileList | null) => {
@@ -597,8 +757,19 @@ export function useColposcopia({
   };
 
   const onSubmit = form.handleSubmit(async (values) => {
+    const cleanedAdditional = (values.extendedFindings.additionalDiagnoses ?? [])
+      .filter((d) => d.diagnosis.trim().length > 0)
+      .map((d) => ({
+        diagnosis: d.diagnosis.trim(),
+        ...(d.cie10Code?.trim() ? { cie10Code: d.cie10Code.trim().toUpperCase() } : {}),
+      }));
+
     const payload: CreateColposcopyInput = {
       ...values,
+      extendedFindings: {
+        ...values.extendedFindings,
+        additionalDiagnoses: cleanedAdditional,
+      },
       images: draftImages,
     };
 
@@ -613,6 +784,13 @@ export function useColposcopia({
 
     const saved = res.data;
     setSessionUploadedPaths([]);
+
+    if (values.syncBackgroundToHistory && onBackgroundSynced) {
+      const syncPatch = buildColposcopyBackgroundSyncPatch(saved.extendedFindings);
+      if (Object.keys(syncPatch).length > 0) {
+        onBackgroundSynced(syncPatch);
+      }
+    }
 
     if (editingItem) {
       onColposcopiesChange(
@@ -669,11 +847,17 @@ export function useColposcopia({
     scjOptions: SCJ_VISIBILITY_OPTIONS,
     tzOptions: TRANSFORMATION_ZONE_OPTIONS,
     schillerOptions: SCHILLER_TEST_OPTIONS,
+    papOptions: COLPOSCOPY_PAP_OPTIONS,
+    vphOptions: COLPOSCOPY_VPH_OPTIONS,
+    diagnosisPresets: COLPOSCOPY_DIAGNOSIS_PRESETS,
     captionPresets: COLPOSCOPY_CAPTION_PRESETS,
     openCreateModal,
     openEditModal,
     handleToggleClockHours,
     handleToggleBiopsyTaken,
+    addAdditionalDiagnosis,
+    updateAdditionalDiagnosis,
+    removeAdditionalDiagnosis,
     applyClassificationSuggestion,
     applyTemplate,
     applyNormalDefaults,

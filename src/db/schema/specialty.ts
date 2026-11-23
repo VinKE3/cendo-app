@@ -21,31 +21,56 @@ export interface ClinicalImageRecord {
   timestamp?: string;
 }
 
+export interface ColposcopyAdditionalDiagnosisRecord {
+  diagnosis: string;
+  cie10Code?: string;
+}
+
 export interface ColposcopyExtendedFindingsRecord {
   inadequateReason?: string;
+  // Información Complementaria / Antecedentes editables por informe
+  nps?: string;
+  irs?: string;
+  fur?: string;
+  obstetricFormula?: string;
+  mac?: string;
+  papResult?: string;
+  papOther?: string;
+  vphResult?: string;
+  vphSerotype?: string;
+  // Normales
+  atrophicSquamousEpithelium?: boolean;
   nabothCyst?: boolean;
   cryptOpenings?: boolean;
   deciduosis?: boolean;
+  // Anormales Grado 2
   rapidAcetowhite?: boolean;
   thickenedGlands?: boolean;
   sharpBorders?: boolean;
   innerBorderSign?: boolean;
   ridgeSign?: boolean;
+  // No específicos
   leukoplakia?: boolean;
   erosion?: boolean;
+  // Sospecha de invasión
   fragileVessels?: boolean;
   irregularSurface?: boolean;
   exophyticLesion?: boolean;
   necrosis?: boolean;
+  necroticUlceration?: boolean;
   nodularTumor?: boolean;
+  // Hallazgos varios
   congenitalTZ?: boolean;
   condyloma?: boolean;
   polyp?: boolean;
   inflammation?: boolean;
   stenosis?: boolean;
+  congenitalAnomaly?: boolean;
   postTreatmentAnomaly?: boolean;
   endometriosisFoci?: boolean;
   otherFindings?: string;
+  // Diagnósticos adicionales (Dx 4+)
+  additionalDiagnoses?: ColposcopyAdditionalDiagnosisRecord[];
 }
 
 export interface UltrasoundBreastLesionRecord {

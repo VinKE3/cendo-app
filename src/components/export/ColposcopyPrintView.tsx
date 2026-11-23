@@ -9,6 +9,8 @@ import { useSignatureSettings } from "@/components/providers/SignatureSettingsPr
 import type { ClinicalImageRecord } from "@/db/schema/specialty";
 import {
   classifyColposcopyFindings,
+  normalizeScjVisibility,
+  resolveColposcopyComplementaryData,
   type ColposcopyReportItem,
 } from "@/features/colposcopia/colposcopia.schema";
 import type {
@@ -65,7 +67,7 @@ function FindingRow({
   return (
     <div
       className={cn(
-        "flex items-center justify-between gap-1.5 rounded px-1.5 py-[1.5px] text-[8.5px] leading-tight",
+        "flex items-center justify-between gap-1.5 rounded px-1.5 py-[1px] text-[8.2px] leading-tight",
         rowBg
       )}
     >
@@ -167,45 +169,6 @@ function CheckOptionChip({
   );
 }
 
-function matchPapCategory(
-  rawPap: string | null | undefined
-): "NILM" | "ASC-US" | "ASC-H" | "LIE-BG" | "LIE-AG" | "CA" | "OTROS" {
-  const upper = (rawPap ?? "").toUpperCase();
-  if (!upper) return "OTROS";
-  if (upper.includes("ASC-US") || upper.includes("ASCUS")) return "ASC-US";
-  if (upper.includes("ASC-H") || upper.includes("ASCH")) return "ASC-H";
-  if (upper.includes("LIE-BG") || upper.includes("LIEBG") || upper.includes("NIC I") || upper.includes("BAJO GRADO")) {
-    return "LIE-BG";
-  }
-  if (upper.includes("LIE-AG") || upper.includes("LIEAG") || upper.includes("NIC II") || upper.includes("NIC III") || upper.includes("ALTO GRADO")) {
-    return "LIE-AG";
-  }
-  if (upper.includes("CA IN SITU") || upper.includes("CARCINOMA")) return "CA";
-  if (upper.includes("NEGATIVO") || upper.includes("NILM") || upper.includes("NORMAL")) {
-    return "NILM";
-  }
-  return "OTROS";
-}
-
-function matchVphCategory(
-  rawVph: string | null | undefined
-): "NEGATIVO" | "POSITIVO" | "NA" | "NO_REALIZADO" {
-  const upper = (rawVph ?? "").toUpperCase();
-  if (!upper || upper.includes("NO REALIZADO") || upper.includes("NO SE REALIZ") || upper.includes("NO REFIERE")) {
-    return "NO_REALIZADO";
-  }
-  if (upper === "NA" || upper === "N/A" || upper.includes("PENDIENTE")) {
-    return "NA";
-  }
-  if (upper.includes("NEGATIVO") || upper.includes("NO DETECTADO")) {
-    return "NEGATIVO";
-  }
-  if (upper.includes("POSITIVO") || upper.includes("DETECTADO") || upper.includes("GENOTIPO")) {
-    return "POSITIVO";
-  }
-  return "NO_REALIZADO";
-}
-
 function chunkColpoImages(
   items: ClinicalImageRecord[],
   chunkSize: number
@@ -257,8 +220,13 @@ export function ColposcopyPrintView({
   });
 
   const ext = report.extendedFindings ?? {};
-  const papCat = matchPapCategory(background?.papHistory);
-  const vphCat = matchVphCategory(background?.vphTestHistory);
+  const comp = resolveColposcopyComplementaryData(ext, background);
+  const normalizedScj = normalizeScjVisibility(
+    report.squamocolumnarJunctionVisible
+  );
+  const additionalDiagnoses = (ext.additionalDiagnoses ?? []).filter(
+    (d) => d.diagnosis.trim().length > 0
+  );
 
   // Las primeras 4 imágenes se integran en la Página 2 (igual que la Pág. 10 de informe.pdf)
   const inlinePhotos = report.images.slice(0, 4);
@@ -289,7 +257,7 @@ export function ColposcopyPrintView({
           PÁGINA 1 / 2: FILIACIÓN + ANTECEDENTES + SECCIONES IFCPC I A VII
          ===================================================================== */}
       <section className="page-sheet box-border flex min-h-[297mm] w-[210mm] flex-col justify-between overflow-hidden rounded-xl border border-border bg-card shadow-sm print:rounded-none print:border-none print:shadow-none">
-        <div className="flex-1 space-y-2.5 px-[13mm] pt-[9mm] pb-2">
+        <div className="flex-1 space-y-2 px-[13mm] pt-[7.5mm] pb-1.5">
           {/* 1. Membrete CENDO + Médico Evaluador */}
           <header className="flex items-start justify-between gap-4 border-b-2 border-primary pb-2">
             <div className="flex items-center gap-3">
@@ -343,146 +311,194 @@ export function ColposcopyPrintView({
             </div>
           </div>
 
-          {/* 2. Datos Personales (Sin truncar nombre) */}
-          <div className="grid grid-cols-12 items-center gap-2 rounded-lg border border-border bg-muted/20 px-3 py-2">
-            <div className="col-span-5">
-              <span className="block text-[8px] font-bold text-muted-foreground uppercase">
+          {/* 2. Datos Personales (con Fecha de Nacimiento, sin truncar nombre) */}
+          <div className="grid grid-cols-12 items-center gap-2 rounded-lg border border-border bg-muted/20 px-3 py-1.5">
+            <div className="col-span-4">
+              <span className="block text-[7.5px] font-bold text-muted-foreground uppercase">
                 Apellidos y Nombres
               </span>
-              <strong className="block text-[11px] leading-snug font-bold text-foreground">
+              <strong className="block text-[10.5px] leading-snug font-bold text-foreground">
                 {patient.fullName}
               </strong>
             </div>
 
             <div className="col-span-2">
-              <span className="block text-[8px] font-bold text-muted-foreground uppercase">
+              <span className="block text-[7.5px] font-bold text-muted-foreground uppercase">
                 Documento
               </span>
-              <span className="font-mono text-[10.5px] font-bold text-foreground">
+              <span className="font-mono text-[9.5px] font-bold text-foreground">
                 {patient.documentType} {patient.documentNumber}
               </span>
             </div>
 
             <div className="col-span-2">
-              <span className="block text-[8px] font-bold text-muted-foreground uppercase">
+              <span className="block text-[7.5px] font-bold text-muted-foreground uppercase">
+                F. Nacimiento
+              </span>
+              <span className="font-mono text-[9.5px] font-semibold text-foreground">
+                {patient.birthDate
+                  ? formatPeruDateDisplay(patient.birthDate)
+                  : "NA"}
+              </span>
+            </div>
+
+            <div className="col-span-2">
+              <span className="block text-[7.5px] font-bold text-muted-foreground uppercase">
                 Edad / Teléfono
               </span>
-              <span className="text-[10px] font-semibold text-foreground">
+              <span className="text-[9.5px] font-semibold text-foreground">
                 {patient.age} años
                 {patient.phone ? ` • ${patient.phone}` : ""}
               </span>
             </div>
 
-            <div className="col-span-3 text-right">
-              <span className="block text-[8px] font-bold text-muted-foreground uppercase">
-                Validez del Examen
+            <div className="col-span-2 text-right">
+              <span className="block text-[7.5px] font-bold text-muted-foreground uppercase">
+                Validez
               </span>
               <span
                 className={cn(
-                  "mt-0.5 inline-block rounded-full border px-2.5 py-0.5 text-[9px] font-bold",
+                  "mt-0.5 inline-block rounded-full border px-2 py-0.5 text-[8.5px] font-bold",
                   report.adequateColposcopy
                     ? "border-success/40 bg-success/10 text-success"
                     : "border-warning/40 bg-warning/15 text-foreground"
                 )}
               >
-                {report.adequateColposcopy
-                  ? "Colposcopía Adecuada"
-                  : "Colposcopía Inadecuada"}
+                {report.adequateColposcopy ? "Adecuada" : "Inadecuada"}
               </span>
             </div>
           </div>
 
-          {/* 3. Información Complementaria / Antecedentes (Pág. 9 de informe.pdf) */}
+          {/* 3. Información Complementaria / Antecedentes (5 casillas separadas + PAP + VPH) */}
           <div className="overflow-hidden rounded-lg border border-primary/25 bg-card">
-            <div className="flex items-center justify-between border-b border-primary/20 bg-primary/10 px-2.5 py-1 text-[8.5px] font-bold tracking-wider text-primary uppercase">
-              <span>INFORMACIÓN COMPLEMENTARIA • ANTECEDENTES GINECO-OBSTÉTRICOS Y GENERALES</span>
-              <span className="font-mono text-[7.5px]">HISTORIA CLÍNICA</span>
+            <div className="flex items-center justify-between border-b border-primary/20 bg-primary/10 px-2.5 py-1 text-[8px] font-bold tracking-wider text-primary uppercase">
+              <span>
+                INFORMACIÓN COMPLEMENTARIA • ANTECEDENTES GINECO-OBSTÉTRICOS Y
+                GENERALES
+              </span>
+              <span className="font-mono text-[7px]">EXCEL CENDO / HC</span>
             </div>
-            <div className="space-y-1.5 px-2.5 py-1.5 text-[9px]">
-              <div className="grid grid-cols-12 gap-2">
-                <div className="col-span-3">
-                  <strong className="text-muted-foreground">
-                    Fórmula Obstétrica:{" "}
+            <div className="space-y-1.5 px-2 py-1.5 text-[8.5px]">
+              <div className="grid grid-cols-5 gap-1.5">
+                <div className="rounded border border-border/80 bg-muted/15 px-1.5 py-1">
+                  <span className="block text-[7px] font-bold text-muted-foreground uppercase">
+                    N° Parejas (NPS)
+                  </span>
+                  <strong className="font-mono text-[9px] text-foreground">
+                    {comp.nps}
                   </strong>
-                  <span className="font-mono font-bold text-foreground">
-                    {background?.obstetricFormula || "G0 P0000"}
-                  </span>
                 </div>
-                <div className="col-span-2">
-                  <strong className="text-muted-foreground">FUR: </strong>
-                  <span className="font-mono font-semibold text-foreground">
-                    {background?.lastMenstrualPeriod
-                      ? formatPeruDateDisplay(background.lastMenstrualPeriod)
-                      : "NA"}
+                <div className="rounded border border-border/80 bg-muted/15 px-1.5 py-1">
+                  <span className="block text-[7px] font-bold text-muted-foreground uppercase">
+                    IRS
                   </span>
+                  <strong className="font-mono text-[9px] text-foreground">
+                    {comp.irs}
+                  </strong>
                 </div>
-                <div className="col-span-3">
-                  <strong className="text-muted-foreground">IRS / NPS: </strong>
-                  <span className="font-mono font-semibold text-foreground">
-                    {background?.sexualDebutAge
-                      ? `${background.sexualDebutAge}a`
-                      : "NA"}{" "}
-                    / {background?.sexualPartnersCount ?? "NA"}
+                <div className="rounded border border-border/80 bg-muted/15 px-1.5 py-1">
+                  <span className="block text-[7px] font-bold text-muted-foreground uppercase">
+                    FUR
                   </span>
+                  <strong className="font-mono text-[9px] text-foreground">
+                    {comp.fur ? formatPeruDateDisplay(comp.fur) : "NA"}
+                  </strong>
                 </div>
-                <div className="col-span-4">
-                  <strong className="text-muted-foreground">MAC: </strong>
-                  <span className="font-semibold text-foreground">
-                    {background?.contraceptiveMethod || "Ninguno"}
+                <div className="rounded border border-border/80 bg-muted/15 px-1.5 py-1">
+                  <span className="block text-[7px] font-bold text-muted-foreground uppercase">
+                    Fórmula Obstétrica
                   </span>
+                  <strong className="font-mono text-[9px] text-foreground">
+                    {comp.obstetricFormula}
+                  </strong>
+                </div>
+                <div className="rounded border border-border/80 bg-muted/15 px-1.5 py-1">
+                  <span className="block text-[7px] font-bold text-muted-foreground uppercase">
+                    MAC
+                  </span>
+                  <strong className="block truncate text-[9px] text-foreground">
+                    {comp.mac}
+                  </strong>
                 </div>
               </div>
 
               <div className="grid grid-cols-12 items-center gap-2 border-t border-border/70 pt-1">
                 <div className="col-span-7 flex flex-wrap items-center gap-1">
-                  <strong className="mr-0.5 text-[8.5px] text-muted-foreground uppercase">
+                  <strong className="mr-0.5 text-[8px] text-muted-foreground uppercase">
                     Resultado PAP:
                   </strong>
-                  <CheckOptionChip label="NILM" checked={papCat === "NILM"} />
+                  <CheckOptionChip
+                    label="NILM"
+                    checked={comp.papResult === "Negativo / NILM"}
+                  />
                   <CheckOptionChip
                     label="ASC-US"
-                    checked={papCat === "ASC-US"}
+                    checked={comp.papResult === "ASC-US"}
                   />
-                  <CheckOptionChip label="ASC-H" checked={papCat === "ASC-H"} />
+                  <CheckOptionChip
+                    label="ASC-H"
+                    checked={comp.papResult === "ASC-H"}
+                  />
                   <CheckOptionChip
                     label="LIE-BG"
-                    checked={papCat === "LIE-BG"}
+                    checked={comp.papResult === "LIE-BG"}
                   />
                   <CheckOptionChip
                     label="LIE-AG"
-                    checked={papCat === "LIE-AG"}
+                    checked={comp.papResult === "LIE-AG"}
                   />
                   <CheckOptionChip
                     label="CA in situ"
-                    checked={papCat === "CA"}
+                    checked={comp.papResult === "CA in situ"}
+                  />
+                  <CheckOptionChip
+                    label="En proceso"
+                    checked={comp.papResult === "En proceso"}
+                  />
+                  <CheckOptionChip
+                    label="No se realizó"
+                    checked={comp.papResult === "No se realizó"}
                   />
                   <CheckOptionChip
                     label={
-                      papCat === "OTROS" && background?.papHistory
-                        ? `OTROS (${background.papHistory.slice(0, 22)})`
-                        : "OTROS"
+                      comp.papResult === "Otros" && comp.papOther
+                        ? `Otros (${comp.papOther.slice(0, 22)})`
+                        : "Otros"
                     }
-                    checked={papCat === "OTROS"}
+                    checked={comp.papResult === "Otros"}
                   />
+                  {comp.papResult !== "Otros" && comp.papOther ? (
+                    <span className="rounded border border-border bg-muted/30 px-1.5 py-0.5 text-[7.5px] font-semibold text-foreground">
+                      {comp.papOther}
+                    </span>
+                  ) : null}
                 </div>
 
                 <div className="col-span-5 flex flex-wrap items-center justify-end gap-1">
-                  <strong className="mr-0.5 text-[8.5px] text-muted-foreground uppercase">
+                  <strong className="mr-0.5 text-[8px] text-muted-foreground uppercase">
                     Test VPH:
                   </strong>
                   <CheckOptionChip
                     label="Negativo"
-                    checked={vphCat === "NEGATIVO"}
+                    checked={comp.vphResult === "Negativo"}
                   />
                   <CheckOptionChip
                     label="Positivo"
-                    checked={vphCat === "POSITIVO"}
+                    checked={comp.vphResult === "Positivo"}
                   />
-                  <CheckOptionChip label="NA" checked={vphCat === "NA"} />
+                  <CheckOptionChip
+                    label="En proceso"
+                    checked={comp.vphResult === "En proceso"}
+                  />
                   <CheckOptionChip
                     label="No se realizó"
-                    checked={vphCat === "NO_REALIZADO"}
+                    checked={comp.vphResult === "No se realizó"}
                   />
+                  {comp.vphResult === "Positivo" || comp.vphSerotype ? (
+                    <span className="rounded border border-warning/50 bg-warning/15 px-1.5 py-0.5 font-mono text-[7.5px] font-bold text-foreground">
+                      Serotipo: {comp.vphSerotype || "Por definir"}
+                    </span>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -490,34 +506,34 @@ export function ColposcopyPrintView({
 
           {/* 4. Sección I: Criterios de Evaluación General */}
           <div className="overflow-hidden rounded-lg border border-border bg-muted/15">
-            <div className="border-b border-border bg-muted/40 px-2.5 py-1 text-[8.5px] font-bold tracking-wider text-primary uppercase">
+            <div className="border-b border-border bg-muted/40 px-2.5 py-1 text-[8px] font-bold tracking-wider text-primary uppercase">
               I. CRITERIOS DE EVALUACIÓN GENERAL (IFCPC RÍO DE JANEIRO 2011)
             </div>
-            <div className="grid grid-cols-3 gap-2 p-2">
-              <div className="rounded border border-border bg-card px-2.5 py-1.5">
+            <div className="grid grid-cols-3 gap-2 p-1.5">
+              <div className="rounded border border-border bg-card px-2 py-1">
                 <span className="block text-[7.5px] font-bold text-muted-foreground uppercase">
                   1. Adecuación del Examen
                 </span>
-                <strong className="text-[10.5px] font-bold text-foreground">
+                <strong className="text-[10px] font-bold text-foreground">
                   {report.adequateColposcopy ? "Adecuada" : "Inadecuada"}
                   {!report.adequateColposcopy && ext.inadequateReason
                     ? ` (${ext.inadequateReason})`
                     : ""}
                 </strong>
               </div>
-              <div className="rounded border border-border bg-card px-2.5 py-1.5">
+              <div className="rounded border border-border bg-card px-2 py-1">
                 <span className="block text-[7.5px] font-bold text-muted-foreground uppercase">
                   2. Unión Escamocolumnar (UEC)
                 </span>
-                <strong className="text-[10.5px] font-bold text-foreground">
-                  {report.squamocolumnarJunctionVisible}
+                <strong className="text-[10px] font-bold text-foreground">
+                  {normalizedScj}
                 </strong>
               </div>
-              <div className="rounded border border-border bg-card px-2.5 py-1.5">
+              <div className="rounded border border-border bg-card px-2 py-1">
                 <span className="block text-[7.5px] font-bold text-muted-foreground uppercase">
                   3. Zona de Transformación (ZT)
                 </span>
-                <strong className="text-[10.5px] font-bold text-foreground">
+                <strong className="text-[10px] font-bold text-foreground">
                   {report.transformationZoneType}
                 </strong>
               </div>
@@ -537,6 +553,11 @@ export function ColposcopyPrintView({
                 <FindingRow
                   label="Epitelio Escamoso Original: Maduro"
                   isPositive={report.matureSquamousEpithelium}
+                  tone="normal"
+                />
+                <FindingRow
+                  label="Epitelio Escamoso Original: Atrófico"
+                  isPositive={Boolean(ext.atrophicSquamousEpithelium)}
                   tone="normal"
                 />
                 <FindingRow
@@ -700,8 +721,13 @@ export function ColposcopyPrintView({
                   tone="destructive"
                 />
                 <FindingRow
-                  label="Necrosis / Ulceración Necrótica"
+                  label="Necrosis"
                   isPositive={Boolean(ext.necrosis)}
+                  tone="destructive"
+                />
+                <FindingRow
+                  label="Ulceración Necrótica"
+                  isPositive={Boolean(ext.necroticUlceration)}
                   tone="destructive"
                 />
                 <FindingRow
@@ -740,6 +766,11 @@ export function ColposcopyPrintView({
                 <FindingRow
                   label="Estenosis del Canal Cervical"
                   isPositive={Boolean(ext.stenosis)}
+                  tone="warning"
+                />
+                <FindingRow
+                  label="Anomalía Congénita"
+                  isPositive={Boolean(ext.congenitalAnomaly)}
                   tone="warning"
                 />
                 <FindingRow
@@ -852,21 +883,44 @@ export function ColposcopyPrintView({
                     CIE-10: {report.cie10Code}
                   </span>
                 </div>
-                <div className="space-y-1 p-3 text-[10.5px]">
+                <div className="space-y-1.5 p-3 text-[10.5px]">
                   <p className="font-bold text-foreground uppercase">
                     1.{" "}
                     {report.adequateColposcopy
                       ? "COLPOSCOPÍA ADECUADA"
-                      : "COLPOSCOPÍA INADECUADA"}{" "}
-                    • UEC {report.squamocolumnarJunctionVisible.toUpperCase()}
+                      : "COLPOSCOPÍA INADECUADA"}
+                    {!report.adequateColposcopy && ext.inadequateReason
+                      ? ` (${ext.inadequateReason})`
+                      : ""}{" "}
+                    • UEC {normalizedScj.toUpperCase()}
                   </p>
                   <p className="font-bold text-foreground uppercase">
                     2. ZONA DE TRANSFORMACIÓN{" "}
                     {report.transformationZoneType.toUpperCase()}
                   </p>
-                  <p className="font-bold text-primary uppercase">
-                    3. {report.diagnosis}
-                  </p>
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <p className="font-bold text-primary uppercase">
+                      3. {report.diagnosis}
+                    </p>
+                    <span className="shrink-0 rounded border border-primary/30 bg-card px-1.5 py-0.5 font-mono text-[8.5px] font-bold text-primary">
+                      CIE-10: {report.cie10Code}
+                    </span>
+                  </div>
+                  {additionalDiagnoses.map((addItem, idx) => (
+                    <div
+                      key={`print-add-dx-${idx}`}
+                      className="flex flex-wrap items-baseline justify-between gap-2 border-t border-warning/25 pt-1"
+                    >
+                      <p className="font-bold text-foreground uppercase">
+                        {4 + idx}. {addItem.diagnosis}
+                      </p>
+                      {addItem.cie10Code ? (
+                        <span className="shrink-0 rounded border border-primary/30 bg-card px-1.5 py-0.5 font-mono text-[8.5px] font-bold text-primary">
+                          CIE-10: {addItem.cie10Code}
+                        </span>
+                      ) : null}
+                    </div>
+                  ))}
                 </div>
               </div>
 

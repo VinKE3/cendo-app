@@ -275,6 +275,7 @@ export interface OfficialClinicalTemplateSeed {
 
 const DEFAULT_EXTENDED_COLPOSCOPY: ColposcopyExtendedFindingsRecord = {
   inadequateReason: "",
+  atrophicSquamousEpithelium: false,
   nabothCyst: false,
   cryptOpenings: false,
   deciduosis: false,
@@ -289,15 +290,18 @@ const DEFAULT_EXTENDED_COLPOSCOPY: ColposcopyExtendedFindingsRecord = {
   irregularSurface: false,
   exophyticLesion: false,
   necrosis: false,
+  necroticUlceration: false,
   nodularTumor: false,
   congenitalTZ: false,
   condyloma: false,
   polyp: false,
   inflammation: false,
   stenosis: false,
+  congenitalAnomaly: false,
   postTreatmentAnomaly: false,
   endometriosisFoci: false,
   otherFindings: "",
+  additionalDiagnoses: [],
 };
 
 const OFFICIAL_ULTRASOUND_TEMPLATES: OfficialClinicalTemplateSeed[] =
@@ -327,7 +331,7 @@ const OFFICIAL_COLPOSCOPY_TEMPLATES: OfficialClinicalTemplateSeed[] = [
     sortOrder: 1,
     payload: {
       adequateColposcopy: true,
-      squamocolumnarJunctionVisible: "Visible",
+      squamocolumnarJunctionVisible: "Completamente visible",
       transformationZoneType: "Tipo 1",
       matureSquamousEpithelium: true,
       ectopy: false,
@@ -345,7 +349,7 @@ const OFFICIAL_COLPOSCOPY_TEMPLATES: OfficialClinicalTemplateSeed[] = [
       biopsyClockHours: [],
       cie10Code: "Z01.4",
       diagnosis:
-        "Colposcopía adecuada satisfactoria sin lesiones intraepiteliales (Cérvix sano).",
+        "Hallazgos colposcópicos normales (Colposcopía sin alteraciones).",
       planRecommendations:
         "Continuar control ginecológico preventivo periódico y tamizaje citológico / VPH según norma vigente.",
     },
@@ -359,7 +363,7 @@ const OFFICIAL_COLPOSCOPY_TEMPLATES: OfficialClinicalTemplateSeed[] = [
     sortOrder: 2,
     payload: {
       adequateColposcopy: true,
-      squamocolumnarJunctionVisible: "Visible",
+      squamocolumnarJunctionVisible: "Completamente visible",
       transformationZoneType: "Tipo 1",
       matureSquamousEpithelium: true,
       ectopy: false,
@@ -391,7 +395,7 @@ const OFFICIAL_COLPOSCOPY_TEMPLATES: OfficialClinicalTemplateSeed[] = [
     sortOrder: 3,
     payload: {
       adequateColposcopy: true,
-      squamocolumnarJunctionVisible: "Visible",
+      squamocolumnarJunctionVisible: "Completamente visible",
       transformationZoneType: "Tipo 2",
       matureSquamousEpithelium: false,
       ectopy: false,
@@ -428,7 +432,7 @@ const OFFICIAL_COLPOSCOPY_TEMPLATES: OfficialClinicalTemplateSeed[] = [
     sortOrder: 4,
     payload: {
       adequateColposcopy: true,
-      squamocolumnarJunctionVisible: "Visible",
+      squamocolumnarJunctionVisible: "Completamente visible",
       transformationZoneType: "Tipo 1",
       matureSquamousEpithelium: true,
       ectopy: true,

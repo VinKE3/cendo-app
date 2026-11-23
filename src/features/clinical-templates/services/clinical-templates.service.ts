@@ -3,6 +3,7 @@ import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { clinicalTemplates } from "@/db/schema";
 import { recordAuditLog } from "@/lib/audit/audit-log";
+import { normalizeScjVisibility } from "@/features/colposcopia/colposcopia.schema";
 import { DomainError, type SessionPayload } from "@/lib/security/action-guard";
 import {
   CLINICAL_TEMPLATE_SCOPES,
@@ -41,8 +42,51 @@ function normalizeColposcopyPayload(
       )
     : [];
 
+  const ext = payload.extendedFindings ?? {};
+  const cleanedAdditional = (ext.additionalDiagnoses ?? [])
+    .filter((d) => d.diagnosis.trim().length > 0)
+    .map((d) => ({
+      diagnosis: d.diagnosis.trim(),
+      ...(d.cie10Code?.trim() ? { cie10Code: d.cie10Code.trim().toUpperCase() } : {}),
+    }));
+
   return {
     ...payload,
+    squamocolumnarJunctionVisible: normalizeScjVisibility(
+      payload.squamocolumnarJunctionVisible
+    ),
+    extendedFindings: {
+      inadequateReason: payload.adequateColposcopy
+        ? ""
+        : ext.inadequateReason?.trim() ?? "",
+      atrophicSquamousEpithelium: Boolean(ext.atrophicSquamousEpithelium),
+      nabothCyst: Boolean(ext.nabothCyst),
+      cryptOpenings: Boolean(ext.cryptOpenings),
+      deciduosis: Boolean(ext.deciduosis),
+      rapidAcetowhite: Boolean(ext.rapidAcetowhite),
+      thickenedGlands: Boolean(ext.thickenedGlands),
+      sharpBorders: Boolean(ext.sharpBorders),
+      innerBorderSign: Boolean(ext.innerBorderSign),
+      ridgeSign: Boolean(ext.ridgeSign),
+      leukoplakia: Boolean(ext.leukoplakia),
+      erosion: Boolean(ext.erosion),
+      fragileVessels: Boolean(ext.fragileVessels),
+      irregularSurface: Boolean(ext.irregularSurface),
+      exophyticLesion: Boolean(ext.exophyticLesion),
+      necrosis: Boolean(ext.necrosis),
+      necroticUlceration: Boolean(ext.necroticUlceration),
+      nodularTumor: Boolean(ext.nodularTumor),
+      congenitalTZ: Boolean(ext.congenitalTZ),
+      condyloma: Boolean(ext.condyloma),
+      polyp: Boolean(ext.polyp),
+      inflammation: Boolean(ext.inflammation),
+      stenosis: Boolean(ext.stenosis),
+      congenitalAnomaly: Boolean(ext.congenitalAnomaly),
+      postTreatmentAnomaly: Boolean(ext.postTreatmentAnomaly),
+      endometriosisFoci: Boolean(ext.endometriosisFoci),
+      otherFindings: ext.otherFindings?.trim() ?? "",
+      additionalDiagnoses: cleanedAdditional,
+    },
     cie10Code: payload.cie10Code.trim().toUpperCase(),
     biopsyClockHours: normalizedHours,
   };
@@ -83,6 +127,7 @@ function mapTemplateRow(
     };
   }
 
+  const rawColpoPayload = row.payload as ColposcopyClinicalTemplateItem["payload"];
   return {
     id: row.id,
     scope: "COLPOSCOPY",
@@ -90,7 +135,12 @@ function mapTemplateRow(
     code: row.code,
     name: row.name,
     description: row.description ?? "",
-    payload: row.payload as ColposcopyClinicalTemplateItem["payload"],
+    payload: {
+      ...rawColpoPayload,
+      squamocolumnarJunctionVisible: normalizeScjVisibility(
+        rawColpoPayload?.squamocolumnarJunctionVisible
+      ),
+    },
     isOfficial: row.isOfficial,
     sortOrder: row.sortOrder,
     createdAt: row.createdAt.toISOString(),

@@ -11,6 +11,7 @@ import {
   FileCheck2,
   ImagePlus,
   Loader2,
+  Plus,
   Printer,
   Save,
   Settings,
@@ -78,9 +79,23 @@ interface ColposcopyModalProps {
   scjOptions: readonly string[];
   tzOptions: readonly string[];
   schillerOptions: readonly string[];
+  papOptions: readonly string[];
+  vphOptions: readonly string[];
+  diagnosisPresets: ReadonlyArray<{
+    shortLabel: string;
+    diagnosis: string;
+    cie10Code: string;
+  }>;
   captionPresets: readonly string[];
   onToggleClockHours: (hours: string[]) => void;
   onToggleBiopsyTaken: (taken: boolean) => void;
+  onAddAdditionalDiagnosis: () => void;
+  onUpdateAdditionalDiagnosis: (
+    index: number,
+    diagnosis: string,
+    cie10Code: string
+  ) => void;
+  onRemoveAdditionalDiagnosis: (index: number) => void;
   onApplyClassificationSuggestion: () => void;
   onApplyTemplate: (template: ColposcopyClinicalTemplateItem) => void;
   onApplyNormalDefaults: () => void;
@@ -141,9 +156,15 @@ export function ColposcopyModal({
   scjOptions,
   tzOptions,
   schillerOptions,
+  papOptions,
+  vphOptions,
+  diagnosisPresets,
   captionPresets,
   onToggleClockHours,
   onToggleBiopsyTaken,
+  onAddAdditionalDiagnosis,
+  onUpdateAdditionalDiagnosis,
+  onRemoveAdditionalDiagnosis,
   onApplyClassificationSuggestion,
   onApplyTemplate,
   onApplyNormalDefaults,
@@ -173,9 +194,10 @@ export function ColposcopyModal({
   const [tplDesc, setTplDesc] = useState("");
 
   const [openSections, setOpenSections] = useState({
-    normal: false,
+    normal: true,
     abnormal: true,
     invasion: false,
+    misc: false,
     biopsy: true,
     photos: true,
   });
@@ -229,6 +251,31 @@ export function ColposcopyModal({
     (h): h is NonNullable<typeof h> => typeof h === "string"
   );
   const adequateColpo = watchedValues.adequateColposcopy ?? true;
+  const extWatched = watchedValues.extendedFindings ?? {};
+  const papResult = extWatched.papResult ?? "";
+  const vphResult = extWatched.vphResult ?? "";
+  const additionalDiagnoses = extWatched.additionalDiagnoses ?? [];
+
+  const invasionPositiveCount = [
+    watchedValues.atypicalVessels,
+    extWatched.fragileVessels,
+    extWatched.irregularSurface,
+    extWatched.exophyticLesion,
+    extWatched.necrosis,
+    extWatched.necroticUlceration,
+    extWatched.nodularTumor,
+  ].filter(Boolean).length;
+
+  const miscPositiveCount = [
+    extWatched.congenitalTZ,
+    extWatched.condyloma,
+    extWatched.polyp,
+    extWatched.inflammation,
+    extWatched.stenosis,
+    extWatched.congenitalAnomaly,
+    extWatched.postTreatmentAnomaly,
+    extWatched.endometriosisFoci,
+  ].filter(Boolean).length;
 
   const badgeToneClass =
     classification.tone === "destructive"
@@ -358,10 +405,200 @@ export function ColposcopyModal({
             </Button>
           </div>
 
-          {/* 1. Evaluación General IFCPC */}
+          {/* 1. Información Complementaria (Antecedentes, PAP y Test VPH) */}
+          <div className="space-y-3 rounded-xl border border-primary/25 bg-card p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
+              <h3 className="text-xs font-bold tracking-wider text-primary uppercase">
+                1. Información Complementaria • Antecedentes, PAP y VPH
+              </h3>
+              <label className="flex cursor-pointer items-center gap-2 text-[11px] font-medium text-foreground select-none">
+                <input
+                  type="checkbox"
+                  className="size-3.5 accent-primary"
+                  {...register("syncBackgroundToHistory")}
+                />
+                <span>Actualizar también en Historia Clínica</span>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
+              <div className="space-y-1">
+                <label
+                  htmlFor="colpo-nps"
+                  className="block text-[11px] font-semibold text-foreground"
+                >
+                  N° Parejas Sexuales (NPS)
+                </label>
+                <Input
+                  id="colpo-nps"
+                  placeholder="Ej. 2"
+                  className="h-8 font-mono text-xs"
+                  {...register("extendedFindings.nps")}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label
+                  htmlFor="colpo-irs"
+                  className="block text-[11px] font-semibold text-foreground"
+                >
+                  IRS (Inicio Sexual)
+                </label>
+                <Input
+                  id="colpo-irs"
+                  placeholder="Ej. 18"
+                  className="h-8 font-mono text-xs"
+                  {...register("extendedFindings.irs")}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label
+                  htmlFor="colpo-fur"
+                  className="block text-[11px] font-semibold text-foreground"
+                >
+                  FUR
+                </label>
+                <Input
+                  id="colpo-fur"
+                  type="date"
+                  className="h-8 font-mono text-xs"
+                  {...register("extendedFindings.fur")}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label
+                  htmlFor="colpo-formula"
+                  className="block text-[11px] font-semibold text-foreground"
+                >
+                  Fórmula Obstétrica
+                </label>
+                <Input
+                  id="colpo-formula"
+                  placeholder="G0 P0000"
+                  className="h-8 font-mono text-xs uppercase"
+                  {...register("extendedFindings.obstetricFormula")}
+                />
+              </div>
+
+              <div className="col-span-2 space-y-1 sm:col-span-1">
+                <label
+                  htmlFor="colpo-mac"
+                  className="block text-[11px] font-semibold text-foreground"
+                >
+                  MAC (Anticonceptivo)
+                </label>
+                <Input
+                  id="colpo-mac"
+                  placeholder="Ninguno / DIU..."
+                  className="h-8 text-xs"
+                  {...register("extendedFindings.mac")}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 border-t border-border/70 pt-3 lg:grid-cols-12">
+              <div className="space-y-1.5 lg:col-span-7">
+                <span className="block text-[11px] font-semibold text-foreground">
+                  Resultado de Papanicolaou (PAP)
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {papOptions.map((opt) => {
+                    const active = papResult === opt;
+                    return (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() =>
+                          setValue(
+                            "extendedFindings.papResult",
+                            active ? "" : opt,
+                            { shouldDirty: true }
+                          )
+                        }
+                        className={cn(
+                          "cursor-pointer rounded-md border px-2 py-1 text-[11px] font-medium transition-colors",
+                          active
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border bg-muted/20 text-foreground hover:bg-muted"
+                        )}
+                      >
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+                <Input
+                  id="colpo-pap-other"
+                  placeholder={
+                    papResult === "Otros"
+                      ? "Especifique otro resultado de PAP..."
+                      : "Detalle o fecha del PAP previo (opcional)..."
+                  }
+                  className={cn(
+                    "h-8 text-xs",
+                    papResult === "Otros" && "border-primary/60"
+                  )}
+                  {...register("extendedFindings.papOther")}
+                />
+              </div>
+
+              <div className="space-y-1.5 lg:col-span-5">
+                <span className="block text-[11px] font-semibold text-foreground">
+                  Resultado de Test de VPH
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {vphOptions.map((opt) => {
+                    const active = vphResult === opt;
+                    return (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => {
+                          const next = active ? "" : opt;
+                          setValue("extendedFindings.vphResult", next, {
+                            shouldDirty: true,
+                          });
+                          if (next !== "Positivo") {
+                            setValue("extendedFindings.vphSerotype", "", {
+                              shouldDirty: true,
+                            });
+                          }
+                        }}
+                        className={cn(
+                          "cursor-pointer rounded-md border px-2 py-1 text-[11px] font-medium transition-colors",
+                          active
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border bg-muted/20 text-foreground hover:bg-muted"
+                        )}
+                      >
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+                {vphResult === "Positivo" ? (
+                  <Input
+                    id="colpo-vph-serotype"
+                    placeholder="Serotipo VPH (ej. 16, 18, Alto riesgo)..."
+                    className="h-8 border-warning/60 bg-warning/5 font-mono text-xs"
+                    {...register("extendedFindings.vphSerotype")}
+                  />
+                ) : (
+                  <p className="text-[10.5px] text-muted-foreground">
+                    Si el Test de VPH resulta positivo podrá especificar el
+                    serotipo detectado.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Evaluación General IFCPC */}
           <div className="space-y-3 rounded-xl border border-border bg-card p-4">
             <h3 className="border-b border-border pb-2 text-xs font-bold tracking-wider text-primary uppercase">
-              1. Evaluación General IFCPC & Zona de Transformación
+              2. Evaluación General IFCPC & Zona de Transformación
             </h3>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-12">
@@ -382,10 +619,34 @@ export function ColposcopyModal({
 
               <div className="space-y-1.5 sm:col-span-3">
                 <label
+                  htmlFor="colpo-adequate"
+                  className="block text-xs font-semibold text-foreground"
+                >
+                  1. Colposcopía
+                </label>
+                <select
+                  id="colpo-adequate"
+                  value={adequateColpo ? "ADECUADA" : "INADECUADA"}
+                  onChange={(e) =>
+                    setValue(
+                      "adequateColposcopy",
+                      e.target.value === "ADECUADA",
+                      { shouldDirty: true }
+                    )
+                  }
+                  className={selectClassName}
+                >
+                  <option value="ADECUADA">Adecuada</option>
+                  <option value="INADECUADA">Inadecuada</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5 sm:col-span-3">
+                <label
                   htmlFor="colpo-scj"
                   className="block text-xs font-semibold text-foreground"
                 >
-                  Unión Escamo-Columnar (ZSC)
+                  2. Unión Escamocolumnar (UEC)
                 </label>
                 <select
                   id="colpo-scj"
@@ -405,7 +666,7 @@ export function ColposcopyModal({
                   htmlFor="colpo-tz"
                   className="block text-xs font-semibold text-foreground"
                 >
-                  Zona de Transformación (ZT)
+                  3. Tipo Zona de Transformación
                 </label>
                 <select
                   id="colpo-tz"
@@ -420,7 +681,7 @@ export function ColposcopyModal({
                 </select>
               </div>
 
-              <div className="space-y-1.5 sm:col-span-3">
+              <div className="space-y-1.5 sm:col-span-6">
                 <label
                   htmlFor="colpo-consultation"
                   className="block text-xs font-semibold text-foreground"
@@ -436,45 +697,14 @@ export function ColposcopyModal({
                   {consultations.map((c) => (
                     <option key={c.id} value={c.id}>
                       {formatPeruDateDisplay(c.consultationDate)} —{" "}
-                      {c.diagnosis.slice(0, 28)}
+                      {c.diagnosis.slice(0, 32)}
                     </option>
                   ))}
                 </select>
-              </div>
-
-              <div className="space-y-1.5 sm:col-span-6">
-                <label
-                  htmlFor="colpo-schiller"
-                  className="block text-xs font-semibold text-foreground"
-                >
-                  Test de Schiller (Lugol)
-                </label>
-                <select
-                  id="colpo-schiller"
-                  className={selectClassName}
-                  {...register("schillerTest")}
-                >
-                  {schillerOptions.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex items-end sm:col-span-6">
-                <label className="flex h-9 w-full cursor-pointer items-center justify-between rounded-lg border border-border bg-muted/25 px-3 text-xs font-semibold text-foreground select-none">
-                  <span>Colposcopía Adecuada / Satisfactoria</span>
-                  <input
-                    type="checkbox"
-                    className="size-4 accent-primary"
-                    {...register("adequateColposcopy")}
-                  />
-                </label>
               </div>
 
               {!adequateColpo ? (
-                <div className="space-y-1.5 sm:col-span-12">
+                <div className="space-y-1.5 sm:col-span-6">
                   <label
                     htmlFor="colpo-inadequate-reason"
                     className="block text-xs font-semibold text-warning"
@@ -483,7 +713,7 @@ export function ColposcopyModal({
                   </label>
                   <Input
                     id="colpo-inadequate-reason"
-                    placeholder="Ej. Sangrado abundante, cervicitis severa, ZSC no visible en canal..."
+                    placeholder="Ej. Sangrado abundante, cervicitis severa, UEC en canal..."
                     {...register("extendedFindings.inadequateReason")}
                   />
                 </div>
@@ -491,7 +721,7 @@ export function ColposcopyModal({
             </div>
           </div>
 
-          {/* 2. Hallazgos Normales y Varios */}
+          {/* 3. Hallazgos Colposcópicos Normales */}
           <div className="overflow-hidden rounded-xl border border-border bg-card">
             <button
               type="button"
@@ -499,7 +729,7 @@ export function ColposcopyModal({
               className="flex w-full cursor-pointer items-center justify-between bg-muted/25 px-4 py-2.5 text-left"
             >
               <span className="text-xs font-bold tracking-wider text-foreground uppercase">
-                2. Hallazgos Normales & Varios (Opcional)
+                3. Hallazgos Colposcópicos Normales
               </span>
               {openSections.normal ? (
                 <ChevronUp className="size-4 text-muted-foreground" />
@@ -509,62 +739,38 @@ export function ColposcopyModal({
             </button>
 
             {openSections.normal ? (
-              <div className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-3 md:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-3">
                 <CheckboxTile
-                  label="Epitelio escamoso maduro"
+                  label="Epitelio escamoso original: Maduro"
                   registerProps={register("matureSquamousEpithelium")}
                 />
                 <CheckboxTile
-                  label="Ectopia / Epitelio columnar"
-                  registerProps={register("ectopy")}
-                />
-                <CheckboxTile
-                  label="Quistes de Naboth"
-                  registerProps={register("extendedFindings.nabothCyst")}
-                />
-                <CheckboxTile
-                  label="Orificios glandulares"
-                  registerProps={register("extendedFindings.cryptOpenings")}
-                />
-                <CheckboxTile
-                  label="Deciduosis (Gestación)"
-                  registerProps={register("extendedFindings.deciduosis")}
-                />
-                <CheckboxTile
-                  label="ZT Congénita"
-                  registerProps={register("extendedFindings.congenitalTZ")}
-                />
-                <CheckboxTile
-                  label="Condiloma exofítico"
-                  registerProps={register("extendedFindings.condyloma")}
-                />
-                <CheckboxTile
-                  label="Pólipo endocervical"
-                  registerProps={register("extendedFindings.polyp")}
-                />
-                <CheckboxTile
-                  label="Inflamación / Cervicitis"
-                  registerProps={register("extendedFindings.inflammation")}
-                />
-                <CheckboxTile
-                  label="Estenosis cervical"
-                  registerProps={register("extendedFindings.stenosis")}
-                />
-                <CheckboxTile
-                  label="Anomalía post-tratamiento"
+                  label="Epitelio escamoso original: Atrófico"
                   registerProps={register(
-                    "extendedFindings.postTreatmentAnomaly"
+                    "extendedFindings.atrophicSquamousEpithelium"
                   )}
                 />
                 <CheckboxTile
-                  label="Foco endometriosis cervical"
-                  registerProps={register("extendedFindings.endometriosisFoci")}
+                  label="Epitelio columnar: Ectopía"
+                  registerProps={register("ectopy")}
+                />
+                <CheckboxTile
+                  label="Metaplásico: Quiste de Naboth"
+                  registerProps={register("extendedFindings.nabothCyst")}
+                />
+                <CheckboxTile
+                  label="Aberturas y/o criptas glandulares"
+                  registerProps={register("extendedFindings.cryptOpenings")}
+                />
+                <CheckboxTile
+                  label="Deciduosis en el embarazo"
+                  registerProps={register("extendedFindings.deciduosis")}
                 />
               </div>
             ) : null}
           </div>
 
-          {/* 3. Hallazgos Anormales IFCPC (Grado 1, Grado 2 & No Específicos) */}
+          {/* 4. Hallazgos Colposcópicos Anormales (Grado 1, Grado 2 & No Específicos) */}
           <div className="overflow-hidden rounded-xl border border-border bg-card">
             <button
               type="button"
@@ -572,8 +778,8 @@ export function ColposcopyModal({
               className="flex w-full cursor-pointer items-center justify-between bg-muted/25 px-4 py-2.5 text-left"
             >
               <span className="text-xs font-bold tracking-wider text-foreground uppercase">
-                3. Hallazgos Anormales IFCPC (Grado 1 Menor • Grado 2 Mayor • No
-                Específicos)
+                4. Hallazgos Colposcópicos Anormales (Grado 1 • Grado 2 • No
+                Específicos / Lugol)
               </span>
               {openSections.abnormal ? (
                 <ChevronUp className="size-4 text-muted-foreground" />
@@ -586,15 +792,15 @@ export function ColposcopyModal({
               <div className="space-y-4 p-4">
                 <div className="space-y-2">
                   <p className="font-mono text-[10.5px] font-bold text-warning uppercase">
-                    Grado 1 (Menor — Cambios Leves)
+                    Grado 1 (Menor)
                   </p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     <CheckboxTile
-                      label="Epitelio acetoblanco tenue"
+                      label="Epitelio acetoblanco delgado"
                       registerProps={register("thinAcetowhiteEpithelium")}
                     />
                     <CheckboxTile
-                      label="Borde irregular / geográfico"
+                      label="Borde irregular"
                       registerProps={register("irregularBorder")}
                     />
                     <CheckboxTile
@@ -602,7 +808,7 @@ export function ColposcopyModal({
                       registerProps={register("fineMosaic")}
                     />
                     <CheckboxTile
-                      label="Punteado fino"
+                      label="Puntillado fino"
                       registerProps={register("finePunctation")}
                     />
                   </div>
@@ -610,7 +816,7 @@ export function ColposcopyModal({
 
                 <div className="space-y-2 border-t border-border pt-3">
                   <p className="font-mono text-[10.5px] font-bold text-destructive uppercase">
-                    Grado 2 (Mayor — Sugestivo Alto Grado)
+                    Grado 2 (Mayor)
                   </p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     <CheckboxTile
@@ -624,7 +830,7 @@ export function ColposcopyModal({
                       )}
                     />
                     <CheckboxTile
-                      label="Orificios glandulares engrosados"
+                      label="Orificios glandulares con bordes engrosados"
                       registerProps={register(
                         "extendedFindings.thickenedGlands"
                       )}
@@ -634,57 +840,80 @@ export function ColposcopyModal({
                       registerProps={register("coarseMosaic")}
                     />
                     <CheckboxTile
-                      label="Punteado grueso"
+                      label="Puntillado grueso"
                       registerProps={register("coarsePunctation")}
                     />
                     <CheckboxTile
-                      label="Bordes netos / bien definidos"
+                      label="Bordes delimitados"
                       registerProps={register("extendedFindings.sharpBorders")}
                     />
                     <CheckboxTile
-                      label="Signo del límite interno"
+                      label="Signo del límite del borde interno"
                       registerProps={register(
                         "extendedFindings.innerBorderSign"
                       )}
                     />
                     <CheckboxTile
-                      label="Signo de la cresta (Ridge)"
+                      label="Signo de cresta o sobreelevado"
                       registerProps={register("extendedFindings.ridgeSign")}
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 border-t border-border pt-3 sm:grid-cols-12">
-                  <div className="grid grid-cols-2 gap-2 sm:col-span-5">
-                    <CheckboxTile
-                      label="Leucoplasia / Hiperqueratosis"
-                      registerProps={register("extendedFindings.leukoplakia")}
-                    />
-                    <CheckboxTile
-                      label="Erosión epitelial"
-                      registerProps={register("extendedFindings.erosion")}
-                    />
-                  </div>
-                  <div className="sm:col-span-7">
-                    <Input
-                      placeholder="Otros hallazgos vaginales, vulvares u observaciones adicionales..."
-                      {...register("extendedFindings.otherFindings")}
-                    />
+                <div className="space-y-2 border-t border-border pt-3">
+                  <p className="font-mono text-[10.5px] font-bold text-primary uppercase">
+                    No Específicos & Solución de Lugol
+                  </p>
+                  <div className="grid grid-cols-1 items-center gap-3 sm:grid-cols-12">
+                    <div className="grid grid-cols-2 gap-2 sm:col-span-6">
+                      <CheckboxTile
+                        label="Leucoplasia (queratosis / hiperqueratosis)"
+                        registerProps={register("extendedFindings.leukoplakia")}
+                      />
+                      <CheckboxTile
+                        label="Erosión"
+                        registerProps={register("extendedFindings.erosion")}
+                      />
+                    </div>
+                    <div className="space-y-1 sm:col-span-6">
+                      <label
+                        htmlFor="colpo-schiller"
+                        className="block text-[11px] font-semibold text-foreground"
+                      >
+                        Solución de Lugol (Test de Schiller)
+                      </label>
+                      <select
+                        id="colpo-schiller"
+                        className={selectClassName}
+                        {...register("schillerTest")}
+                      >
+                        {schillerOptions.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
               </div>
             ) : null}
           </div>
 
-          {/* 4. Sospecha de Invasión */}
+          {/* 5. Sospecha de Invasión */}
           <div className="overflow-hidden rounded-xl border border-destructive/25 bg-card">
             <button
               type="button"
               onClick={() => toggleSection("invasion")}
               className="flex w-full cursor-pointer items-center justify-between bg-destructive/5 px-4 py-2.5 text-left"
             >
-              <span className="text-xs font-bold tracking-wider text-destructive uppercase">
-                4. Signos de Sospecha de Invasión (Prioritario)
+              <span className="flex items-center gap-2 text-xs font-bold tracking-wider text-destructive uppercase">
+                <span>5. Sospecha de Invasión</span>
+                {invasionPositiveCount > 0 ? (
+                  <Badge variant="destructive" className="text-[10px]">
+                    {invasionPositiveCount} marcados
+                  </Badge>
+                ) : null}
               </span>
               {openSections.invasion ? (
                 <ChevronUp className="size-4 text-destructive" />
@@ -694,36 +923,136 @@ export function ColposcopyModal({
             </button>
 
             {openSections.invasion ? (
-              <div className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-3">
-                <CheckboxTile
-                  label="Vasos atípicos"
-                  registerProps={register("atypicalVessels")}
-                />
-                <CheckboxTile
-                  label="Vasos frágiles / sangrantes"
-                  registerProps={register("extendedFindings.fragileVessels")}
-                />
-                <CheckboxTile
-                  label="Superficie irregular"
-                  registerProps={register("extendedFindings.irregularSurface")}
-                />
-                <CheckboxTile
-                  label="Lesión exofítica"
-                  registerProps={register("extendedFindings.exophyticLesion")}
-                />
-                <CheckboxTile
-                  label="Necrosis tisular"
-                  registerProps={register("extendedFindings.necrosis")}
-                />
-                <CheckboxTile
-                  label="Tumoración o ulceración nodular"
-                  registerProps={register("extendedFindings.nodularTumor")}
-                />
+              <div className="space-y-3 p-4">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <CheckboxTile
+                    label="Vasos atípicos"
+                    registerProps={register("atypicalVessels")}
+                  />
+                </div>
+                <div className="space-y-2 border-t border-border pt-2.5">
+                  <p className="font-mono text-[10px] font-semibold text-destructive uppercase">
+                    Signos Adicionales
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    <CheckboxTile
+                      label="Vasos delgados"
+                      registerProps={register("extendedFindings.fragileVessels")}
+                    />
+                    <CheckboxTile
+                      label="Superficie irregular"
+                      registerProps={register(
+                        "extendedFindings.irregularSurface"
+                      )}
+                    />
+                    <CheckboxTile
+                      label="Lesión exofítica"
+                      registerProps={register(
+                        "extendedFindings.exophyticLesion"
+                      )}
+                    />
+                    <CheckboxTile
+                      label="Necrosis"
+                      registerProps={register("extendedFindings.necrosis")}
+                    />
+                    <CheckboxTile
+                      label="Ulceración necrótica"
+                      registerProps={register(
+                        "extendedFindings.necroticUlceration"
+                      )}
+                    />
+                    <CheckboxTile
+                      label="Tumoración nodular"
+                      registerProps={register("extendedFindings.nodularTumor")}
+                    />
+                  </div>
+                </div>
               </div>
             ) : null}
           </div>
 
-          {/* 5. Biopsia Dirigida & Reloj Cervical Interactivo */}
+          {/* 6. Hallazgos Varios */}
+          <div className="overflow-hidden rounded-xl border border-border bg-card">
+            <button
+              type="button"
+              onClick={() => toggleSection("misc")}
+              className="flex w-full cursor-pointer items-center justify-between bg-muted/25 px-4 py-2.5 text-left"
+            >
+              <span className="flex items-center gap-2 text-xs font-bold tracking-wider text-foreground uppercase">
+                <span>6. Hallazgos Varios</span>
+                {miscPositiveCount > 0 ? (
+                  <Badge variant="secondary" className="text-[10px]">
+                    {miscPositiveCount} marcados
+                  </Badge>
+                ) : null}
+              </span>
+              {openSections.misc ? (
+                <ChevronUp className="size-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="size-4 text-muted-foreground" />
+              )}
+            </button>
+
+            {openSections.misc ? (
+              <div className="space-y-3 p-4">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <CheckboxTile
+                    label="Zona de transformación congénita"
+                    registerProps={register("extendedFindings.congenitalTZ")}
+                  />
+                  <CheckboxTile
+                    label="Condiloma"
+                    registerProps={register("extendedFindings.condyloma")}
+                  />
+                  <CheckboxTile
+                    label="Pólipo (exocervical / endocervical)"
+                    registerProps={register("extendedFindings.polyp")}
+                  />
+                  <CheckboxTile
+                    label="Inflamación"
+                    registerProps={register("extendedFindings.inflammation")}
+                  />
+                  <CheckboxTile
+                    label="Estenosis"
+                    registerProps={register("extendedFindings.stenosis")}
+                  />
+                  <CheckboxTile
+                    label="Anomalía congénita"
+                    registerProps={register(
+                      "extendedFindings.congenitalAnomaly"
+                    )}
+                  />
+                  <CheckboxTile
+                    label="Anomalías pos tratamiento"
+                    registerProps={register(
+                      "extendedFindings.postTreatmentAnomaly"
+                    )}
+                  />
+                  <CheckboxTile
+                    label="Endometriosis"
+                    registerProps={register(
+                      "extendedFindings.endometriosisFoci"
+                    )}
+                  />
+                </div>
+                <div className="space-y-1 border-t border-border pt-2.5">
+                  <label
+                    htmlFor="colpo-other-findings"
+                    className="block text-[11px] font-semibold text-foreground"
+                  >
+                    Otros Hallazgos / Observaciones Adicionales
+                  </label>
+                  <Input
+                    id="colpo-other-findings"
+                    placeholder="Otros hallazgos vaginales, vulvares u observaciones..."
+                    {...register("extendedFindings.otherFindings")}
+                  />
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          {/* 7. Biopsia Dirigida & Reloj Cervical Interactivo */}
           <div className="overflow-hidden rounded-xl border border-border bg-card">
             <button
               type="button"
@@ -732,7 +1061,7 @@ export function ColposcopyModal({
             >
               <span className="flex items-center gap-1.5 text-xs font-bold tracking-wider text-foreground uppercase">
                 <Clock className="size-3.5 text-primary" />
-                5. Mapeo Topográfico & Biopsia Cervical Dirigida
+                7. Mapeo Topográfico & Biopsia Cervical Dirigida
                 {biopsyTaken ? (
                   <Badge variant="destructive" className="ml-2 text-[10px]">
                     Biopsia Activa ({selectedClockHours.length} h)
@@ -796,7 +1125,7 @@ export function ColposcopyModal({
               <div>
                 <h3 className="flex items-center gap-1.5 text-xs font-bold tracking-wider text-foreground uppercase">
                   <Camera className="size-3.5 text-primary" />
-                  6. Galería Fotográfica Colposcópica ({draftImages.length} / 16)
+                  8. Galería Fotográfica Colposcópica ({draftImages.length} / 16)
                 </h3>
                 <p className="text-[11px] text-muted-foreground">
                   Almacenamiento cifrado privado. Inicia vacía sin imágenes de
@@ -890,18 +1219,163 @@ export function ColposcopyModal({
             </div>
           </div>
 
-          {/* 7. Diagnóstico CIE-10 y Plan */}
-          <div className="space-y-3 rounded-xl border border-primary/25 bg-primary/5 p-4">
-            <Cie10Autocomplete
-              diagnosis={watchedValues.diagnosis ?? ""}
-              cie10Code={watchedValues.cie10Code ?? ""}
-              onChange={(diag, code) => {
-                setValue("diagnosis", diag, { shouldDirty: true });
-                setValue("cie10Code", code, { shouldDirty: true });
-              }}
-              required
-              diagnosisError={errors.diagnosis?.message}
-            />
+          {/* 9. Diagnósticos Colposcópicos (1, 2, 3+ con CIE-10) y Plan */}
+          <div className="space-y-3.5 rounded-xl border border-primary/25 bg-primary/5 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary/15 pb-2">
+              <h3 className="text-xs font-bold tracking-wider text-primary uppercase">
+                9. Diagnósticos Colposcópicos (1, 2 y 3 con CIE-10) & Plan
+              </h3>
+              <span className="text-[10.5px] text-muted-foreground">
+                Dx 1 y Dx 2 se sincronizan con la Evaluación General
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label
+                  htmlFor="colpo-dx1"
+                  className="block text-[11px] font-semibold text-foreground"
+                >
+                  Diagnóstico 1 (Adecuación — sin CIE-10)
+                </label>
+                <select
+                  id="colpo-dx1"
+                  value={adequateColpo ? "ADECUADA" : "INADECUADA"}
+                  onChange={(e) =>
+                    setValue(
+                      "adequateColposcopy",
+                      e.target.value === "ADECUADA",
+                      { shouldDirty: true }
+                    )
+                  }
+                  className={selectClassName}
+                >
+                  <option value="ADECUADA">Colposcopía adecuada</option>
+                  <option value="INADECUADA">Colposcopía inadecuada</option>
+                </select>
+                <p className="text-[10px] text-muted-foreground">
+                  UEC: {watchedValues.squamocolumnarJunctionVisible || "Completamente visible"}
+                  {!adequateColpo && extWatched.inadequateReason
+                    ? ` • ${extWatched.inadequateReason}`
+                    : ""}
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label
+                  htmlFor="colpo-dx2"
+                  className="block text-[11px] font-semibold text-foreground"
+                >
+                  Diagnóstico 2 (Zona de Transformación — sin CIE-10)
+                </label>
+                <select
+                  id="colpo-dx2"
+                  className={selectClassName}
+                  {...register("transformationZoneType")}
+                >
+                  {tzOptions.map((opt) => (
+                    <option key={opt} value={opt}>
+                      Zona de Transformación {opt}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-2 rounded-lg border border-border bg-card p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[11px] font-semibold text-primary uppercase">
+                  Selección Rápida Diagnóstico 3 (Excel CENDO)
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {diagnosisPresets.map((preset) => {
+                  const isSelected =
+                    watchedValues.cie10Code === preset.cie10Code &&
+                    watchedValues.diagnosis === preset.diagnosis;
+                  return (
+                    <button
+                      key={preset.shortLabel}
+                      type="button"
+                      onClick={() => {
+                        setValue("diagnosis", preset.diagnosis, {
+                          shouldDirty: true,
+                        });
+                        setValue("cie10Code", preset.cie10Code, {
+                          shouldDirty: true,
+                        });
+                      }}
+                      className={cn(
+                        "cursor-pointer rounded-md border px-2 py-1 text-[11px] font-medium transition-colors",
+                        isSelected
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-muted/20 text-foreground hover:border-primary/40 hover:bg-primary/10"
+                      )}
+                    >
+                      {preset.shortLabel}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <Cie10Autocomplete
+                label="Diagnóstico 3 (Principal con CIE-10)"
+                inputId="colpo-dx3-cie10"
+                diagnosis={watchedValues.diagnosis ?? ""}
+                cie10Code={watchedValues.cie10Code ?? ""}
+                onChange={(diag, code) => {
+                  setValue("diagnosis", diag, { shouldDirty: true });
+                  setValue("cie10Code", code, { shouldDirty: true });
+                }}
+                required
+                diagnosisError={errors.diagnosis?.message}
+              />
+            </div>
+
+            {additionalDiagnoses.map((addItem, idx) => (
+              <div
+                key={`colpo-add-dx-${idx}`}
+                className="space-y-2 rounded-lg border border-border bg-card p-3"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[11px] font-bold text-primary uppercase">
+                    Diagnóstico {4 + idx} (Adicional)
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => onRemoveAdditionalDiagnosis(idx)}
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <Trash2 className="size-3.5" />
+                    Quitar
+                  </Button>
+                </div>
+                <Cie10Autocomplete
+                  label={`Diagnóstico ${4 + idx} (con CIE-10)`}
+                  inputId={`colpo-dx-add-${idx}`}
+                  diagnosis={addItem?.diagnosis ?? ""}
+                  cie10Code={addItem?.cie10Code ?? ""}
+                  onChange={(diag, code) =>
+                    onUpdateAdditionalDiagnosis(idx, diag, code)
+                  }
+                />
+              </div>
+            ))}
+
+            <div className="flex justify-start">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onAddAdditionalDiagnosis}
+                className="bg-card"
+              >
+                <Plus className="size-3.5 text-primary" />
+                Agregar otro diagnóstico
+              </Button>
+            </div>
 
             <div className="space-y-1.5">
               <label

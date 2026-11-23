@@ -100,6 +100,7 @@ interface TabChequeosProps {
   canEdit: boolean;
   canDelete: boolean;
   onEmitBiopsyOrderFromColposcopy?: (colpo: ColposcopyReportItem) => void;
+  onBackgroundSynced?: (patch: Partial<PatientBackgroundItem>) => void;
 }
 
 export function TabChequeos({
@@ -118,6 +119,7 @@ export function TabChequeos({
   canEdit,
   canDelete,
   onEmitBiopsyOrderFromColposcopy,
+  onBackgroundSynced,
 }: TabChequeosProps) {
   const [subTab, setSubTab] = useState<
     "ecografias" | "colposcopia" | "integral"
@@ -137,6 +139,8 @@ export function TabChequeos({
 
   const colpo = useColposcopia({
     patientId: patient.id,
+    background,
+    onBackgroundSynced,
     colposcopies,
     onColposcopiesChange,
     consultations,
@@ -684,9 +688,23 @@ export function TabChequeos({
                                 <span className="line-clamp-1 text-xs font-semibold text-foreground">
                                   {item.diagnosis}
                                 </span>
+                                {(item.extendedFindings?.additionalDiagnoses
+                                  ?.length ?? 0) > 0 ? (
+                                  <Badge
+                                    variant="secondary"
+                                    className="font-mono text-[9.5px]"
+                                  >
+                                    +
+                                    {
+                                      item.extendedFindings.additionalDiagnoses!
+                                        .length
+                                    }{" "}
+                                    Dx
+                                  </Badge>
+                                ) : null}
                               </div>
                               <p className="mt-0.5 text-[11px] text-muted-foreground">
-                                {item.transformationZoneType} • ZSC{" "}
+                                {item.transformationZoneType} • UEC{" "}
                                 {item.squamocolumnarJunctionVisible} • Schiller:{" "}
                                 {item.schillerTest}
                               </p>
@@ -1311,9 +1329,15 @@ export function TabChequeos({
         scjOptions={colpo.scjOptions}
         tzOptions={colpo.tzOptions}
         schillerOptions={colpo.schillerOptions}
+        papOptions={colpo.papOptions}
+        vphOptions={colpo.vphOptions}
+        diagnosisPresets={colpo.diagnosisPresets}
         captionPresets={colpo.captionPresets}
         onToggleClockHours={colpo.handleToggleClockHours}
         onToggleBiopsyTaken={colpo.handleToggleBiopsyTaken}
+        onAddAdditionalDiagnosis={colpo.addAdditionalDiagnosis}
+        onUpdateAdditionalDiagnosis={colpo.updateAdditionalDiagnosis}
+        onRemoveAdditionalDiagnosis={colpo.removeAdditionalDiagnosis}
         onApplyClassificationSuggestion={colpo.applyClassificationSuggestion}
         onApplyTemplate={colpo.applyTemplate}
         onApplyNormalDefaults={colpo.applyNormalDefaults}

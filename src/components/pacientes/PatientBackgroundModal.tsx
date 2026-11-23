@@ -49,6 +49,7 @@ export function PatientBackgroundModal({
 }: PatientBackgroundModalProps) {
   const {
     register,
+    setValue,
     formState: { errors },
   } = form;
 
@@ -237,9 +238,32 @@ export function PatientBackgroundModal({
               </label>
               <Input
                 id="bg-pap"
-                placeholder="Ej. Negativo 2025"
+                placeholder="Ej. Negativo / NILM / LIE-BG / En proceso"
                 {...register("papHistory")}
               />
+              <div className="flex flex-wrap gap-1 pt-0.5">
+                {[
+                  "Negativo / NILM",
+                  "ASC-US",
+                  "ASC-H",
+                  "LIE-BG",
+                  "LIE-AG",
+                  "CA in situ",
+                  "En proceso",
+                  "No se realizó",
+                ].map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() =>
+                      setValue("papHistory", opt, { shouldDirty: true })
+                    }
+                    className="cursor-pointer rounded border border-border bg-muted/30 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:border-primary/40 hover:text-primary"
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="space-y-1.5">
@@ -248,9 +272,28 @@ export function PatientBackgroundModal({
               </label>
               <Input
                 id="bg-vph"
-                placeholder="No realizado / Negativo"
+                placeholder="No se realizó / Negativo / Positivo"
                 {...register("vphTestHistory")}
               />
+              <div className="flex flex-wrap gap-1 pt-0.5">
+                {[
+                  "Negativo",
+                  "Positivo (Serotipo: )",
+                  "En proceso",
+                  "No se realizó",
+                ].map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() =>
+                      setValue("vphTestHistory", opt, { shouldDirty: true })
+                    }
+                    className="cursor-pointer rounded border border-border bg-muted/30 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:border-primary/40 hover:text-primary"
+                  >
+                    {opt === "Positivo (Serotipo: )" ? "Positivo + Serotipo" : opt}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 

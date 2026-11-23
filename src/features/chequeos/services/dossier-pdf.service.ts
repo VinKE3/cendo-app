@@ -23,6 +23,10 @@ import {
 import { detectVerifiedImageType } from "@/features/configuracion/configuracion.schema";
 import {
   classifyColposcopyFindings,
+  formatColposcopyPapLabel,
+  formatColposcopyVphLabel,
+  normalizeScjVisibility,
+  resolveColposcopyComplementaryData,
   type ColposcopyReportItem,
 } from "@/features/colposcopia/colposcopia.schema";
 import { mapColposcopyRow } from "@/features/colposcopia/services/colposcopia.service";
@@ -1218,6 +1222,7 @@ async function drawColposcopySection(
     documentType: string;
     documentNumber: string;
     age: number;
+    birthDate?: string;
   },
   background: {
     obstetricFormula: string | null;
@@ -1244,6 +1249,13 @@ async function drawColposcopySection(
   });
 
   const ext = colpo.extendedFindings ?? {};
+  const comp = resolveColposcopyComplementaryData(ext, background);
+  const normalizedScj = normalizeScjVisibility(
+    colpo.squamocolumnarJunctionVisible
+  );
+  const additionalDiagnoses = (ext.additionalDiagnoses ?? []).filter(
+    (d) => d.diagnosis.trim().length > 0
+  );
   const inlinePhotos = colpo.images.slice(0, 4);
   const overflowPhotos = colpo.images.slice(4);
   const totalColpoPages = 2 + Math.ceil(overflowPhotos.length / 4);
@@ -1259,14 +1271,17 @@ async function drawColposcopySection(
     dateText,
   });
 
+  const dobPart = patient.birthDate
+    ? `F. Nac.: ${formatPeruDateDisplay(patient.birthDate)}  •  `
+    : "";
   drawPatientStrip(
     cursor,
     patient,
-    `Validez: ${colpo.adequateColposcopy ? "Colposcopía Adecuada" : "Colposcopía Inadecuada"}  •  Clasificación IFCPC: ${classification.label}`
+    `${dobPart}Validez: ${colpo.adequateColposcopy ? "Colposcopía Adecuada" : "Colposcopía Inadecuada"}  •  Clasificación IFCPC: ${classification.label}`
   );
 
-  // Bloque Información Complementaria / Antecedentes (Pág. 9 de informe.pdf)
-  const bgBoxH = 42;
+  // Bloque Información Complementaria / 5 Antecedentes separados + PAP & VPH
+  const bgBoxH = 54;
   cursor.page.drawRectangle({
     x: MARGIN_X,
     y: cursor.y - bgBoxH,
@@ -1286,35 +1301,62 @@ async function drawColposcopySection(
       color: C_PRIMARY,
     }
   );
-  const bgLine1 = sanitizeWinAnsi(
-    `Fórmula Obstétrica: ${background?.obstetricFormula || "G0 P0000"}   •   FUR: ${
-      background?.lastMenstrualPeriod
-        ? formatPeruDateDisplay(background.lastMenstrualPeriod)
-        : "NA"
-    }   •   IRS / NPS: ${background?.sexualDebutAge ?? "NA"} / ${
-      background?.sexualPartnersCount ?? "NA"
-    }   •   MAC: ${background?.contraceptiveMethod || "Ninguno"}`
-  );
+
+  const anteBoxes = [
+    { label: "NPS", val: comp.nps, w: 68 },
+    { label: "IRS", val: comp.irs, w: 74 },
+    {
+      label: "FUR",
+      val: comp.fur ? formatPeruDateDisplay(comp.fur) : "NA",
+      w: 84,
+    },
+    { label: "FORMULA OBSTETRICA", val: comp.obstetricFormula, w: 112 },
+    { label: "MAC", val: comp.mac, w: CONTENT_W - 16 - 68 - 74 - 84 - 112 - 16 },
+  ];
+  let anteX = MARGIN_X + 8;
+  const anteBoxTop = cursor.y - 16;
+  const anteBoxH = 22;
+  for (const box of anteBoxes) {
+    cursor.page.drawRectangle({
+      x: anteX,
+      y: anteBoxTop - anteBoxH,
+      width: box.w,
+      height: anteBoxH,
+      color: C_WHITE,
+      borderColor: C_BORDER,
+      borderWidth: 0.5,
+    });
+    cursor.page.drawText(sanitizeWinAnsi(box.label), {
+      x: anteX + 4,
+      y: anteBoxTop - 8,
+      size: 6.2,
+      font: assets.fontBold,
+      color: C_MUTED,
+    });
+    cursor.page.drawText(
+      sanitizeWinAnsi(box.val).slice(0, Math.max(8, Math.floor(box.w / 4.6))),
+      {
+        x: anteX + 4,
+        y: anteBoxTop - 18,
+        size: 7.4,
+        font: assets.fontBold,
+        color: C_TEXT,
+      }
+    );
+    anteX += box.w + 4;
+  }
+
   const bgLine2 = sanitizeWinAnsi(
-    `Resultado PAP Previo: ${background?.papHistory || "Pendiente / No refiere"}   •   Resultado Test VPH: ${
-      background?.vphTestHistory || "No se realizó"
-    }`
+    `Resultado PAP: ${formatColposcopyPapLabel(comp.papResult, comp.papOther)}   •   Resultado Test VPH: ${formatColposcopyVphLabel(comp.vphResult, comp.vphSerotype)}`
   );
-  cursor.page.drawText(bgLine1.slice(0, 108), {
-    x: MARGIN_X + 8,
-    y: cursor.y - 23,
-    size: 7.8,
-    font: assets.fontRegular,
-    color: C_TEXT,
-  });
   cursor.page.drawText(bgLine2.slice(0, 108), {
     x: MARGIN_X + 8,
-    y: cursor.y - 34,
-    size: 7.8,
-    font: assets.fontRegular,
+    y: cursor.y - 47.5,
+    size: 7.6,
+    font: assets.fontBold,
     color: C_TEXT,
   });
-  cursor.y -= bgBoxH + 7;
+  cursor.y -= bgBoxH + 6;
 
   // Sección I: Criterios de Evaluación General (3 cajas)
   const sec1H = 38;
@@ -1345,7 +1387,7 @@ async function drawColposcopySection(
     }`
   );
   const c2Text = sanitizeWinAnsi(
-    `2. Unión Escamocolumnar (UEC): ${colpo.squamocolumnarJunctionVisible}`
+    `2. Unión Escamocolumnar (UEC): ${normalizedScj}`
   );
   const c3Text = sanitizeWinAnsi(
     `3. Zona de Transformación: ${colpo.transformationZoneType}`
@@ -1357,21 +1399,21 @@ async function drawColposcopySection(
     font: assets.fontBold,
     color: C_TEXT,
   });
-  cursor.page.drawText(c2Text.slice(0, 40), {
-    x: MARGIN_X + 180,
+  cursor.page.drawText(c2Text.slice(0, 42), {
+    x: MARGIN_X + 170,
     y: cursor.y - 27,
     size: 8,
     font: assets.fontBold,
     color: C_TEXT,
   });
   cursor.page.drawText(c3Text.slice(0, 34), {
-    x: MARGIN_X + 365,
+    x: MARGIN_X + 372,
     y: cursor.y - 27,
     size: 8,
     font: assets.fontBold,
     color: C_TEXT,
   });
-  cursor.y -= sec1H + 7;
+  cursor.y -= sec1H + 6;
 
   // Helper para dibujar tarjetas IFCPC II a VII en 2 columnas
   interface IfcpcRowItem {
@@ -1382,8 +1424,8 @@ async function drawColposcopySection(
   }
 
   const colW = (CONTENT_W - 10) / 2;
-  const rowH = 13.5;
-  const headerH = 15;
+  const rowH = 12;
+  const headerH = 14;
 
   const drawIfcpcCard = (
     x: number,
@@ -1518,6 +1560,11 @@ async function drawColposcopySection(
       {
         label: "Epitelio Escamoso Original: Maduro",
         pos: colpo.matureSquamousEpithelium,
+        severity: "n",
+      },
+      {
+        label: "Epitelio Escamoso Original: Atrófico",
+        pos: Boolean(ext.atrophicSquamousEpithelium),
         severity: "n",
       },
       {
@@ -1676,8 +1723,13 @@ async function drawColposcopySection(
         severity: "d",
       },
       {
-        label: "Necrosis / Ulceración Necrótica",
+        label: "Necrosis",
         pos: Boolean(ext.necrosis),
+        severity: "d",
+      },
+      {
+        label: "Ulceración Necrótica",
+        pos: Boolean(ext.necroticUlceration),
         severity: "d",
       },
       {
@@ -1717,6 +1769,11 @@ async function drawColposcopySection(
       {
         label: "Estenosis del Canal Cervical",
         pos: Boolean(ext.stenosis),
+        severity: "w",
+      },
+      {
+        label: "Anomalía Congénita",
+        pos: Boolean(ext.congenitalAnomaly),
         severity: "w",
       },
       {
@@ -1774,20 +1831,47 @@ async function drawColposcopySection(
   const rightBoxW = CONTENT_W - leftBoxW - 10;
   const rightBoxX = MARGIN_X + leftBoxW + 10;
 
-  const diagLines = wrapText(
-    `3. ${colpo.diagnosis.toUpperCase()}`,
+  const dx1Lines = wrapText(
+    `1. ${colpo.adequateColposcopy ? "COLPOSCOPÍA ADECUADA" : "COLPOSCOPÍA INADECUADA"}${
+      !colpo.adequateColposcopy && ext.inadequateReason
+        ? ` (${ext.inadequateReason})`
+        : ""
+    }  •  UEC ${normalizedScj.toUpperCase()}`,
     assets.fontBold,
-    8.5,
+    8.1,
     rightBoxW - 16
   );
+  const dx2Lines = [
+    sanitizeWinAnsi(
+      `2. ZONA DE TRANSFORMACIÓN ${colpo.transformationZoneType.toUpperCase()}`
+    ),
+  ];
+  const dx3Lines = wrapText(
+    `3. ${colpo.diagnosis.toUpperCase()} [CIE-10: ${colpo.cie10Code}]`,
+    assets.fontBold,
+    8.2,
+    rightBoxW - 16
+  );
+  const extraDxLines = additionalDiagnoses.flatMap((addItem, idx) =>
+    wrapText(
+      `${4 + idx}. ${addItem.diagnosis.toUpperCase()}${
+        addItem.cie10Code ? ` [CIE-10: ${addItem.cie10Code}]` : ""
+      }`,
+      assets.fontBold,
+      8.0,
+      rightBoxW - 16
+    )
+  );
+  const totalDxLineCount =
+    dx1Lines.length + dx2Lines.length + dx3Lines.length + extraDxLines.length;
   const planLines = wrapText(
     colpo.planRecommendations,
     assets.fontRegular,
     8.3,
     rightBoxW - 16
   );
-  const diagBoxH = Math.max(58, 36 + diagLines.length * 10.5);
-  const planBoxH = Math.max(66, 24 + planLines.length * 10.5);
+  const diagBoxH = Math.max(60, 22 + totalDxLineCount * 10);
+  const planBoxH = Math.max(66, 24 + Math.min(planLines.length, 5) * 10.5);
   const topBlockH = Math.max(132, diagBoxH + 8 + planBoxH);
 
   // Caja Izquierda: Biopsia y Reloj Cervical
@@ -1882,42 +1966,46 @@ async function drawColposcopySection(
     color: C_PRIMARY,
   });
 
-  let dy = y2 - 24;
-  page2.drawText(
-    sanitizeWinAnsi(
-      `1. ${colpo.adequateColposcopy ? "COLPOSCOPÍA ADECUADA" : "COLPOSCOPÍA INADECUADA"}  •  UEC ${colpo.squamocolumnarJunctionVisible.toUpperCase()}`
-    ),
-    {
+  let dy = y2 - 23;
+  for (const l of dx1Lines) {
+    page2.drawText(l, {
       x: rightBoxX + 8,
       y: dy,
-      size: 8.2,
+      size: 8.1,
       font: assets.fontBold,
       color: C_TEXT,
-    }
-  );
-  dy -= 10.5;
-  page2.drawText(
-    sanitizeWinAnsi(
-      `2. ZONA DE TRANSFORMACIÓN ${colpo.transformationZoneType.toUpperCase()}`
-    ),
-    {
+    });
+    dy -= 10;
+  }
+  for (const l of dx2Lines) {
+    page2.drawText(l, {
       x: rightBoxX + 8,
       y: dy,
-      size: 8.2,
+      size: 8.1,
       font: assets.fontBold,
       color: C_TEXT,
-    }
-  );
-  dy -= 10.5;
-  for (const dl of diagLines) {
+    });
+    dy -= 10;
+  }
+  for (const dl of dx3Lines) {
     page2.drawText(dl, {
       x: rightBoxX + 8,
       y: dy,
-      size: 8.4,
+      size: 8.2,
       font: assets.fontBold,
       color: C_PRIMARY,
     });
-    dy -= 10.5;
+    dy -= 10;
+  }
+  for (const el of extraDxLines) {
+    page2.drawText(el, {
+      x: rightBoxX + 8,
+      y: dy,
+      size: 8.0,
+      font: assets.fontBold,
+      color: C_TEXT,
+    });
+    dy -= 10;
   }
 
   // Caja Derecha Inferior: Plan de Manejo y Conducta Recomendada
@@ -2391,6 +2479,7 @@ export async function generateCheckupDossierPdf(params: {
     documentType: patientRow.documentType,
     documentNumber: patientRow.documentNumber,
     age,
+    birthDate: patientRow.birthDate ?? "",
   };
 
   const mainDoctor = buildDoctorMeta(
