@@ -393,7 +393,7 @@ export function PrescriptionModal({
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-12">
                 <div className="space-y-1 sm:col-span-7">
                   <label className="block text-[11px] font-medium text-foreground">
-                    Medicamento (Genérico / Comercial) *
+                    Medicamento Genérico (Comercial) *
                   </label>
                   <Input
                     type="text"
@@ -404,7 +404,7 @@ export function PrescriptionModal({
                         medicationName: e.target.value,
                       }))
                     }
-                    placeholder="Ej. Visanne 2mg (Dienogest)"
+                    placeholder="Ej. Dienogest 2 mg (Visanne)"
                   />
                 </div>
 

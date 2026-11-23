@@ -7,7 +7,11 @@ import { z } from "zod";
 import { toast } from "sonner";
 import type { QuoteItemRecord } from "@/db/schema/clinical";
 import type { MedicalConsultationItem } from "@/features/consultas/consultas.schema";
-import type { LabOrderItem } from "@/features/laboratorio/laboratorio.schema";
+import {
+  getLabOrderKindMeta,
+  isPathologyLabTemplate,
+  type LabOrderItem,
+} from "@/features/laboratorio/laboratorio.schema";
 import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
 import {
   formatProviderOptionLabel,
@@ -573,7 +577,7 @@ export function useCotizaciones({
     ];
 
     if (
-      order.templateType !== "GENERAL" &&
+      isPathologyLabTemplate(order.templateType) &&
       requestLabels.length === 0 &&
       order.specimenDetails?.anatomicalSite
     ) {
@@ -688,7 +692,7 @@ export function useCotizaciones({
       }
     }
 
-    if (order.templateType !== "GENERAL" && matchedTariffs.length === 0) {
+    if (isPathologyLabTemplate(order.templateType) && matchedTariffs.length === 0) {
       const siteNorm = normalizeMatchText(
         order.specimenDetails?.anatomicalSite ?? ""
       );
@@ -703,9 +707,7 @@ export function useCotizaciones({
     setDraftItems(nextItems);
 
     setSourceLabel(
-      `Cotización generada desde orden de ${
-        order.templateType !== "GENERAL" ? "Anatomía Patológica" : "Laboratorio"
-      } (${order.orderDate})`
+      `Cotización generada desde orden de ${getLabOrderKindMeta(order.templateType).shortLabel} (${order.orderDate})`
     );
 
     if (unmatched.length > 0) {

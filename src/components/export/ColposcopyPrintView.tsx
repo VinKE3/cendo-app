@@ -395,7 +395,7 @@ export function ColposcopyPrintView({
           {/* 3. Información Complementaria / Antecedentes (Pág. 9 de informe.pdf) */}
           <div className="overflow-hidden rounded-lg border border-primary/25 bg-card">
             <div className="flex items-center justify-between border-b border-primary/20 bg-primary/10 px-2.5 py-1 text-[8.5px] font-bold tracking-wider text-primary uppercase">
-              <span>INFORMACIÓN COMPLEMENTARIA • ANTECEDENTES GINECO-OBSTÉTRICOS</span>
+              <span>INFORMACIÓN COMPLEMENTARIA • ANTECEDENTES GINECO-OBSTÉTRICOS Y GENERALES</span>
               <span className="font-mono text-[7.5px]">HISTORIA CLÍNICA</span>
             </div>
             <div className="space-y-1.5 px-2.5 py-1.5 text-[9px]">

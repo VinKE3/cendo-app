@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   buildLabOrderPdfTitle,
+  getLabOrderKindMeta,
   type LabOrderItem,
 } from "@/features/laboratorio/laboratorio.schema";
 import type { PatientDirectoryItem } from "@/features/pacientes/pacientes.schema";
@@ -71,7 +72,9 @@ export function LabOrderPrintModal({
       <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-5xl">
         <DialogHeader>
           <DialogTitle>
-            Vista Previa de Orden de Laboratorio / Patología (A4 CENDO)
+            {labOrder
+              ? `Vista Previa: ${getLabOrderKindMeta(labOrder.templateType).shortLabel} (A4 CENDO)`
+              : "Vista Previa de Orden de Exámenes Auxiliares (A4 CENDO)"}
           </DialogTitle>
           <DialogDescription>
             Formato oficial listo para imprimir, guardar en PDF o enviar por

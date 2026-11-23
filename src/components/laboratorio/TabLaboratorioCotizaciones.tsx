@@ -11,6 +11,7 @@ import {
   Plus,
   Printer,
   Receipt,
+  Scan,
   Search,
   Settings,
   Trash2,
@@ -49,9 +50,11 @@ import type { MedicalConsultationItem } from "@/features/consultas/consultas.sch
 import { useCotizaciones } from "@/features/cotizaciones/hooks/use-cotizaciones";
 import type { ProcedureQuoteItem } from "@/features/cotizaciones/cotizaciones.schema";
 import { useLaboratorio } from "@/features/laboratorio/hooks/use-laboratorio";
-import type {
-  LabOrderItem,
-  LabOrderTemplateItem,
+import {
+  getLabOrderKindMeta,
+  isPathologyLabTemplate,
+  type LabOrderItem,
+  type LabOrderTemplateItem,
 } from "@/features/laboratorio/laboratorio.schema";
 import type {
   PatientBackgroundItem,
@@ -255,6 +258,15 @@ export function TabLaboratorioCotizaciones({
                 </Button>
                 <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={lab.openCreateImagingModal}
+                >
+                  <Scan className="size-3.5 text-primary" />
+                  + Orden Imágenes
+                </Button>
+                <Button
+                  type="button"
                   size="sm"
                   onClick={lab.openCreateModal}
                 >
@@ -282,12 +294,13 @@ export function TabLaboratorioCotizaciones({
           <CardHeader className="border-b border-border">
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
               <FlaskConical className="size-4 text-primary" />
-              Órdenes de Laboratorio Clínico y Remisión Patológica (
+              Exámenes Auxiliares: Laboratorio, Imágenes y Patología (
               {lab.totalCount})
             </CardTitle>
             <CardDescription>
-              Análisis de laboratorio, paneles hormonales y remisiones de
-              biopsias / citología con cadena de custodia e impresión A4.
+              Órdenes separadas por tipo: análisis de laboratorio clínico,
+              estudios de diagnóstico por imágenes y remisiones de anatomía
+              patológica con impresión A4 diferenciada.
             </CardDescription>
           </CardHeader>
 
@@ -325,6 +338,8 @@ export function TabLaboratorioCotizaciones({
                       const linkedCons = ord.consultationId
                         ? consultations.find((c) => c.id === ord.consultationId)
                         : null;
+                      const kindMeta = getLabOrderKindMeta(ord.templateType);
+                      const isPathology = isPathologyLabTemplate(ord.templateType);
                       return (
                         <TableRow key={ord.id}>
                           <TableCell className="align-top">
@@ -337,7 +352,7 @@ export function TabLaboratorioCotizaciones({
                                   variant="outline"
                                   className="font-mono text-[10px]"
                                 >
-                                  LAB-{ord.id.slice(0, 8).toUpperCase()}
+                                  {kindMeta.codePrefix}-{ord.id.slice(0, 8).toUpperCase()}
                                 </Badge>
                                 <Badge
                                   variant={
@@ -377,16 +392,21 @@ export function TabLaboratorioCotizaciones({
                                     CIE-10: {ord.cie10Code}
                                   </Badge>
                                 ) : null}
-                                {ord.templateType !== "GENERAL" ? (
-                                  <Badge
-                                    variant="outline"
-                                    className="border-primary/30 text-[10px] text-primary"
-                                  >
-                                    Anatomía Patológica
-                                  </Badge>
-                                ) : null}
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    "text-[10px]",
+                                    kindMeta.kind === "IMAGEN"
+                                      ? "border-warning/60 bg-warning/10 text-foreground"
+                                      : kindMeta.kind === "PATHOLOGY"
+                                        ? "border-primary/40 bg-primary/10 text-primary"
+                                        : "border-border text-muted-foreground"
+                                  )}
+                                >
+                                  {kindMeta.shortLabel}
+                                </Badge>
                               </div>
-                              {ord.templateType !== "GENERAL" &&
+                              {isPathology &&
                               ord.specimenDetails?.anatomicalSite ? (
                                 <p className="text-[11px] font-medium text-primary">
                                   Muestra: {ord.specimenDetails.anatomicalSite}
@@ -763,6 +783,7 @@ export function TabLaboratorioCotizaciones({
         labTemplates={labTemplates}
         categories={lab.categories}
         presetPacks={lab.presetPacks}
+        instructionPresets={lab.instructionPresets}
         watchedDiagnosis={lab.watchedDiagnosis}
         watchedCie10={lab.watchedCie10}
         watchedConsultationId={lab.watchedConsultationId}
@@ -777,6 +798,7 @@ export function TabLaboratorioCotizaciones({
         manualTestName={lab.manualTestName}
         onManualTestNameChange={lab.setManualTestName}
         onApplyTemplate={lab.applyTemplate}
+        onSwitchToImaging={lab.switchToImagingMode}
         onSwitchToPathology={lab.switchToPathologyMode}
         onResetToGeneral={lab.resetToGeneralOrder}
         onOpenManageTemplates={() => lab.setTemplateManagerOpen(true)}

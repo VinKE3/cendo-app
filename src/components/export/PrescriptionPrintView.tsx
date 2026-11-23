@@ -70,6 +70,7 @@ export function PrescriptionPrintView({
 
   const isA5 = paperFormat === "A5";
   const showAllergyAlert = hasPositiveAllergy(patientAllergies);
+  const isSpaciousLayout = prescription.items.length <= 3;
 
   return (
     <div
@@ -98,163 +99,228 @@ export function PrescriptionPrintView({
         className={cn(
           "page-sheet box-border flex flex-col justify-between overflow-hidden rounded-xl border border-border bg-card shadow-sm print:rounded-none print:border-none print:shadow-none",
           isA5
-            ? "min-h-[210mm] w-[148mm] text-[11px]"
-            : "min-h-[297mm] w-[210mm] text-xs"
+            ? "min-h-[210mm] w-[148mm] text-xs"
+            : "min-h-[297mm] w-[210mm] text-[13px]"
         )}
       >
         <div
           className={cn(
-            "flex-1",
-            isA5 ? "space-y-2.5 px-[10mm] pt-[7mm] pb-3" : "space-y-3.5 px-[14mm] pt-[10mm] pb-4"
+            "flex flex-1 flex-col justify-between",
+            isA5
+              ? "gap-3 px-[10mm] pt-[7mm] pb-2"
+              : "gap-4 px-[14mm] pt-[10mm] pb-3"
           )}
         >
-          {/* 1. Membrete Institucional */}
-          <header className="flex items-start justify-between gap-3 border-b-2 border-primary pb-2.5">
-            <div className="flex items-center gap-2.5">
-              <BrandLogo size={isA5 ? "sm" : "md"} showText={false} />
-              <div>
-                <h1
-                  className={cn(
-                    "font-sans font-extrabold tracking-tight text-primary",
-                    isA5 ? "text-base" : "text-lg"
-                  )}
-                >
-                  CENDO • CENTRO DE ENDOMETRIOSIS
-                </h1>
-                <p className="text-[10.5px] font-medium text-foreground">
-                  Ginecología Especializada • Cirugía Laparoscópica • Patología Cervical
+          <div className={cn(isA5 ? "space-y-2.5" : "space-y-4")}>
+            {/* 1. Membrete Institucional */}
+            <header className="flex items-start justify-between gap-3 border-b-2 border-primary pb-2.5">
+              <div className="flex items-center gap-2.5">
+                <BrandLogo size={isA5 ? "sm" : "md"} showText={false} />
+                <div>
+                  <h1
+                    className={cn(
+                      "font-sans font-extrabold tracking-tight text-primary",
+                      isA5 ? "text-base" : "text-lg"
+                    )}
+                  >
+                    CENDO • CENTRO DE ENDOMETRIOSIS
+                  </h1>
+                  <p className="text-[10.5px] font-medium text-foreground">
+                    Ginecología Especializada • Cirugía Laparoscópica • Patología Cervical
+                  </p>
+                  <p className="mt-0.5 font-mono text-[9px] text-muted-foreground">
+                    {clinicAddress} • Citas: {clinicPhone}
+                  </p>
+                </div>
+              </div>
+
+              <div className="shrink-0 border-l border-border pl-3 text-right">
+                <div className="inline-block rounded border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-bold tracking-wider text-primary uppercase">
+                  RECETA MÉDICA
+                </div>
+                <p className="mt-1 font-mono text-[9.5px] text-muted-foreground">
+                  N° REC-{prescription.id.slice(0, 8).toUpperCase()}
                 </p>
-                <p className="mt-0.5 font-mono text-[9px] text-muted-foreground">
-                  {clinicAddress} • Citas: {clinicPhone}
+                <p className="font-mono text-[10px] font-semibold text-foreground">
+                  Fecha: {formatPeruDateDisplay(prescription.prescriptionDate)}
                 </p>
               </div>
-            </div>
+            </header>
 
-            <div className="shrink-0 border-l border-border pl-3 text-right">
-              <div className="inline-block rounded border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-bold tracking-wider text-primary uppercase">
-                RECETA MÉDICA
-              </div>
-              <p className="mt-1 font-mono text-[9.5px] text-muted-foreground">
-                N° REC-{prescription.id.slice(0, 8).toUpperCase()}
-              </p>
-              <p className="font-mono text-[10px] font-semibold text-foreground">
-                Fecha: {formatPeruDateDisplay(prescription.prescriptionDate)}
-              </p>
-            </div>
-          </header>
-
-          {/* 2. Filiación de la Paciente */}
-          <div className="grid grid-cols-12 items-center gap-2 rounded-lg border border-border bg-muted/30 p-2.5">
-            <div className="col-span-6">
-              <span className="block text-[9px] font-semibold text-muted-foreground uppercase">
-                Paciente
-              </span>
-              <strong className="text-xs font-bold text-foreground sm:text-sm">
-                {patient.fullName}
-              </strong>
-            </div>
-
-            <div className="col-span-2">
-              <span className="block text-[9px] font-semibold text-muted-foreground uppercase">
-                {patient.documentType}
-              </span>
-              <span className="font-mono font-bold text-foreground">
-                {patient.documentNumber}
-              </span>
-            </div>
-
-            <div className="col-span-2">
-              <span className="block text-[9px] font-semibold text-muted-foreground uppercase">
-                Edad
-              </span>
-              <span className="font-medium text-foreground">{patient.age} años</span>
-            </div>
-
-            <div className="col-span-2">
-              <span className="block text-[9px] font-semibold text-muted-foreground uppercase">
-                Teléfono
-              </span>
-              <span className="font-mono text-muted-foreground">
-                {patient.phone || "—"}
-              </span>
-            </div>
-
-            <div className="col-span-12 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-1.5 text-[11px]">
-              <div>
-                <strong className="text-foreground">Diagnóstico: </strong>
-                <span className="text-foreground">{prescription.diagnosis}</span>
-              </div>
-              {prescription.cie10Code ? (
-                <span className="rounded border border-border bg-card px-2 py-0.5 font-mono text-[9.5px] font-bold text-foreground">
-                  CIE-10: {prescription.cie10Code}
+            {/* 2. Filiación de la Paciente */}
+            <div className="grid grid-cols-12 items-center gap-2 rounded-lg border border-border bg-muted/30 p-2.5">
+              <div className="col-span-6">
+                <span className="block text-[9px] font-semibold text-muted-foreground uppercase">
+                  Paciente
                 </span>
-              ) : null}
+                <strong className="text-xs font-bold text-foreground sm:text-sm">
+                  {patient.fullName}
+                </strong>
+              </div>
+
+              <div className="col-span-2">
+                <span className="block text-[9px] font-semibold text-muted-foreground uppercase">
+                  {patient.documentType}
+                </span>
+                <span className="font-mono font-bold text-foreground">
+                  {patient.documentNumber}
+                </span>
+              </div>
+
+              <div className="col-span-2">
+                <span className="block text-[9px] font-semibold text-muted-foreground uppercase">
+                  Edad
+                </span>
+                <span className="font-medium text-foreground">{patient.age} años</span>
+              </div>
+
+              <div className="col-span-2">
+                <span className="block text-[9px] font-semibold text-muted-foreground uppercase">
+                  Teléfono
+                </span>
+                <span className="font-mono text-muted-foreground">
+                  {patient.phone || "—"}
+                </span>
+              </div>
+
+              <div className="col-span-12 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-1.5 text-[11px]">
+                <div>
+                  <strong className="text-foreground">Diagnóstico: </strong>
+                  <span className="text-foreground">{prescription.diagnosis}</span>
+                </div>
+                {prescription.cie10Code ? (
+                  <span className="rounded border border-border bg-card px-2 py-0.5 font-mono text-[9.5px] font-bold text-foreground">
+                    CIE-10: {prescription.cie10Code}
+                  </span>
+                ) : null}
+              </div>
             </div>
+
+            {/* Alerta de Alergias / RAMs si existen */}
+            {showAllergyAlert ? (
+              <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
+                <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+                <div>
+                  <strong className="uppercase">Alerta de Alergias / RAMs: </strong>
+                  <span>{patientAllergies}</span>
+                </div>
+              </div>
+            ) : null}
           </div>
 
-          {/* Alerta de Alergias / RAMs si existen */}
-          {showAllergyAlert ? (
-            <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
-              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-              <div>
-                <strong className="uppercase">Alerta de Alergias / RAMs: </strong>
-                <span>{patientAllergies}</span>
-              </div>
-            </div>
-          ) : null}
-
-          {/* 3. Cuerpo Rp/ */}
-          <div className="space-y-2.5 pt-0.5">
-            <div className="flex items-center gap-2 border-b border-primary/30 pb-1">
-              <span className="font-serif text-xl font-bold italic text-primary select-none">
+          {/* 3. Cuerpo Rp/ — Amplio, legible y distribuido como receta física */}
+          <div className="flex flex-1 flex-col justify-start pt-1">
+            <div className="flex items-baseline gap-2.5 border-b-2 border-primary/35 pb-1.5">
+              <span
+                className={cn(
+                  "font-serif font-bold italic text-primary select-none",
+                  isA5 ? "text-2xl" : "text-3xl"
+                )}
+              >
                 Rp/
               </span>
-              <span className="text-[10.5px] font-bold tracking-wider text-muted-foreground uppercase">
-                Tratamiento Farmacológico Prescrito
+              <span
+                className={cn(
+                  "font-bold tracking-wider text-muted-foreground uppercase",
+                  isA5 ? "text-[10.5px]" : "text-xs"
+                )}
+              >
+                Prescripción Médica e Indicaciones de Administración
               </span>
             </div>
 
-            <div className="space-y-2">
+            <div
+              className={cn(
+                "mt-3 flex-1",
+                isSpaciousLayout
+                  ? isA5
+                    ? "space-y-3.5"
+                    : "space-y-5"
+                  : isA5
+                    ? "space-y-2"
+                    : "space-y-3"
+              )}
+            >
               {prescription.items.map((item, idx) => (
                 <div
                   key={item.id}
-                  className="space-y-1 rounded-lg border border-border bg-card p-2.5"
+                  className={cn(
+                    "break-inside-avoid rounded-lg border border-border/80 bg-card",
+                    isSpaciousLayout
+                      ? isA5
+                        ? "space-y-1.5 p-3"
+                        : "space-y-2 p-4"
+                      : isA5
+                        ? "space-y-1 p-2.5"
+                        : "space-y-1.5 p-3"
+                  )}
                 >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="flex size-5 shrink-0 items-center justify-center rounded bg-primary font-mono text-[10px] font-bold text-primary-foreground">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border/60 pb-1.5">
+                    <div className="flex items-baseline gap-2.5">
+                      <span
+                        className={cn(
+                          "inline-flex shrink-0 items-center justify-center rounded bg-primary font-mono font-bold text-primary-foreground",
+                          isA5 ? "size-5 text-[11px]" : "size-6 text-xs"
+                        )}
+                      >
                         {idx + 1}
                       </span>
-                      <strong className="font-bold text-foreground">
+                      <strong
+                        className={cn(
+                          "font-extrabold tracking-tight text-foreground",
+                          isA5
+                            ? isSpaciousLayout
+                              ? "text-[13.5px]"
+                              : "text-xs"
+                            : isSpaciousLayout
+                              ? "text-[16px]"
+                              : "text-[14px]"
+                        )}
+                      >
                         {item.medicationName}
                       </strong>
                     </div>
 
-                    <div className="flex shrink-0 items-center gap-1.5 text-[10px]">
-                      <span className="rounded border border-border bg-muted px-2 py-0.5 font-mono font-medium text-foreground">
+                    <div
+                      className={cn(
+                        "flex shrink-0 items-center gap-1.5",
+                        isA5 ? "text-[10px]" : "text-[11px]"
+                      )}
+                    >
+                      <span className="rounded border border-border bg-muted px-2 py-0.5 font-mono font-semibold text-foreground">
                         {item.presentation}
                       </span>
-                      <span className="rounded bg-primary/10 px-2 py-0.5 font-semibold text-primary">
-                        {item.route}
-                      </span>
+                      {item.quantity ? (
+                        <span className="rounded border border-primary/30 bg-primary/10 px-2 py-0.5 font-mono font-bold text-primary">
+                          Cant.: {item.quantity}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
 
-                  <div className="space-y-0.5 pl-7 leading-snug text-foreground">
+                  <div
+                    className={cn(
+                      "space-y-1 text-foreground",
+                      isA5 ? "pl-7" : "pl-8.5",
+                      isA5
+                        ? isSpaciousLayout
+                          ? "text-[12px] leading-relaxed"
+                          : "text-[11px] leading-snug"
+                        : isSpaciousLayout
+                          ? "text-[14px] leading-relaxed"
+                          : "text-[12.5px] leading-snug"
+                    )}
+                  >
                     <p>
-                      <strong>Dosis:</strong> {item.dosage} •{" "}
-                      <strong>Frecuencia:</strong> {item.frequency} •{" "}
-                      <strong>Duración:</strong> {item.duration}
+                      <strong className="text-primary">Administrar:</strong>{" "}
+                      {item.dosage} —{" "}
+                      <span className="font-semibold">{item.route}</span> —{" "}
+                      {item.frequency} — {item.duration}.
                     </p>
                     {item.instructions ? (
-                      <p className="text-[10.5px] italic text-muted-foreground">
-                        <strong>Indicación especial:</strong> {item.instructions}
-                      </p>
-                    ) : null}
-                    {item.quantity ? (
-                      <p className="font-mono text-[10px] text-muted-foreground">
-                        Cantidad a dispensar:{" "}
-                        <strong className="text-foreground">{item.quantity}</strong>
+                      <p className="italic text-muted-foreground">
+                        <strong className="not-italic text-foreground">Nota:</strong>{" "}
+                        {item.instructions}
                       </p>
                     ) : null}
                   </div>
@@ -263,33 +329,53 @@ export function PrescriptionPrintView({
             </div>
           </div>
 
-          {/* 4. Indicaciones Generales */}
-          {prescription.generalIndications ? (
-            <div className="space-y-1 rounded-lg border border-border bg-muted/30 p-2.5">
-              <strong className="block text-[9.5px] font-bold text-foreground uppercase">
-                Indicaciones Generales y Cuidados Clínicos
-              </strong>
-              <p className="leading-relaxed whitespace-pre-line text-foreground">
-                {prescription.generalIndications}
-              </p>
+          {/* 4. Indicaciones Generales y Próxima Cita (Parte inferior antes de firma) */}
+          {prescription.generalIndications || prescription.nextAppointmentDate ? (
+            <div className="space-y-2.5 pt-1">
+              {prescription.generalIndications ? (
+                <div
+                  className={cn(
+                    "space-y-1 rounded-lg border border-border bg-muted/30",
+                    isA5 ? "p-2.5 text-[11px]" : "p-3.5 text-[13px]"
+                  )}
+                >
+                  <strong className="block text-[10px] font-bold tracking-wider text-primary uppercase">
+                    Indicaciones Generales y Cuidados Clínicos
+                  </strong>
+                  <p className="leading-relaxed whitespace-pre-line text-foreground">
+                    {prescription.generalIndications}
+                  </p>
+                </div>
+              ) : null}
+
+              {prescription.nextAppointmentDate ? (
+                <div
+                  className={cn(
+                    "flex items-center justify-between rounded-lg border border-primary/25 bg-primary/5 px-3.5 py-2 text-foreground",
+                    isA5 ? "text-[11px]" : "text-xs"
+                  )}
+                >
+                  <span className="flex items-center gap-1.5 font-semibold text-primary">
+                    <Calendar className="size-3.5" />
+                    Próxima Cita de Control Ginecológico:
+                  </span>
+                  <strong className="rounded border border-border bg-card px-2.5 py-0.5 font-mono">
+                    {formatPeruDateDisplay(prescription.nextAppointmentDate)}
+                  </strong>
+                </div>
+              ) : null}
             </div>
           ) : null}
+        </div>
 
-          {/* 5. Próxima Cita */}
-          {prescription.nextAppointmentDate ? (
-            <div className="flex items-center justify-between rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-foreground">
-              <span className="flex items-center gap-1.5 font-semibold text-primary">
-                <Calendar className="size-3.5" />
-                Próxima Cita de Control Ginecológico:
-              </span>
-              <strong className="rounded border border-border bg-card px-2 py-0.5 font-mono">
-                {formatPeruDateDisplay(prescription.nextAppointmentDate)}
-              </strong>
-            </div>
-          ) : null}
-
-          {/* 6. Pie Legal y Firma */}
-          <div className="flex items-end justify-between gap-4 border-t border-border pt-3">
+        {/* 5. Pie Legal + Firma anclados siempre al pie de página */}
+        <div className="shrink-0 break-inside-avoid pt-2">
+          <div
+            className={cn(
+              "flex items-end justify-between gap-4 border-t border-border pt-2.5 pb-2",
+              isA5 ? "px-[10mm]" : "px-[14mm]"
+            )}
+          >
             <div className="max-w-xs space-y-0.5 font-mono text-[8.5px] text-muted-foreground">
               <p>Documento médico oficial • Válido para dispensación en farmacia</p>
               <p>Ley General de Salud N° 26842 • Sistema Clínico CENDO Miraflores</p>
@@ -304,13 +390,12 @@ export function PrescriptionPrintView({
               compact={isA5}
             />
           </div>
-        </div>
 
-        <div className="shrink-0 pt-2">
           <CendoFooterWave
             address={clinicAddress}
             email={clinicEmail}
             phone={clinicPhone}
+            compact={isA5}
           />
         </div>
       </section>

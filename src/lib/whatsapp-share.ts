@@ -1,4 +1,7 @@
-import { getDefaultInstructionsForTemplateType } from "@/features/laboratorio/laboratorio.schema";
+import {
+  getDefaultInstructionsForTemplateType,
+  getLabOrderKindMeta,
+} from "@/features/laboratorio/laboratorio.schema";
 import {
   type CalendarClinicInfo,
   type CalendarExportAppointment,
@@ -316,13 +319,18 @@ export function generateLabOrderWhatsAppUrl(
     .filter(Boolean)
     .join("\n");
 
+  const kindMeta = getLabOrderKindMeta(order.templateType);
   const headerTitle =
-    order.templateType === "GENERAL"
-      ? "Orden de Laboratorio Clínico"
-      : "Remisión a Laboratorio / Patología";
+    kindMeta.kind === "IMAGEN"
+      ? "Orden de Exámenes de Imágenes"
+      : kindMeta.kind === "PATHOLOGY"
+        ? "Remisión a Anatomía Patológica"
+        : "Orden de Laboratorio Clínico";
+  const emoji =
+    kindMeta.kind === "IMAGEN" ? "🩻" : kindMeta.kind === "PATHOLOGY" ? "🔬" : "🧪";
 
   const message = [
-    `🧪 *${headerTitle} • CENDO*`,
+    `${emoji} *${headerTitle} • CENDO*`,
     ``,
     `Estimada *${order.patientName}*, le compartimos el detalle de su orden médica:`,
     ``,

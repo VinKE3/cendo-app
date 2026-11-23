@@ -10,6 +10,7 @@ import {
 import { recordAuditLog } from "@/lib/audit/audit-log";
 import { DomainError, type SessionPayload } from "@/lib/security/action-guard";
 import {
+  isPathologyLabTemplate,
   slugifyTemplateCode,
   type CreateLabOrderInput,
   type CreateLabTemplateInput,
@@ -42,8 +43,9 @@ export function mapLabOrderRow(
     patientInstructions: row.patientInstructions ?? "",
     templateType,
     templateTitle: row.templateTitle ?? "",
-    specimenDetails:
-      templateType === "GENERAL" ? null : (row.specimenDetails ?? null),
+    specimenDetails: !isPathologyLabTemplate(templateType)
+      ? null
+      : (row.specimenDetails ?? null),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -193,9 +195,10 @@ export async function createLabOrder(
   const doctorCmp = doctor.cmp?.trim() || "61693";
   const doctorRne = doctor.rne?.trim() || null;
 
-  // Regla clínica: una orden GENERAL nunca debe almacenar metadatos residuales de biopsia/patología
-  const sanitizedSpecimen =
-    input.templateType === "GENERAL" ? null : (input.specimenDetails ?? null);
+  // Regla clínica: solo las órdenes de Anatomía Patológica conservan specimenDetails
+  const sanitizedSpecimen = !isPathologyLabTemplate(input.templateType)
+    ? null
+    : (input.specimenDetails ?? null);
 
   const [inserted] = await db
     .insert(labOrders)
@@ -272,8 +275,9 @@ export async function updateLabOrder(
     throw new DomainError("Orden de laboratorio no encontrada o sin acceso autorizado.");
   }
 
-  const sanitizedSpecimen =
-    input.templateType === "GENERAL" ? null : (input.specimenDetails ?? null);
+  const sanitizedSpecimen = !isPathologyLabTemplate(input.templateType)
+    ? null
+    : (input.specimenDetails ?? null);
 
   const [updated] = await db
     .update(labOrders)

@@ -16,6 +16,7 @@ import { DomainError, type SessionPayload } from "@/lib/security/action-guard";
 import { getPeruDateString } from "@/lib/utils";
 import { assertNoScheduleConflict } from "@/features/agenda/services/agenda.service";
 import {
+  isPathologyLabTemplate,
   parseConsultationAuxExamsToLabItems,
   type LabOrderItem,
 } from "@/features/laboratorio/laboratorio.schema";
@@ -506,10 +507,9 @@ export async function createConsultation(
     const createdLabOrders: LabOrderItem[] = [];
     if (input.draftLabOrders.length > 0) {
       for (const draftLab of input.draftLabOrders) {
-        const sanitizedSpecimen =
-          draftLab.templateType === "GENERAL"
-            ? null
-            : (draftLab.specimenDetails ?? null);
+        const sanitizedSpecimen = !isPathologyLabTemplate(draftLab.templateType)
+          ? null
+          : (draftLab.specimenDetails ?? null);
         const [lab] = await tx
           .insert(labOrders)
           .values({

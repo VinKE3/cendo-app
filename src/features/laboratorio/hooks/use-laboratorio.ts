@@ -39,14 +39,20 @@ import {
 import {
   getDefaultInstructionsForTemplateType,
   hasDuplicateLabTest,
+  IMAGING_CATEGORIES,
+  IMAGING_INSTRUCTION_PRESETS,
+  IMAGING_PRESET_PACKS,
+  IMAGING_TESTS_CATALOG,
   inferLabSampleAndCategory,
+  isImagingLabTemplate,
+  isPathologyLabTemplate,
   LAB_CATEGORIES,
+  LAB_INSTRUCTION_PRESETS,
   LAB_PRESET_PACKS,
   LAB_TEMPLATE_TYPES,
   LAB_TESTS_CATALOG,
   LAB_URGENCIES,
   parseConsultationAuxExamsToLabItems,
-  type LabCatalogTest,
   type LabOrderItem,
   type LabOrderTemplateItem,
   type LabPresetPack,
@@ -215,9 +221,29 @@ export function useLaboratorio({
 
   const pagination = usePagination(filteredOrders, 10);
 
+  const isImagingMode = isImagingLabTemplate(watchedTemplateType);
+
+  const activeCategories = useMemo(
+    () => (isImagingMode ? IMAGING_CATEGORIES : LAB_CATEGORIES),
+    [isImagingMode]
+  );
+
+  const activePresetPacks = useMemo(
+    () => (isImagingMode ? IMAGING_PRESET_PACKS : LAB_PRESET_PACKS),
+    [isImagingMode]
+  );
+
+  const activeInstructionPresets = useMemo(
+    () => (isImagingMode ? IMAGING_INSTRUCTION_PRESETS : LAB_INSTRUCTION_PRESETS),
+    [isImagingMode]
+  );
+
   const filteredCatalog = useMemo(() => {
     const q = catalogSearch.trim().toLowerCase();
-    return LAB_TESTS_CATALOG.filter((test) => {
+    const sourceCatalog = isImagingMode
+      ? IMAGING_TESTS_CATALOG
+      : LAB_TESTS_CATALOG;
+    return sourceCatalog.filter((test) => {
       if (catalogCategory !== "Todas" && test.category !== catalogCategory) {
         return false;
       }
@@ -228,7 +254,7 @@ export function useLaboratorio({
         test.sampleType.toLowerCase().includes(q)
       );
     });
-  }, [catalogSearch, catalogCategory]);
+  }, [catalogSearch, catalogCategory, isImagingMode]);
 
   const setSearch = (val: string) => {
     setSearchState(val);
@@ -704,6 +730,30 @@ export function useLaboratorio({
     toast.success(`Plantilla aplicada: ${tmpl.title}`);
   };
 
+  const openCreateImagingModal = () => {
+    resetConsultModeFlags(null);
+    setEditingItem(null);
+    setSourceLabel(null);
+    setSaveAndPrintIntent(false);
+    setSelectedTests([]);
+    setCatalogSearch("");
+    setCatalogCategory("Todas");
+    setManualTestName("");
+    form.reset({
+      consultationId: consultations[0]?.id ?? "",
+      orderDate: todayStr,
+      diagnosis: consultations[0]?.diagnosis ?? "",
+      cie10Code: consultations[0]?.cie10Code ?? "",
+      urgency: "Rutina",
+      customTests: "",
+      patientInstructions: getDefaultInstructionsForTemplateType("IMAGEN"),
+      templateType: "IMAGEN",
+      templateTitle: "Orden de Exámenes de Imágenes",
+      ...defaultSpecimenValues,
+    });
+    setDialogOpen(true);
+  };
+
   const openCreatePathologyModal = () => {
     resetConsultModeFlags(null);
     setEditingItem(null);
@@ -728,15 +778,35 @@ export function useLaboratorio({
     setDialogOpen(true);
   };
 
+  const switchToImagingMode = () => {
+    if (form.getValues("templateType") === "IMAGEN") return;
+    const prevInstr = form.getValues("patientInstructions").trim();
+    const generalDefault = getDefaultInstructionsForTemplateType("GENERAL");
+    const biopsyDefault = getDefaultInstructionsForTemplateType("BIOPSIA");
+    form.setValue("templateType", "IMAGEN", { shouldDirty: true });
+    form.setValue("templateTitle", "Orden de Exámenes de Imágenes", {
+      shouldDirty: true,
+    });
+    if (!prevInstr || prevInstr === generalDefault || prevInstr === biopsyDefault) {
+      form.setValue(
+        "patientInstructions",
+        getDefaultInstructionsForTemplateType("IMAGEN"),
+        { shouldDirty: true }
+      );
+    }
+    setCatalogCategory("Todas");
+  };
+
   const switchToPathologyMode = () => {
-    if (form.getValues("templateType") !== "GENERAL") return;
+    if (isPathologyLabTemplate(form.getValues("templateType"))) return;
+    const currentInstr = form.getValues("patientInstructions").trim();
+    const generalDefault = getDefaultInstructionsForTemplateType("GENERAL");
+    const imageDefault = getDefaultInstructionsForTemplateType("IMAGEN");
     form.setValue("templateType", "BIOPSIA", { shouldDirty: true });
     form.setValue("templateTitle", "Solicitud de Anatomía Patológica", {
       shouldDirty: true,
     });
-    const currentInstr = form.getValues("patientInstructions").trim();
-    const generalDefault = getDefaultInstructionsForTemplateType("GENERAL");
-    if (!currentInstr || currentInstr === generalDefault) {
+    if (!currentInstr || currentInstr === generalDefault || currentInstr === imageDefault) {
       form.setValue(
         "patientInstructions",
         getDefaultInstructionsForTemplateType("BIOPSIA"),
@@ -776,7 +846,10 @@ export function useLaboratorio({
   };
 
   const applyPresetPack = (pack: LabPresetPack) => {
-    const matchedTests = LAB_TESTS_CATALOG.filter((t) =>
+    const sourceCatalog = isImagingLabTemplate(form.getValues("templateType"))
+      ? IMAGING_TESTS_CATALOG
+      : LAB_TESTS_CATALOG;
+    const matchedTests = sourceCatalog.filter((t) =>
       pack.testIds.includes(t.id)
     );
     setSelectedTests((prev) => {
@@ -802,7 +875,13 @@ export function useLaboratorio({
     toast.success(`Perfil agregado: ${pack.name}`);
   };
 
-  const addCatalogTest = (test: LabCatalogTest) => {
+  const addCatalogTest = (test: {
+    id: string;
+    name: string;
+    category: string;
+    sampleType: string;
+    notes?: string;
+  }) => {
     if (hasDuplicateLabTest(selectedTests, test.name)) {
       setSelectedTests((prev) =>
         prev.filter((it) => it.testName.toLowerCase() !== test.name.toLowerCase())
@@ -824,14 +903,16 @@ export function useLaboratorio({
   const addManualTest = () => {
     const clean = manualTestName.trim();
     if (clean.length < 2) {
-      toast.error("Escriba el nombre del análisis.");
+      toast.error("Escriba el nombre del examen.");
       return;
     }
     if (hasDuplicateLabTest(selectedTests, clean)) {
       toast.info(`"${clean}" ya está agregado en la orden.`);
       return;
     }
-    const inferred = inferLabSampleAndCategory(clean);
+    const inferred = isImagingLabTemplate(form.getValues("templateType"))
+      ? { category: "Diagnóstico por Imágenes", sampleType: "Estudio por Imágenes" }
+      : inferLabSampleAndCategory(clean);
     setSelectedTests((prev) => [
       ...prev,
       {
@@ -870,7 +951,7 @@ export function useLaboratorio({
   };
 
   const onSubmit = form.handleSubmit(async (values) => {
-    const isPathology = values.templateType !== "GENERAL";
+    const isPathology = isPathologyLabTemplate(values.templateType);
     const sampleText = values.anatomicalSite.trim();
     const hasCustomTests = values.customTests.trim().length >= 3;
 
@@ -915,11 +996,10 @@ export function useLaboratorio({
         ? values.consultationId
         : null;
 
-    const specimenDetails: LabSpecimenDetailsRecord | null =
-      values.templateType === "GENERAL"
-        ? null
-        : {
-            anatomicalSite: values.anatomicalSite || undefined,
+    const specimenDetails: LabSpecimenDetailsRecord | null = !isPathology
+      ? null
+      : {
+          anatomicalSite: values.anatomicalSite || undefined,
             sampleMethod: values.sampleMethod || undefined,
             fixative: values.fixative || undefined,
             containerCount: Number(values.containerCount) || 1,
@@ -1122,9 +1202,11 @@ export function useLaboratorio({
     filteredCatalog,
     manualTestName,
     setManualTestName,
-    categories: LAB_CATEGORIES,
-    presetPacks: LAB_PRESET_PACKS,
+    categories: activeCategories,
+    presetPacks: activePresetPacks,
+    instructionPresets: activeInstructionPresets,
     openCreateModal,
+    openCreateImagingModal,
     openCreatePathologyModal,
     openEditModal,
     openFromConsultation,
@@ -1135,6 +1217,7 @@ export function useLaboratorio({
     openPathologyFromProcedure,
     openPrenatalBattery,
     applyTemplate,
+    switchToImagingMode,
     switchToPathologyMode,
     resetToGeneralOrder,
     applyPresetPack,

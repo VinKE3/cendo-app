@@ -9,6 +9,7 @@ export type LabUrgency = (typeof LAB_URGENCIES)[number];
 
 export const LAB_TEMPLATE_TYPES = [
   "GENERAL",
+  "IMAGEN",
   "PAP",
   "BIOPSIA",
   "TRUCUT",
@@ -17,6 +18,46 @@ export const LAB_TEMPLATE_TYPES = [
   "CUSTOM",
 ] as const;
 export type LabTemplateType = (typeof LAB_TEMPLATE_TYPES)[number];
+
+export type LabOrderModeKind = "LAB" | "IMAGEN" | "PATHOLOGY";
+
+export function isImagingLabTemplate(templateType?: string | null): boolean {
+  return templateType === "IMAGEN";
+}
+
+export function isPathologyLabTemplate(templateType?: string | null): boolean {
+  return Boolean(templateType) && templateType !== "GENERAL" && templateType !== "IMAGEN";
+}
+
+export function getLabOrderKindMeta(templateType?: string | null): {
+  kind: LabOrderModeKind;
+  shortLabel: string;
+  fullTitle: string;
+  codePrefix: string;
+} {
+  if (isImagingLabTemplate(templateType)) {
+    return {
+      kind: "IMAGEN",
+      shortLabel: "Imágenes",
+      fullTitle: "ORDEN DE EXÁMENES DE IMÁGENES",
+      codePrefix: "IMG",
+    };
+  }
+  if (isPathologyLabTemplate(templateType)) {
+    return {
+      kind: "PATHOLOGY",
+      shortLabel: "Anatomía Patológica",
+      fullTitle: "SOLICITUD DE ANATOMÍA PATOLÓGICA",
+      codePrefix: "AP",
+    };
+  }
+  return {
+    kind: "LAB",
+    shortLabel: "Laboratorio",
+    fullTitle: "ORDEN DE EXÁMENES DE LABORATORIO",
+    codePrefix: "LAB",
+  };
+}
 
 export const PATHOLOGY_SAMPLE_SUGGESTIONS = [
   "Citología de Cérvix",
@@ -29,7 +70,7 @@ export const PATHOLOGY_SAMPLE_SUGGESTIONS = [
 ] as const;
 
 /**
- * Construye el nombre de archivo PDF diferenciando solicitudes de Anatomía Patológica de órdenes generales.
+ * Construye el nombre de archivo PDF diferenciando Laboratorio, Imágenes y Anatomía Patológica.
  */
 export function buildLabOrderPdfTitle(
   order: { templateType: string; orderDate: string },
@@ -39,8 +80,11 @@ export function buildLabOrderPdfTitle(
     .trim()
     .replace(/[\\/:*?"<>|]+/g, "")
     .replace(/\s+/g, " ");
-  const prefix =
-    order.templateType !== "GENERAL" ? "Anatomia_Patologica" : "OrdenLab";
+  const prefix = isImagingLabTemplate(order.templateType)
+    ? "OrdenImagenes"
+    : isPathologyLabTemplate(order.templateType)
+      ? "Anatomia_Patologica"
+      : "OrdenLab";
   return `${prefix}_${safePatientName}_${order.orderDate}`;
 }
 
@@ -501,6 +545,172 @@ export const LAB_INSTRUCTION_PRESETS = [
   "Realizar la toma entre los días 2 y 4 del ciclo menstrual.",
 ] as const;
 
+export const IMAGING_CATEGORIES = [
+  "Ecografía Ginecológica & Endometriosis",
+  "Ecografía Obstétrica & Doppler",
+  "Mama & Senología",
+  "Resonancia, Tomografía & Otros",
+] as const;
+export type ImagingCategory = (typeof IMAGING_CATEGORIES)[number];
+
+export const IMAGING_TESTS_CATALOG: Array<{
+  id: string;
+  name: string;
+  category: ImagingCategory;
+  sampleType: string;
+  notes?: string;
+}> = [
+  {
+    id: "img-eco-tv",
+    name: "Ecografía Transvaginal (Útero y Anexos)",
+    category: "Ecografía Ginecológica & Endometriosis",
+    sampleType: "Vía Transvaginal",
+    notes: "Vejiga vacía; traer estudios previos",
+  },
+  {
+    id: "img-eco-pelvica",
+    name: "Ecografía Pélvica Suprapúbica",
+    category: "Ecografía Ginecológica & Endometriosis",
+    sampleType: "Vía Transabdominal",
+    notes: "Acudir con vejiga llena (tomar 4 vasos de agua 1 h antes)",
+  },
+  {
+    id: "img-eco-idea",
+    name: "Mapeo Ecográfico de Endometriosis (Protocolo IDEA)",
+    category: "Ecografía Ginecológica & Endometriosis",
+    sampleType: "Transvaginal + Mapeo Profundo",
+    notes: "Requiere preparación intestinal previa según protocolo CENDO",
+  },
+  {
+    id: "img-eco-folicular",
+    name: "Seguimiento Ecográfico Folicular / Ovulación",
+    category: "Ecografía Ginecológica & Endometriosis",
+    sampleType: "Vía Transvaginal",
+  },
+  {
+    id: "img-histerosono",
+    name: "Histerosonografía / Sono-Histerosalpingografía",
+    category: "Ecografía Ginecológica & Endometriosis",
+    sampleType: "Cavidad Uterina / Trompas",
+    notes: "Realizar entre día 6 y 11 del ciclo (sin sangrado)",
+  },
+  {
+    id: "img-eco-mama",
+    name: "Ecografía de Mama Bilateral + Axilas (ACR BI-RADS)",
+    category: "Mama & Senología",
+    sampleType: "Mama Bilateral",
+    notes: "Traer mamografías / ecografías mamarias anteriores",
+  },
+  {
+    id: "img-mamografia",
+    name: "Mamografía Digital Bilateral 2D / Tomosíntesis 3D",
+    category: "Mama & Senología",
+    sampleType: "Mama Bilateral",
+    notes: "No usar desodorante, talco ni cremas el día del examen",
+  },
+  {
+    id: "img-eco-obs-1t",
+    name: "Ecografía Obstétrica del I Trimestre (Vitalidad y LCN)",
+    category: "Ecografía Obstétrica & Doppler",
+    sampleType: "Obstétrica",
+  },
+  {
+    id: "img-eco-genetica",
+    name: "Ecografía Genética (11 – 14 Semanas / FMF)",
+    category: "Ecografía Obstétrica & Doppler",
+    sampleType: "Obstétrica / Translucencia Nucal",
+  },
+  {
+    id: "img-eco-morfologica",
+    name: "Ecografía Obstétrica Morfológica Detallada (20 – 24 Sem.)",
+    category: "Ecografía Obstétrica & Doppler",
+    sampleType: "Obstétrica / Estructural",
+  },
+  {
+    id: "img-eco-obs-3t",
+    name: "Ecografía Obstétrica de Crecimiento, Perfil Biofísico y Doppler",
+    category: "Ecografía Obstétrica & Doppler",
+    sampleType: "Obstétrica + Doppler Materno-Fetal",
+  },
+  {
+    id: "img-rmn-pelvis",
+    name: "Resonancia Magnética (RMN) de Pelvis — Protocolo Endometriosis",
+    category: "Resonancia, Tomografía & Otros",
+    sampleType: "Con/Sin Contraste EV + Gel Vaginal/Rectal",
+    notes: "Evaluar función renal (creatinina) si usa gadolinio",
+  },
+  {
+    id: "img-rmn-mama",
+    name: "Resonancia Magnética (RMN) de Mamas Bilateral con Contraste",
+    category: "Resonancia, Tomografía & Otros",
+    sampleType: "Con Contraste Gadolinio",
+    notes: "Realizar idealmente entre día 7 y 14 del ciclo",
+  },
+  {
+    id: "img-densitometria",
+    name: "Densitometría Ósea (Columna Lumbar y Cadera Bilateral)",
+    category: "Resonancia, Tomografía & Otros",
+    sampleType: "DXA Ósea",
+    notes: "Suspender suplementos de calcio 24 horas antes",
+  },
+  {
+    id: "img-tac-abd",
+    name: "Tomografía (TAC) Abdomino-Pélvica con Contraste",
+    category: "Resonancia, Tomografía & Otros",
+    sampleType: "TAC Contrastada",
+    notes: "Ayuno de 6 horas y creatinina reciente",
+  },
+  {
+    id: "img-rx-torax",
+    name: "Radiografía de Tórax (PA y Lateral — Pre-quirúrgico)",
+    category: "Resonancia, Tomografía & Otros",
+    sampleType: "Radiología Convencional",
+  },
+];
+
+export const IMAGING_PRESET_PACKS: LabPresetPack[] = [
+  {
+    id: "img-pack-chequeo",
+    name: "Chequeo Imagenológico Preventivo",
+    description: "Ecografía Transvaginal + Ecografía de Mama Bilateral",
+    testIds: ["img-eco-tv", "img-eco-mama"],
+    diagnosis: "Chequeo ginecológico preventivo por imágenes",
+    cie10Code: "Z01.4",
+  },
+  {
+    id: "img-pack-endo",
+    name: "Estudio Avanzado de Endometriosis",
+    description: "Mapeo Ecográfico IDEA + RMN Pelvis protocolo Endometriosis",
+    testIds: ["img-eco-idea", "img-rmn-pelvis"],
+    diagnosis: "Sospecha de endometriosis pélvica profunda",
+    cie10Code: "N80.3",
+  },
+  {
+    id: "img-pack-mama40",
+    name: "Despistaje Mamario (> 40 años)",
+    description: "Mamografía Digital Bilateral + Ecografía de Mama Bilateral",
+    testIds: ["img-mamografia", "img-eco-mama"],
+    diagnosis: "Tamizaje preventivo de patología mamaria",
+    cie10Code: "Z12.3",
+  },
+  {
+    id: "img-pack-climaterio",
+    name: "Control Integral Climaterio",
+    description: "Ecografía Transvaginal + Mamografía + Densitometría Ósea",
+    testIds: ["img-eco-tv", "img-mamografia", "img-densitometria"],
+    diagnosis: "Evaluación integral en climaterio y menopausia",
+    cie10Code: "N95.1",
+  },
+];
+
+export const IMAGING_INSTRUCTION_PRESETS = [
+  "Traer informes e imágenes ecográficas, mamográficas o RMN previas para comparación.",
+  "Acudir con vejiga llena (tomar 3-4 vasos de agua 1 hora antes) si incluye Ecografía Pélvica.",
+  "Para mamografía o ecografía de mama: no aplicar desodorante, talco ni cremas en axilas o mamas.",
+  "Si el estudio requiere contraste endovenoso, presentar resultado reciente de creatinina sérica y ayuno de 6 horas.",
+  "En protocolo de endometriosis profundo / RMN: seguir indicaciones de preparación intestinal previas.",
+] as const;
+
 export interface LabOrderItem {
   id: string;
   patientId: string;
@@ -562,6 +772,9 @@ export function getDefaultInstructionsForTemplateType(
   if (templateType === "GENERAL") {
     return "Acudir en ayuno de 8 a 10 horas si incluye perfil metabólico o cumplir las indicaciones específicas de cada análisis.";
   }
+  if (templateType === "IMAGEN") {
+    return "Traer estudios por imágenes anteriores para comparación. Si incluye Ecografía Pélvica suprapúbica acudir con vejiga llena; en estudios mamarios evitar desodorante o talco.";
+  }
   return "Muestra remitida desde consultorio CENDO para estudio de Anatomía Patológica.";
 }
 
@@ -570,6 +783,18 @@ export function inferLabSampleAndCategory(testName: string): {
   sampleType: string;
 } {
   const lower = testName.toLowerCase();
+  if (
+    lower.includes("ecograf") ||
+    lower.includes("mamograf") ||
+    lower.includes("resonancia") ||
+    lower.includes("rmn") ||
+    lower.includes("tomograf") ||
+    lower.includes("radiograf") ||
+    lower.includes("densitometr") ||
+    lower.includes("doppler")
+  ) {
+    return { category: "Diagnóstico por Imágenes", sampleType: "Estudio por Imágenes" };
+  }
   if (lower.includes("pap") || lower.includes("vph") || lower.includes("citolog")) {
     return { category: "Ginecología & Marcadores", sampleType: "Muestra cervical" };
   }
@@ -728,8 +953,7 @@ function validateLabOrderPayload(
   ctx: z.RefinementCtx
 ) {
   const hasPathologySample =
-    data.templateType &&
-    data.templateType !== "GENERAL" &&
+    isPathologyLabTemplate(data.templateType) &&
     (data.specimenDetails?.anatomicalSite?.trim().length ?? 0) >= 2;
 
   if (

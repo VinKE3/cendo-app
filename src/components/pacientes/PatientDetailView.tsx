@@ -294,6 +294,7 @@ export function PatientDetailView({
             id: "temp-bg",
             patientId: patient.id,
             obstetricFormula: "G0 P0000",
+            obstetricFormulaDetails: "",
             menarche: 12,
             sexualDebutAge: 18,
             sexualPartnersCount: 1,
@@ -700,13 +701,13 @@ export function PatientDetailView({
             </CardContent>
           </Card>
 
-          {/* Columna 2: Antecedentes Gineco-Obstétricos Persistentes (8 cols) */}
+          {/* Columna 2: Antecedentes Gineco-Obstétricos y Generales (8 cols) */}
           <Card className="border border-border bg-card lg:col-span-8">
             <CardHeader className="flex-row items-center justify-between border-b border-border">
               <div>
                 <CardTitle className="flex items-center gap-2 text-sm font-semibold">
                   <Activity className="size-4 text-primary" />
-                  Antecedentes Gineco-Obstétricos Persistentes
+                  Antecedentes Gineco-Obstétricos y Generales
                 </CardTitle>
                 <CardDescription>
                   Historial obstétrico, método anticonceptivo, FUR y comorbilidades CENDO
@@ -735,9 +736,14 @@ export function PatientDetailView({
                   <p className="mt-1 font-mono text-lg font-bold text-primary">
                     {background?.obstetricFormula || "G0 P0000"}
                   </p>
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="block text-[10px] text-muted-foreground">
                     Gestas • T / P / A / V
                   </span>
+                  {background?.obstetricFormulaDetails ? (
+                    <p className="mt-1 border-t border-border/60 pt-1 text-[11px] leading-snug text-foreground">
+                      {background.obstetricFormulaDetails}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="rounded-lg border border-border bg-muted/30 p-3">

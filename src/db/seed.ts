@@ -44,7 +44,7 @@ async function seed() {
       email: "cendoperu@gmail.com",
       fullName: "Patrick José Jacinto Gomero",
       doctorTitle: "Dr.",
-      specialty: "Ginecología y Obstetricia - Endometriosis y Colposcopía",
+      specialty: "Ginecólogo Obstetra",
       cmp: "61693",
       rne: "38657",
       role: "admin" as const,

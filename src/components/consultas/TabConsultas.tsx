@@ -783,6 +783,7 @@ export function TabConsultas({
         labTemplates={initialManagedLabTemplates}
         categories={inlineLab.categories}
         presetPacks={inlineLab.presetPacks}
+        instructionPresets={inlineLab.instructionPresets}
         watchedDiagnosis={inlineLab.watchedDiagnosis}
         watchedCie10={inlineLab.watchedCie10}
         watchedConsultationId={inlineLab.watchedConsultationId}
@@ -797,6 +798,7 @@ export function TabConsultas({
         manualTestName={inlineLab.manualTestName}
         onManualTestNameChange={inlineLab.setManualTestName}
         onApplyTemplate={inlineLab.applyTemplate}
+        onSwitchToImaging={inlineLab.switchToImagingMode}
         onSwitchToPathology={inlineLab.switchToPathologyMode}
         onResetToGeneral={inlineLab.resetToGeneralOrder}
         onOpenManageTemplates={() => inlineLab.setTemplateManagerOpen(true)}

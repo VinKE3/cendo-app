@@ -12,6 +12,7 @@ export interface PatientBackgroundItem {
   catamenialRegimen: string;
   stiHistory: string;
   obstetricFormula: string;
+  obstetricFormulaDetails: string;
   contraceptiveMethod: string;
   lastMenstrualPeriod: string;
   papHistory: string;
@@ -198,6 +199,7 @@ export const patientBackgroundInputSchema = z
       .min(2, "La fórmula obstétrica es requerida (ej. G0 P0000).")
       .max(30)
       .transform((val) => val.trim().toUpperCase()),
+    obstetricFormulaDetails: z.string().trim().max(400).optional().default(""),
     menarche: optionalNullableInt(8, 22, "Edad de menarquia"),
     sexualDebutAge: optionalNullableInt(10, 45, "Edad de inicio sexual"),
     sexualPartnersCount: optionalNullableInt(0, 100, "Número de parejas sexuales"),

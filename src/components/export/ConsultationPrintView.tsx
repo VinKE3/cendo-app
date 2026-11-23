@@ -274,7 +274,9 @@ export function ConsultationPrintView({
                     <span className="font-semibold text-muted-foreground">
                       Genitales Externos:{" "}
                     </span>
-                    <span>{consultation.physicalExam.externalGenitalia}</span>
+                    <span className="whitespace-pre-line">
+                      {consultation.physicalExam.externalGenitalia}
+                    </span>
                   </div>
                 ) : null}
                 {consultation.physicalExam.speculoscopy ? (
@@ -282,15 +284,19 @@ export function ConsultationPrintView({
                     <span className="font-semibold text-muted-foreground">
                       Especuloscopía:{" "}
                     </span>
-                    <span>{consultation.physicalExam.speculoscopy}</span>
+                    <span className="whitespace-pre-line">
+                      {consultation.physicalExam.speculoscopy}
+                    </span>
                   </div>
                 ) : null}
                 {consultation.physicalExam.bimanualPalpation ? (
                   <div className="col-span-2">
                     <span className="font-semibold text-muted-foreground">
-                      Tacto Bimanual:{" "}
+                      Tacto Vaginal / Bimanual:{" "}
                     </span>
-                    <span>{consultation.physicalExam.bimanualPalpation}</span>
+                    <span className="whitespace-pre-line">
+                      {consultation.physicalExam.bimanualPalpation}
+                    </span>
                   </div>
                 ) : null}
               </div>
@@ -301,11 +307,11 @@ export function ConsultationPrintView({
             )}
           </div>
 
-          {/* 5. Diagnóstico y Plan Terapéutico */}
-          <div className="space-y-2 rounded-lg border border-primary/25 bg-primary/5 p-3">
+          {/* 5. Impresión Diagnóstica (Separada) */}
+          <div className="space-y-1.5 rounded-lg border border-primary/30 bg-primary/5 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-[10px] font-bold tracking-wider text-primary uppercase">
-                4. Impresión Diagnóstica & Plan de Trabajo
+                4. Impresión Diagnóstica
               </h2>
               {consultation.cie10Code ? (
                 <span className="rounded border border-primary/30 bg-card px-2 py-0.5 font-mono text-[10px] font-bold text-primary">
@@ -313,87 +319,115 @@ export function ConsultationPrintView({
                 </span>
               ) : null}
             </div>
-
             <p className="text-sm font-bold text-foreground">
               {consultation.diagnosis}
             </p>
+          </div>
 
-            <div>
-              <span className="block text-[9.5px] font-semibold text-muted-foreground uppercase">
-                Plan de Trabajo / Indicaciones
-              </span>
-              <p className="mt-0.5 whitespace-pre-line text-foreground">
-                {consultation.treatmentPlan}
-              </p>
-            </div>
-
-            {linkedLabOrders.length > 0 ? (
-              <div className="space-y-1.5 border-t border-border pt-1.5">
-                <span className="block text-[9.5px] font-semibold text-muted-foreground uppercase">
-                  Exámenes Auxiliares / Laboratorio Oficial
-                </span>
-                {linkedLabOrders.map((ord) => (
-                  <div key={ord.id} className="space-y-0.5 text-[11px]">
-                    <p className="font-mono text-[9.5px] font-bold text-primary">
-                      LAB-{ord.id.slice(0, 8).toUpperCase()} ({ord.urgency})
-                    </p>
-                    <p className="pl-2 text-foreground">
-                      {ord.items.map((it) => it.testName).join(" • ")}
-                      {ord.customTests ? ` • ${ord.customTests}` : ""}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            ) : consultation.auxiliaryExams ? (
-              <div className="border-t border-border pt-1.5">
-                <span className="block text-[9.5px] font-semibold text-muted-foreground uppercase">
-                  Exámenes Auxiliares Solicitados
-                </span>
-                <p className="mt-0.5 whitespace-pre-line">
-                  {consultation.auxiliaryExams}
-                </p>
-              </div>
-            ) : null}
-
-            {linkedPrescriptions.length > 0 ? (
-              <div className="space-y-1.5 border-t border-border pt-1.5">
-                <span className="block text-[9.5px] font-semibold text-muted-foreground uppercase">
-                  Terapéutica / Medicación Oficial (Rp/)
-                </span>
-                {linkedPrescriptions.map((rx) => (
-                  <div key={rx.id} className="space-y-0.5 text-[11px]">
-                    <p className="font-mono text-[9.5px] font-bold text-primary">
-                      REC-{rx.id.slice(0, 8).toUpperCase()} ({formatPeruDateDisplay(rx.prescriptionDate)})
-                    </p>
-                    <ul className="space-y-0.5 pl-2">
-                      {rx.items.map((item, idx) => (
-                        <li key={item.id}>
-                          <strong>{idx + 1}. {item.medicationName}</strong> ({item.route}) —{" "}
-                          {item.dosage} • {item.frequency} • {item.duration}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            ) : consultation.prescriptionNotes ? (
-              <div className="border-t border-border pt-1.5">
-                <span className="block text-[9.5px] font-semibold text-muted-foreground uppercase">
-                  Terapéutica / Medicación (Rp/)
-                </span>
-                <p className="mt-0.5 whitespace-pre-line">
-                  {consultation.prescriptionNotes}
-                </p>
-              </div>
-            ) : null}
-
+          {/* 6. Plan de Trabajo (Separado) */}
+          <div className="space-y-1.5 rounded-lg border border-border bg-card p-3">
+            <h2 className="text-[10px] font-bold tracking-wider text-primary uppercase">
+              5. Plan de Trabajo / Indicaciones
+            </h2>
+            <p className="whitespace-pre-line text-foreground">
+              {consultation.treatmentPlan}
+            </p>
             {consultation.nextAppointmentDate ? (
-              <p className="pt-1 font-mono text-[10.5px] font-semibold text-primary">
+              <p className="border-t border-border pt-1.5 font-mono text-[10.5px] font-semibold text-primary">
                 Próximo control sugerido:{" "}
                 {formatPeruDateDisplay(consultation.nextAppointmentDate)}
               </p>
             ) : null}
           </div>
+
+          {/* 7. Exámenes Auxiliares (Separado) */}
+          {linkedLabOrders.length > 0 || consultation.auxiliaryExams.trim() ? (
+            <div className="space-y-2 rounded-lg border border-border bg-card p-3">
+              <h2 className="text-[10px] font-bold tracking-wider text-primary uppercase">
+                6. Exámenes Auxiliares Solicitados
+              </h2>
+
+              {linkedLabOrders.length > 0 ? (
+                <div className="space-y-1.5">
+                  {linkedLabOrders.map((ord) => {
+                    const isImg = ord.templateType === "IMAGEN";
+                    const isPath = ord.templateType !== "GENERAL" && !isImg;
+                    const codePrefix = isImg ? "IMG" : isPath ? "AP" : "LAB";
+                    const modeLabel = isImg
+                      ? "Exámenes de Imágenes"
+                      : isPath
+                        ? "Anatomía Patológica"
+                        : "Laboratorio Clínico";
+
+                    return (
+                      <div key={ord.id} className="space-y-0.5 text-[11px]">
+                        <p className="font-mono text-[9.5px] font-bold text-primary">
+                          {codePrefix}-{ord.id.slice(0, 8).toUpperCase()} • {modeLabel} ({ord.urgency})
+                        </p>
+                        <p className="pl-2 text-foreground">
+                          {ord.items.map((it) => it.testName).join(" • ")}
+                          {ord.customTests ? ` • ${ord.customTests}` : ""}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
+
+              {consultation.auxiliaryExams.trim() ? (
+                <p
+                  className={
+                    linkedLabOrders.length > 0
+                      ? "border-t border-border pt-1.5 whitespace-pre-line text-foreground"
+                      : "whitespace-pre-line text-foreground"
+                  }
+                >
+                  {consultation.auxiliaryExams}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {/* 8. Tratamiento / Medicación (Separado) */}
+          {linkedPrescriptions.length > 0 || consultation.prescriptionNotes.trim() ? (
+            <div className="space-y-2 rounded-lg border border-border bg-card p-3">
+              <h2 className="text-[10px] font-bold tracking-wider text-primary uppercase">
+                7. Tratamiento / Medicación (Rp/)
+              </h2>
+
+              {linkedPrescriptions.length > 0 ? (
+                <div className="space-y-1.5">
+                  {linkedPrescriptions.map((rx) => (
+                    <div key={rx.id} className="space-y-0.5 text-[11px]">
+                      <p className="font-mono text-[9.5px] font-bold text-primary">
+                        REC-{rx.id.slice(0, 8).toUpperCase()} ({formatPeruDateDisplay(rx.prescriptionDate)})
+                      </p>
+                      <ul className="space-y-0.5 pl-2">
+                        {rx.items.map((item, idx) => (
+                          <li key={item.id}>
+                            <strong>{idx + 1}. {item.medicationName}</strong> ({item.route}) —{" "}
+                            {item.dosage} • {item.frequency} • {item.duration}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {consultation.prescriptionNotes.trim() ? (
+                <p
+                  className={
+                    linkedPrescriptions.length > 0
+                      ? "border-t border-border pt-1.5 whitespace-pre-line text-foreground"
+                      : "whitespace-pre-line text-foreground"
+                  }
+                >
+                  {consultation.prescriptionNotes}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         {/* Firma médica y Cenefa CENDO */}

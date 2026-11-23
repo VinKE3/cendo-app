@@ -53,7 +53,7 @@ export function ViewBackgroundButton({
       variant="outline"
       size="sm"
       onClick={onToggle}
-      title="Consultar antecedentes gineco-obstétricos y estudios previos de la paciente"
+      title="Consultar antecedentes gineco-obstétricos y generales de la paciente"
       className={cn(
         "gap-1.5",
         open && "border-primary bg-primary/10 text-primary hover:bg-primary/15",
@@ -120,7 +120,7 @@ export function PatientBackgroundQuickPanel({
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary/15 pb-2">
         <span className="flex items-center gap-1.5 font-semibold tracking-wide text-primary uppercase">
           <BookOpen className="size-3.5" />
-          Resumen Clínico & Antecedentes • {patient.fullName}
+          Antecedentes Gineco-Obstétricos y Generales • {patient.fullName}
         </span>
         <span className="font-mono text-[11px] text-muted-foreground">
           {patient.documentType} {patient.documentNumber} • {patient.age} años
@@ -180,6 +180,11 @@ export function PatientBackgroundQuickPanel({
                 patient.obstetricFormula ||
                 "G0 P0000"}
             </p>
+            {background.obstetricFormulaDetails ? (
+              <p className="mt-0.5 text-[10.5px] leading-snug text-foreground">
+                {background.obstetricFormulaDetails}
+              </p>
+            ) : null}
             <p className="mt-0.5 text-[11px] text-muted-foreground">
               MAC: {background.contraceptiveMethod || "Ninguno"}
             </p>

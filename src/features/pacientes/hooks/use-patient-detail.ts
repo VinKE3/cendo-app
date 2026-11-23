@@ -65,6 +65,7 @@ function buildDefaultBackgroundValues(
     return {
       patientId,
       obstetricFormula: bg.obstetricFormula || "G0 P0000",
+      obstetricFormulaDetails: bg.obstetricFormulaDetails || "",
       menarche: bg.menarche ?? 12,
       sexualDebutAge: bg.sexualDebutAge ?? 18,
       sexualPartnersCount: bg.sexualPartnersCount ?? 1,
@@ -88,6 +89,7 @@ function buildDefaultBackgroundValues(
   return {
     patientId,
     obstetricFormula: "G0 P0000",
+    obstetricFormulaDetails: "",
     menarche: 12,
     sexualDebutAge: 18,
     sexualPartnersCount: 1,

@@ -56,7 +56,7 @@ export function PatientBackgroundModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Antecedentes Gineco-Obstétricos</DialogTitle>
+          <DialogTitle>Antecedentes Gineco-Obstétricos y Generales</DialogTitle>
           <DialogDescription>
             Historial persistente de <strong className="text-foreground">{patientName}</strong>.
             Las alergias y comorbilidades se destacan en la cabecera de la ficha.
@@ -138,6 +138,17 @@ export function PatientBackgroundModal({
                 )
               ) : null}
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="bg-formula-details" className="block text-xs font-medium">
+              Detalle de Fórmula Obstétrica (Partos / Cesáreas / Abortos)
+            </label>
+            <Input
+              id="bg-formula-details"
+              placeholder="Ej. 1 parto vaginal (2019), 1 cesárea (2022), 1 aborto espontáneo..."
+              {...register("obstetricFormulaDetails")}
+            />
           </div>
 
           {/* Bloque 2: Historia Ginecológica */}

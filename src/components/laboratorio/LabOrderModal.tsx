@@ -11,6 +11,7 @@ import {
   Microscope,
   Plus,
   Printer,
+  Scan,
   Search,
   Settings,
   Sparkles,
@@ -32,12 +33,11 @@ import { Textarea } from "@/components/ui/textarea";
 import type { LabOrderItemRecord } from "@/db/schema/clinical";
 import type { MedicalConsultationItem } from "@/features/consultas/consultas.schema";
 import {
-  LAB_INSTRUCTION_PRESETS,
   LAB_URGENCIES,
   PATHOLOGY_SAMPLE_SUGGESTIONS,
   hasDuplicateLabTest,
-  type LabCatalogTest,
-  type LabCategory,
+  isImagingLabTemplate,
+  isPathologyLabTemplate,
   type LabOrderItem,
   type LabOrderTemplateItem,
   type LabPresetPack,
@@ -60,8 +60,9 @@ interface LabOrderModalProps {
   isSubmitting: boolean;
   consultations: MedicalConsultationItem[];
   labTemplates: LabOrderTemplateItem[];
-  categories: readonly LabCategory[];
+  categories: readonly string[];
   presetPacks: LabPresetPack[];
+  instructionPresets: readonly string[];
   watchedDiagnosis: string;
   watchedCie10: string;
   watchedConsultationId: string;
@@ -72,15 +73,28 @@ interface LabOrderModalProps {
   onCatalogSearchChange: (val: string) => void;
   catalogCategory: string;
   onCatalogCategoryChange: (cat: string) => void;
-  filteredCatalog: LabCatalogTest[];
+  filteredCatalog: Array<{
+    id: string;
+    name: string;
+    category: string;
+    sampleType: string;
+    notes?: string;
+  }>;
   manualTestName: string;
   onManualTestNameChange: (val: string) => void;
   onApplyTemplate: (tmpl: LabOrderTemplateItem) => void;
+  onSwitchToImaging: () => void;
   onSwitchToPathology: () => void;
   onResetToGeneral: () => void;
   onOpenManageTemplates: () => void;
   onApplyPresetPack: (pack: LabPresetPack) => void;
-  onToggleCatalogTest: (test: LabCatalogTest) => void;
+  onToggleCatalogTest: (test: {
+    id: string;
+    name: string;
+    category: string;
+    sampleType: string;
+    notes?: string;
+  }) => void;
   onAddManualTest: () => void;
   onRemoveSelectedTest: (idx: number) => void;
   onAppendInstruction: (text: string) => void;
@@ -107,6 +121,7 @@ export function LabOrderModal({
   labTemplates,
   categories,
   presetPacks,
+  instructionPresets,
   watchedDiagnosis,
   watchedCie10,
   watchedConsultationId,
@@ -121,6 +136,7 @@ export function LabOrderModal({
   manualTestName,
   onManualTestNameChange,
   onApplyTemplate,
+  onSwitchToImaging,
   onSwitchToPathology,
   onResetToGeneral,
   onOpenManageTemplates,
@@ -150,25 +166,32 @@ export function LabOrderModal({
     onOpenChange(nextOpen);
   };
 
-  const isPathologyTemplate = watchedTemplateType !== "GENERAL";
+  const isImagingTemplate = isImagingLabTemplate(watchedTemplateType);
+  const isPathologyTemplate = isPathologyLabTemplate(watchedTemplateType);
 
   return (
     <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-5xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {isPathologyTemplate ? (
+            {isImagingTemplate ? (
+              <Scan className="size-5 text-primary" />
+            ) : isPathologyTemplate ? (
               <Microscope className="size-5 text-primary" />
             ) : (
               <FlaskConical className="size-5 text-primary" />
             )}
             {editingItem
-              ? isPathologyTemplate
-                ? "Editar Solicitud de Anatomía Patológica"
-                : "Editar Orden de Laboratorio"
-              : isPathologyTemplate
-                ? "Nueva Solicitud de Anatomía Patológica"
-                : "Nueva Orden de Laboratorio"}
+              ? isImagingTemplate
+                ? "Editar Orden de Exámenes de Imágenes"
+                : isPathologyTemplate
+                  ? "Editar Solicitud de Anatomía Patológica"
+                  : "Editar Orden de Exámenes de Laboratorio"
+              : isImagingTemplate
+                ? "Nueva Orden de Exámenes de Imágenes"
+                : isPathologyTemplate
+                  ? "Nueva Solicitud de Anatomía Patológica"
+                  : "Nueva Orden de Exámenes de Laboratorio"}
           </DialogTitle>
           <DialogDescription>
             Paciente:{" "}
@@ -185,20 +208,33 @@ export function LabOrderModal({
         ) : null}
 
         <form onSubmit={onSubmit} className="space-y-5">
-          {/* Selector de Modo Principal: Orden de Laboratorio vs Solicitud de Anatomía Patológica */}
-          <div className="grid grid-cols-2 gap-2 rounded-xl border border-border bg-muted/30 p-1.5">
+          {/* Selector de Modo Principal en 3 vías: Laboratorio vs Imágenes vs Anatomía Patológica */}
+          <div className="grid grid-cols-1 gap-2 rounded-xl border border-border bg-muted/30 p-1.5 sm:grid-cols-3">
             <button
               type="button"
               onClick={onResetToGeneral}
               className={cn(
                 "flex cursor-pointer items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-all",
-                !isPathologyTemplate
+                !isImagingTemplate && !isPathologyTemplate
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted-foreground hover:bg-card hover:text-foreground"
               )}
             >
               <FlaskConical className="size-4" />
-              <span>Orden de Laboratorio</span>
+              <span>Exámenes de Laboratorio</span>
+            </button>
+            <button
+              type="button"
+              onClick={onSwitchToImaging}
+              className={cn(
+                "flex cursor-pointer items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-all",
+                isImagingTemplate
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-card hover:text-foreground"
+              )}
+            >
+              <Scan className="size-4" />
+              <span>Exámenes de Imágenes</span>
             </button>
             <button
               type="button"
@@ -211,7 +247,7 @@ export function LabOrderModal({
               )}
             >
               <Microscope className="size-4" />
-              <span>Solicitud de Anatomía Patológica</span>
+              <span>Anatomía Patológica</span>
             </button>
           </div>
           {/* Bloque 1: Tipo de formato, Fecha, Urgencia, Vínculo */}
@@ -325,74 +361,87 @@ export function LabOrderModal({
                   )}
                 </button>
 
-                {isPathologyTemplate ? (
+                {isImagingTemplate ? (
+                  <Badge variant="secondary" className="text-[10.5px]">
+                    Modo Exámenes de Imágenes
+                  </Badge>
+                ) : isPathologyTemplate ? (
                   <Badge variant="secondary" className="text-[10.5px]">
                     Modo Remisión: {watchedTemplateTitle || watchedTemplateType}
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="text-[10.5px]">
-                    Modo Orden General
+                    Modo Laboratorio Clínico
                   </Badge>
                 )}
               </div>
 
-              {isPathologyTemplate ? (
+              {isPathologyTemplate || isImagingTemplate ? (
                 <Button
                   type="button"
                   variant="outline"
                   size="xs"
                   onClick={onResetToGeneral}
                 >
-                  Cambiar a Orden General
+                  Cambiar a Laboratorio
                 </Button>
               ) : null}
             </div>
 
             {showTemplates ? (
               <div className="mt-3 space-y-3 border-t border-border pt-3">
-                {/* Plantillas de Patología */}
-                <div className="space-y-1.5">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="block text-[11px] font-medium text-muted-foreground">
-                      Plantillas de Remisión / Muestras Especializadas (activa
-                      cadena de custodia):
-                    </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="xs"
-                      onClick={onOpenManageTemplates}
-                    >
-                      <Settings className="size-3" />
-                      Gestionar Plantillas
-                    </Button>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {labTemplates.map((tmpl) => (
-                      <button
-                        key={tmpl.id}
+                {/* Plantillas de Patología (ocultas en modo Imágenes) */}
+                {!isImagingTemplate ? (
+                  <div className="space-y-1.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="block text-[11px] font-medium text-muted-foreground">
+                        Plantillas de Remisión / Muestras Especializadas (activa
+                        cadena de custodia):
+                      </span>
+                      <Button
                         type="button"
-                        onClick={() => {
-                          onApplyTemplate(tmpl);
-                          setShowTemplates(false);
-                        }}
-                        className={cn(
-                          "cursor-pointer rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors",
-                          watchedTemplateTitle === tmpl.title
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
-                        )}
+                        variant="outline"
+                        size="xs"
+                        onClick={onOpenManageTemplates}
                       >
-                        {tmpl.title}
-                      </button>
-                    ))}
+                        <Settings className="size-3" />
+                        Gestionar Plantillas
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {labTemplates.map((tmpl) => (
+                        <button
+                          key={tmpl.id}
+                          type="button"
+                          onClick={() => {
+                            onApplyTemplate(tmpl);
+                            setShowTemplates(false);
+                          }}
+                          className={cn(
+                            "cursor-pointer rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors",
+                            watchedTemplateTitle === tmpl.title
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+                          )}
+                        >
+                          {tmpl.title}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                ) : null}
 
                 {/* Perfiles Clínicos Rápidos */}
-                <div className="space-y-1 border-t border-border pt-2">
+                <div
+                  className={cn(
+                    "space-y-1",
+                    !isImagingTemplate && "border-t border-border pt-2"
+                  )}
+                >
                   <span className="block text-[11px] font-medium text-muted-foreground">
-                    Perfiles Diagnósticos CENDO (1 clic para sumar análisis):
+                    {isImagingTemplate
+                      ? "Perfiles de Diagnóstico por Imágenes (1 clic):"
+                      : "Perfiles Diagnósticos CENDO (1 clic para sumar análisis):"}
                   </span>
                   <div className="flex flex-wrap gap-1.5">
                     {presetPacks.map((pack) => (
@@ -603,7 +652,11 @@ export function LabOrderModal({
                   type="text"
                   value={catalogSearch}
                   onChange={(e) => onCatalogSearchChange(e.target.value)}
-                  placeholder="Buscar análisis (ej. CA-125, PAP, Hemograma)..."
+                  placeholder={
+                    isImagingTemplate
+                      ? "Buscar estudio (ej. Transvaginal, Mamografía, RMN)..."
+                      : "Buscar análisis (ej. CA-125, PAP, Hemograma)..."
+                  }
                   className="bg-card pl-8 text-xs"
                 />
               </div>
@@ -643,7 +696,11 @@ export function LabOrderModal({
                   type="text"
                   value={manualTestName}
                   onChange={(e) => onManualTestNameChange(e.target.value)}
-                  placeholder="Añadir examen específico a la lista..."
+                  placeholder={
+                    isImagingTemplate
+                      ? "Añadir estudio por imagen específico..."
+                      : "Añadir examen específico a la lista..."
+                  }
                   className="bg-card text-xs"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
@@ -719,12 +776,18 @@ export function LabOrderModal({
                   htmlFor="lab-custom-tests"
                   className="block text-xs font-medium"
                 >
-                  Exámenes Complementarios / Imágenes Adicionales
+                  {isImagingTemplate
+                    ? "Estudios por Imágenes Adicionales / Detalles"
+                    : "Exámenes Complementarios / Notas Adicionales"}
                 </label>
                 <Textarea
                   id="lab-custom-tests"
                   rows={2}
-                  placeholder="Ej. Resonancia Magnética pélvica con protocolo de endometriosis..."
+                  placeholder={
+                    isImagingTemplate
+                      ? "Ej. Evaluar foco en tabique rectovaginal, contraste EV..."
+                      : "Ej. Perfil tiroideo adicional o indicaciones específicas..."
+                  }
                   {...register("customTests")}
                 />
               </div>
@@ -747,7 +810,7 @@ export function LabOrderModal({
                 className="h-7 max-w-[260px] rounded-md border border-input bg-card px-2 text-xs text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
               >
                 <option value="">+ Insertar indicación rápida...</option>
-                {LAB_INSTRUCTION_PRESETS.map((preset) => (
+                {instructionPresets.map((preset) => (
                   <option key={preset} value={preset}>
                     {preset}
                   </option>

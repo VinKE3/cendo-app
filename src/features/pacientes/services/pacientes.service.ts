@@ -31,6 +31,7 @@ function mapBackgroundRow(
     catamenialRegimen: row.catamenialRegimen ?? "28/4",
     stiHistory: row.stiHistory ?? "Niega ITS",
     obstetricFormula: row.obstetricFormula ?? "G0 P0000",
+    obstetricFormulaDetails: row.obstetricFormulaDetails ?? "",
     contraceptiveMethod: row.contraceptiveMethod ?? "Ninguno",
     lastMenstrualPeriod: row.lastMenstrualPeriod ?? "",
     papHistory: row.papHistory ?? "No refiere",
@@ -608,6 +609,7 @@ export async function upsertPatientBackground(
 
   const payload = {
     obstetricFormula: input.obstetricFormula,
+    obstetricFormulaDetails: input.obstetricFormulaDetails?.trim() || null,
     menarche: input.menarche,
     sexualDebutAge: input.sexualDebutAge,
     sexualPartnersCount: input.sexualPartnersCount,

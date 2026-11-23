@@ -487,7 +487,7 @@ export function useRecetas({
         ? med.commercialBrands[brandIndex]
         : med.commercialBrands[0];
     const medicationName = brand
-      ? `${brand.brandName} (${med.genericName})`
+      ? `${med.genericName} (${brand.brandName})`
       : med.genericName;
     const presentation = brand?.presentation || "Presentación médica";
     const preset = inferDosagePresetForMedication(med.genericName);

@@ -1277,7 +1277,7 @@ async function drawColposcopySection(
     borderWidth: 0.6,
   });
   cursor.page.drawText(
-    "INFORMACIÓN COMPLEMENTARIA  •  ANTECEDENTES GINECO-OBSTÉTRICOS",
+    "INFORMACIÓN COMPLEMENTARIA  •  ANTECEDENTES GINECO-OBSTÉTRICOS Y GENERALES",
     {
       x: MARGIN_X + 8,
       y: cursor.y - 11,

@@ -76,6 +76,7 @@ export const patientBackgrounds = pgTable(
     catamenialRegimen: text("catamenial_regimen"),
     stiHistory: text("sti_history"),
     obstetricFormula: varchar("obstetric_formula", { length: 30 }).default("G0 P0000"),
+    obstetricFormulaDetails: text("obstetric_formula_details"),
     contraceptiveMethod: text("contraceptive_method"),
     lastMenstrualPeriod: date("last_menstrual_period", { mode: "string" }),
     papHistory: text("pap_history"),

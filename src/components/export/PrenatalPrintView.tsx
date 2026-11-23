@@ -206,7 +206,7 @@ export function PrenatalPrintView({
           patientFullName={patient.fullName}
           documentNumber={`${patient.documentType} ${patient.documentNumber}`}
           doctorName={`DR. ${doctorCleanName.toUpperCase()}`}
-          doctorSpecialty="GINECOLOGÍA Y OBSTETRICIA - MEDICINA MATERNO FETAL"
+          doctorSpecialty={resolvedSig.doctorSpecialty || "GINECÓLOGO OBSTETRA"}
           doctorCredentials={`CMP ${card.doctorCmp || "61693"} • RNE ${card.doctorRne || "38657"}`}
           clinicAddress={clinicAddress}
           clinicEmail={clinicEmail}
@@ -2604,7 +2604,7 @@ export function PrenatalPrintView({
             </div>
             <CendoSignatureBlock
               doctorName={`DR. ${doctorCleanName.toUpperCase()}`}
-              doctorSpecialty="GINECOLOGÍA Y OBSTETRICIA - MEDICINA MATERNO FETAL"
+              doctorSpecialty={resolvedSig.doctorSpecialty || "GINECÓLOGO OBSTETRA"}
               doctorCredentials={`CMP ${card.doctorCmp || "61693"} • RNE ${card.doctorRne || "38657"}`}
               signatureSrc={resolvedSignatureSrc}
               showDigitalSignature={resolvedShowDigitalSignature}

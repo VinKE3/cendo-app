@@ -580,10 +580,9 @@ export function ConsultationModal({
                 <label htmlFor="pe-general" className="block text-xs font-medium">
                   Examen General
                 </label>
-                <Textarea
+                <Input
                   id="pe-general"
-                  rows={2}
-                  placeholder="Ej. Paciente en buen estado general, lúcida, orientada, hidratada y afebril..."
+                  placeholder="Ej. Buen estado general, lúcida, orientada, hidratada, afebril..."
                   className="bg-card"
                   {...register("generalExam")}
                 />
@@ -593,10 +592,9 @@ export function ConsultationModal({
                 <label htmlFor="pe-breasts" className="block text-xs font-medium">
                   Examen de Mamas (Bilateral)
                 </label>
-                <Textarea
+                <Input
                   id="pe-breasts"
-                  rows={2}
-                  placeholder="Ej. Mamas simétricas, sin nódulos palpables ni secreción por pezón..."
+                  placeholder="Ej. Mamas simétricas, sin nódulos palpables ni secreción..."
                   className="bg-card"
                   {...register("breastsExam")}
                 />
@@ -606,9 +604,10 @@ export function ConsultationModal({
                 <label htmlFor="pe-genitalia" className="block text-xs font-medium">
                   Genitales Externos
                 </label>
-                <Input
+                <Textarea
                   id="pe-genitalia"
-                  placeholder="Ej. Genitales externos de morfología habitual, sin lesiones..."
+                  rows={3}
+                  placeholder="Ej. Genitales externos de morfología habitual, sin lesiones, ni flujo patológico..."
                   className="bg-card"
                   {...register("externalGenitalia")}
                 />
@@ -616,11 +615,12 @@ export function ConsultationModal({
 
               <div className="space-y-1">
                 <label htmlFor="pe-spec" className="block text-xs font-medium">
-                  Especuloscopía (Vagina & Cérvix)
+                  Especuloscopía (Vagina &amp; Cérvix)
                 </label>
-                <Input
+                <Textarea
                   id="pe-spec"
-                  placeholder="Ej. Vagina elástica normotrófica; cérvix central, epitelio liso..."
+                  rows={3}
+                  placeholder="Ej. Vagina elástica normotrófica; cérvix central, epitelio liso, sin lesiones..."
                   className="bg-card"
                   {...register("speculoscopy")}
                 />
@@ -628,11 +628,12 @@ export function ConsultationModal({
 
               <div className="space-y-1 sm:col-span-2">
                 <label htmlFor="pe-bimanual" className="block text-xs font-medium">
-                  Tacto Bimanual (Útero & Anexos)
+                  Tacto Vaginal / Bimanual (Útero &amp; Anexos)
                 </label>
-                <Input
+                <Textarea
                   id="pe-bimanual"
-                  placeholder="Ej. Útero de tamaño y consistencia conservados, móvil, anexos no palpables..."
+                  rows={3}
+                  placeholder="Ej. Útero en AVF, tamaño y consistencia conservados, móvil, no doloroso; anexos libres, fondo de saco libre..."
                   className="bg-card"
                   {...register("bimanualPalpation")}
                 />
@@ -676,13 +677,13 @@ export function ConsultationModal({
               ) : null}
             </div>
 
-            {/* Exámenes Auxiliares / Órdenes de Laboratorio */}
+            {/* Exámenes Auxiliares / Órdenes de Laboratorio, Imágenes & Patología */}
             <div className="space-y-2.5 rounded-lg border border-border bg-card p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
                     <FlaskConical className="size-3.5 text-primary" />
-                    Exámenes Auxiliares / Laboratorio
+                    Exámenes Auxiliares (Laboratorio / Imágenes / Patología)
                   </span>
                   {editingItem && linkedLabOrders.length > 0 ? (
                     <Badge variant="secondary" className="font-mono text-[10px]">
@@ -702,7 +703,7 @@ export function ConsultationModal({
                   onClick={onOpenAddLabOrderModal}
                 >
                   <Plus className="size-3" />
-                  Añadir Orden de Laboratorio
+                  Añadir Orden de Exámenes
                 </Button>
               </div>
 
@@ -717,7 +718,18 @@ export function ConsultationModal({
                         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
                           <div className="flex flex-wrap items-center gap-2">
                             <Badge variant="outline" className="font-mono text-[10px]">
-                              LAB-{ord.id.slice(0, 8).toUpperCase()}
+                              {ord.templateType === "IMAGEN"
+                                ? `IMG-${ord.id.slice(0, 8).toUpperCase()}`
+                                : ord.templateType !== "GENERAL"
+                                  ? `AP-${ord.id.slice(0, 8).toUpperCase()}`
+                                  : `LAB-${ord.id.slice(0, 8).toUpperCase()}`}
+                            </Badge>
+                            <Badge variant="outline" className="text-[10px]">
+                              {ord.templateType === "IMAGEN"
+                                ? "Imágenes"
+                                : ord.templateType !== "GENERAL"
+                                  ? "Patología"
+                                  : "Laboratorio"}
                             </Badge>
                             <Badge
                               variant={
