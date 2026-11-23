@@ -8,6 +8,7 @@ interface CendoSignatureBlockProps {
   showDigitalSignature: boolean;
   align?: "center" | "right";
   compact?: boolean;
+  slim?: boolean;
   showSalutation?: boolean;
   className?: string;
 }
@@ -20,6 +21,7 @@ export function CendoSignatureBlock({
   showDigitalSignature,
   align = "center",
   compact = false,
+  slim = false,
   showSalutation = false,
   className,
 }: CendoSignatureBlockProps) {
@@ -28,7 +30,7 @@ export function CendoSignatureBlock({
   return (
     <div
       className={cn(
-        "min-w-[215px] max-w-[260px]",
+        slim ? "min-w-[195px] max-w-[240px]" : "min-w-[215px] max-w-[260px]",
         align === "right" ? "ml-auto text-center" : "text-center",
         className
       )}
@@ -42,7 +44,7 @@ export function CendoSignatureBlock({
       <div
         className={cn(
           "flex w-full items-end justify-center border-b border-foreground/45 pb-1",
-          compact ? "h-12" : "h-16"
+          slim ? "h-9" : compact ? "h-12" : "h-16"
         )}
       >
         {canRenderSignature ? (
@@ -50,7 +52,7 @@ export function CendoSignatureBlock({
           <img
             src={signatureSrc!}
             alt={`Firma médica de ${doctorName}`}
-            className="max-h-full max-w-[180px] object-contain mix-blend-multiply select-none"
+            className="max-h-full max-w-[180px] object-contain mix-blend-multiply print:mix-blend-normal select-none"
           />
         ) : (
           <span className="sr-only">
@@ -59,16 +61,35 @@ export function CendoSignatureBlock({
         )}
       </div>
 
-      <div className="space-y-0.5 pt-1">
-        <p className="text-[11px] font-bold tracking-wide text-foreground uppercase">
+      <div
+        className={cn(
+          slim ? "space-y-0 pt-0.5 leading-tight" : "space-y-0.5 pt-1"
+        )}
+      >
+        <p
+          className={cn(
+            "font-bold tracking-wide text-foreground uppercase",
+            slim ? "text-[10px]" : "text-[11px]"
+          )}
+        >
           {doctorName}
         </p>
         {doctorSpecialty ? (
-          <p className="text-[9.5px] font-semibold tracking-wide text-primary uppercase">
+          <p
+            className={cn(
+              "font-semibold tracking-wide text-primary uppercase",
+              slim ? "text-[8.5px]" : "text-[9.5px]"
+            )}
+          >
             {doctorSpecialty}
           </p>
         ) : null}
-        <p className="font-mono text-[9.5px] font-semibold text-muted-foreground">
+        <p
+          className={cn(
+            "font-mono font-semibold text-muted-foreground",
+            slim ? "text-[8.5px]" : "text-[9.5px]"
+          )}
+        >
           {doctorCredentials || "CMP 61693 • RNE 38657"}
         </p>
       </div>

@@ -19,6 +19,11 @@ export function CendoFooterWave({
   slim = false,
   className,
 }: CendoFooterWaveProps) {
+  const iconCircleClass = cn(
+    "inline-flex shrink-0 items-center justify-center rounded-full bg-primary-foreground text-primary",
+    slim ? "size-3.5" : "size-4"
+  );
+
   return (
     <footer className={cn("relative w-full select-none overflow-hidden", className)}>
       <svg
@@ -27,7 +32,7 @@ export function CendoFooterWave({
         xmlns="http://www.w3.org/2000/svg"
         className={cn(
           "block w-full",
-          slim ? "h-[10mm]" : compact ? "h-[18mm]" : "h-[34mm]"
+          slim ? "h-[6mm]" : compact ? "h-[18mm]" : "h-[34mm]"
         )}
         preserveAspectRatio="none"
         aria-hidden="true"
@@ -46,29 +51,34 @@ export function CendoFooterWave({
         className={cn(
           "bg-primary text-primary-foreground",
           slim
-            ? "px-6 pb-1.5 pt-0.5"
+            ? "px-6 py-1"
             : compact
               ? "px-8 pb-2.5 pt-0.5"
               : "px-8 pb-4 pt-1"
         )}
       >
-        <div className="mx-auto flex flex-wrap items-center justify-between gap-3 text-[10px] font-medium tracking-tight">
+        <div
+          className={cn(
+            "mx-auto flex flex-wrap items-center justify-between gap-3 font-medium tracking-tight",
+            slim ? "text-[9px]" : "text-[10px]"
+          )}
+        >
           <div className="flex items-center gap-2">
-            <span className="inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-primary-foreground text-primary">
+            <span className={iconCircleClass}>
               <MapPin className="size-2.5" aria-hidden="true" />
             </span>
             <span>{address}</span>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-primary-foreground text-primary">
+            <span className={iconCircleClass}>
               <Mail className="size-2.5" aria-hidden="true" />
             </span>
             <span>{email}</span>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-primary-foreground text-primary">
+            <span className={iconCircleClass}>
               <Phone className="size-2.5" aria-hidden="true" />
             </span>
             <span>{phone}</span>

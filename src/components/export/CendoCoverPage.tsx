@@ -38,7 +38,7 @@ export function CendoCoverPage({
       className={cn(
         "page-sheet relative mx-auto flex flex-col justify-between overflow-hidden border border-border bg-card text-foreground shadow-sm print:border-none print:shadow-none",
         isA5Landscape
-          ? "h-[147.5mm] w-[210mm]"
+          ? "h-[147mm] w-[210mm]"
           : isA5
             ? "h-[209.5mm] w-[148mm]"
             : "h-[296.5mm] w-[210mm]",

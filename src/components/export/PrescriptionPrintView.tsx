@@ -76,15 +76,15 @@ export function PrescriptionPrintView({
   const isSpaciousLayout = prescription.items.length <= 3;
 
   const thTextSizeClass = isA5Landscape
-    ? "pb-1.5 text-[11px]"
+    ? "pb-1 text-[10.5px]"
     : isA5Portrait
       ? "pb-1.5 text-[10px]"
       : "pb-2 text-[12px]";
 
   const tdRowClass = isA5Landscape
-    ? isSpaciousLayout
-      ? "py-2.5 text-[12.5px] leading-snug"
-      : "py-1.5 text-[11px] leading-snug"
+    ? prescription.items.length <= 2
+      ? "py-1.5 text-[11.5px] leading-tight"
+      : "py-1 text-[10.5px] leading-tight"
     : isA5Portrait
       ? isSpaciousLayout
         ? "py-3 text-[11px] leading-snug"
@@ -120,7 +120,7 @@ export function PrescriptionPrintView({
         className={cn(
           "page-sheet box-border flex flex-col justify-between overflow-hidden rounded-xl border border-border bg-card shadow-sm print:rounded-none print:border-none print:shadow-none",
           isA5Landscape
-            ? "min-h-[147.5mm] w-[210mm] text-[12px]"
+            ? "min-h-[147mm] w-[210mm] text-[11.5px]"
             : isA5Portrait
               ? "min-h-[209.5mm] w-[148mm] text-xs"
               : "min-h-[296.5mm] w-[210mm] text-[13px]"
@@ -130,7 +130,7 @@ export function PrescriptionPrintView({
           className={cn(
             "flex flex-1 flex-col justify-between",
             isA5Landscape
-              ? "gap-2 px-[10mm] pt-[5mm] pb-1"
+              ? "gap-1 px-[9mm] pt-[4mm] pb-0"
               : isA5Portrait
                 ? "gap-2.5 px-[10mm] pt-[7mm] pb-2"
                 : "gap-4 px-[14mm] pt-[10mm] pb-3"
@@ -139,7 +139,7 @@ export function PrescriptionPrintView({
           <div
             className={cn(
               isA5Landscape
-                ? "space-y-1.5"
+                ? "space-y-1"
                 : isA5Portrait
                   ? "space-y-2.5"
                   : "space-y-4"
@@ -149,7 +149,7 @@ export function PrescriptionPrintView({
             <header
               className={cn(
                 "flex items-start justify-between gap-3 border-b-2 border-primary",
-                isA5Landscape ? "pb-1.5" : "pb-2.5"
+                isA5Landscape ? "pb-1" : "pb-2.5"
               )}
             >
               <div className="flex items-center gap-2.5">
@@ -158,28 +158,59 @@ export function PrescriptionPrintView({
                   <h1
                     className={cn(
                       "font-sans font-extrabold tracking-tight text-primary",
-                      isCompactHeight ? "text-base" : "text-lg"
+                      isA5Landscape
+                        ? "text-[15px] leading-tight"
+                        : isA5Portrait
+                          ? "text-base"
+                          : "text-lg"
                     )}
                   >
                     CENDO • CENTRO DE ENDOMETRIOSIS
                   </h1>
-                  <p className="text-[10.5px] font-medium text-foreground">
+                  <p
+                    className={cn(
+                      "font-medium text-foreground",
+                      isA5Landscape ? "text-[9.5px] leading-tight" : "text-[10.5px]"
+                    )}
+                  >
                     Ginecología Especializada • Cirugía Laparoscópica • Patología Cervical
                   </p>
-                  <p className="mt-0.5 font-mono text-[9px] text-muted-foreground">
+                  <p
+                    className={cn(
+                      "font-mono text-muted-foreground",
+                      isA5Landscape
+                        ? "text-[8.5px] leading-tight"
+                        : "mt-0.5 text-[9px]"
+                    )}
+                  >
                     {clinicAddress} • Citas: {clinicPhone}
                   </p>
                 </div>
               </div>
 
               <div className="shrink-0 border-l border-border pl-3 text-right">
-                <div className="inline-block rounded border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-bold tracking-wider text-primary uppercase">
+                <div
+                  className={cn(
+                    "inline-block rounded border border-primary/20 bg-primary/10 font-bold tracking-wider text-primary uppercase",
+                    isA5Landscape ? "px-1.5 py-0 text-[9px]" : "px-2 py-0.5 text-[10px]"
+                  )}
+                >
                   RECETA MÉDICA
                 </div>
-                <p className="mt-1 font-mono text-[9.5px] text-muted-foreground">
+                <p
+                  className={cn(
+                    "font-mono text-muted-foreground",
+                    isA5Landscape ? "mt-0.5 text-[8.5px]" : "mt-1 text-[9.5px]"
+                  )}
+                >
                   N° REC-{prescription.id.slice(0, 8).toUpperCase()}
                 </p>
-                <p className="font-mono text-[10px] font-semibold text-foreground">
+                <p
+                  className={cn(
+                    "font-mono font-semibold text-foreground",
+                    isA5Landscape ? "text-[9px]" : "text-[10px]"
+                  )}
+                >
                   Fecha: {formatPeruDateDisplay(prescription.prescriptionDate)}
                 </p>
               </div>
@@ -189,7 +220,7 @@ export function PrescriptionPrintView({
             <div
               className={cn(
                 "grid grid-cols-12 items-center rounded-lg border border-border bg-muted/30",
-                isA5Landscape ? "gap-1.5 p-2" : "gap-2 p-2.5"
+                isA5Landscape ? "gap-1 px-2 py-1.5" : "gap-2 p-2.5"
               )}
             >
               <div className="col-span-6">
@@ -226,7 +257,12 @@ export function PrescriptionPrintView({
                 </span>
               </div>
 
-              <div className="col-span-12 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-1.5 text-[11px]">
+              <div
+                className={cn(
+                  "col-span-12 flex flex-wrap items-center justify-between gap-2 border-t border-border",
+                  isA5Landscape ? "pt-1 text-[10.5px]" : "pt-1.5 text-[11px]"
+                )}
+              >
                 <div>
                   <strong className="text-foreground">Diagnóstico: </strong>
                   <span className="text-foreground">{prescription.diagnosis}</span>
@@ -243,8 +279,10 @@ export function PrescriptionPrintView({
             {showAllergyAlert ? (
               <div
                 className={cn(
-                  "flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 text-[11px] text-destructive",
-                  isA5Landscape ? "py-1.5" : "py-2"
+                  "flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 text-destructive",
+                  isA5Landscape
+                    ? "px-2.5 py-1 text-[10.5px]"
+                    : "px-3 py-2 text-[11px]"
                 )}
               >
                 <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
@@ -257,17 +295,26 @@ export function PrescriptionPrintView({
           </div>
 
           {/* 3. Cuerpo Rp/ — Tabla abierta de 6 columnas (estilo recetario clínico) */}
-          <div className="flex flex-1 flex-col justify-start pt-1">
+          <div
+            className={cn(
+              "flex flex-1 flex-col justify-start",
+              isA5Landscape ? "pt-0" : "pt-1"
+            )}
+          >
             <div
               className={cn(
                 "flex items-baseline gap-2.5",
-                isA5Landscape ? "mb-1.5" : isA5Portrait ? "mb-2" : "mb-3"
+                isA5Landscape ? "mb-1" : isA5Portrait ? "mb-2" : "mb-3"
               )}
             >
               <span
                 className={cn(
                   "font-serif font-bold italic text-primary select-none",
-                  isCompactHeight ? "text-2xl" : "text-3xl"
+                  isA5Landscape
+                    ? "text-xl leading-none"
+                    : isA5Portrait
+                      ? "text-2xl"
+                      : "text-3xl"
                 )}
               >
                 Rp/
@@ -288,7 +335,7 @@ export function PrescriptionPrintView({
                   <tr className="border-b border-foreground/40 text-foreground">
                     <th
                       className={cn(
-                        "w-[23%] pr-2 text-left font-bold",
+                        "w-[22%] pr-2 text-left font-bold",
                         thTextSizeClass
                       )}
                     >
@@ -304,7 +351,7 @@ export function PrescriptionPrintView({
                     </th>
                     <th
                       className={cn(
-                        "w-[25%] px-1.5 text-center font-bold",
+                        "w-[24%] px-1.5 text-center font-bold",
                         thTextSizeClass
                       )}
                     >
@@ -328,7 +375,7 @@ export function PrescriptionPrintView({
                     </th>
                     <th
                       className={cn(
-                        "w-[12%] pl-1.5 text-center font-bold",
+                        "w-[14%] pl-1.5 text-center font-bold",
                         thTextSizeClass
                       )}
                     >
@@ -409,12 +456,20 @@ export function PrescriptionPrintView({
 
           {/* 4. Indicaciones Generales y Próxima Cita (Parte inferior antes de firma) */}
           {prescription.generalIndications || prescription.nextAppointmentDate ? (
-            <div className={cn("pt-1", isA5Landscape ? "space-y-1.5" : "space-y-2")}>
+            <div
+              className={cn(
+                isA5Landscape ? "space-y-1 pt-0" : "space-y-2 pt-1"
+              )}
+            >
               {prescription.generalIndications ? (
                 <div
                   className={cn(
-                    "border-t border-border/70 pt-2 leading-relaxed text-foreground",
-                    isCompactHeight ? "text-[11px]" : "text-[12.5px]"
+                    "border-t border-border/70 text-foreground",
+                    isA5Landscape
+                      ? "pt-1 text-[10.5px] leading-snug"
+                      : isA5Portrait
+                        ? "pt-2 text-[11px] leading-relaxed"
+                        : "pt-2 text-[12.5px] leading-relaxed"
                   )}
                 >
                   <p className="whitespace-pre-line">
@@ -429,16 +484,28 @@ export function PrescriptionPrintView({
               {prescription.nextAppointmentDate ? (
                 <div
                   className={cn(
-                    "flex items-center justify-between text-foreground",
-                    !prescription.generalIndications && "border-t border-border/70 pt-2",
-                    isCompactHeight ? "text-[11px]" : "text-xs"
+                    "flex flex-wrap items-center gap-2 text-foreground",
+                    !prescription.generalIndications &&
+                      (isA5Landscape
+                        ? "border-t border-border/70 pt-1"
+                        : "border-t border-border/70 pt-2"),
+                    isA5Landscape
+                      ? "text-[10.5px]"
+                      : isA5Portrait
+                        ? "text-[11px]"
+                        : "text-xs"
                   )}
                 >
                   <span className="flex items-center gap-1.5 font-semibold text-primary">
                     <Calendar className="size-3.5" />
                     Próxima Cita de Control Ginecológico:
                   </span>
-                  <strong className="rounded border border-border bg-card px-2.5 py-0.5 font-mono">
+                  <strong
+                    className={cn(
+                      "rounded border border-border bg-card font-mono",
+                      isA5Landscape ? "px-2 py-0" : "px-2.5 py-0.5"
+                    )}
+                  >
                     {formatPeruDateDisplay(prescription.nextAppointmentDate)}
                   </strong>
                 </div>
@@ -448,12 +515,17 @@ export function PrescriptionPrintView({
         </div>
 
         {/* 5. Pie Legal + Firma anclados siempre al pie de página */}
-        <div className="shrink-0 break-inside-avoid pt-1.5">
+        <div
+          className={cn(
+            "shrink-0 break-inside-avoid",
+            isA5Landscape ? "pt-0.5" : "pt-1.5"
+          )}
+        >
           <div
             className={cn(
               "flex items-end justify-between gap-4 border-t border-border",
               isA5Landscape
-                ? "px-[10mm] pt-1.5 pb-1"
+                ? "px-[9mm] pt-1 pb-0.5"
                 : isA5Portrait
                   ? "px-[10mm] pt-2 pb-1.5"
                   : "px-[14mm] pt-2.5 pb-2"
@@ -470,7 +542,8 @@ export function PrescriptionPrintView({
               doctorCredentials={credentials || "CMP 61693 • RNE 38657"}
               signatureSrc={resolvedSignatureSrc}
               showDigitalSignature={resolvedShowDigitalSignature}
-              compact={isCompactHeight}
+              compact={isA5Portrait}
+              slim={isA5Landscape}
             />
           </div>
 

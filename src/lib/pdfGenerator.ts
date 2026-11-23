@@ -69,9 +69,39 @@ const PAPER_DIMENSIONS: Record<
   A5_LANDSCAPE: {
     pageSize: "A5 landscape",
     sheetWidth: "210mm",
-    sheetMinHeight: "147.5mm",
+    sheetMinHeight: "147mm",
   },
 };
+
+/**
+ * Clona un contenedor HTML e incrusta en Base64 (data URL) las imágenes ya cargadas
+ * para que la ventana de impresión `about:blank` nunca dependa de cookies ni timing de red.
+ */
+function cloneWithInlinedImages(sourceElement: HTMLElement): HTMLElement {
+  const cloned = sourceElement.cloneNode(true) as HTMLElement;
+  const sourceImages = Array.from(sourceElement.querySelectorAll("img"));
+  const clonedImages = Array.from(cloned.querySelectorAll("img"));
+
+  sourceImages.forEach((srcImg, index) => {
+    const targetImg = clonedImages[index];
+    if (!targetImg || !srcImg.complete || srcImg.naturalWidth === 0) return;
+    if (srcImg.src.startsWith("data:")) return;
+
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = srcImg.naturalWidth;
+      canvas.height = srcImg.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.drawImage(srcImg, 0, 0);
+      targetImg.src = canvas.toDataURL("image/png");
+    } catch {
+      // Si algún recurso bloquea lectura por canvas, conservar el src original
+    }
+  });
+
+  return cloned;
+}
 
 /**
  * Abre una ventana de impresión A4/A5 limpia para el elemento HTML indicado,
@@ -84,6 +114,8 @@ export function printHtmlElement(
 ): boolean {
   const sourceElement = document.getElementById(elementId);
   if (!sourceElement) return false;
+
+  const clonedElement = cloneWithInlinedImages(sourceElement);
 
   const printWindow = window.open("", "_blank", "width=1024,height=768");
   if (!printWindow) return false;
@@ -176,7 +208,7 @@ export function printHtmlElement(
     </style>
   </head>
   <body>
-    <div id="print-root">${sourceElement.innerHTML}</div>
+    <div id="print-root">${clonedElement.innerHTML}</div>
   </body>
 </html>`);
   let hasPrinted = false;
