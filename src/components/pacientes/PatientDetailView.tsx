@@ -760,8 +760,8 @@ export function PatientDetailView({
             </CardHeader>
 
             <CardContent className="space-y-4 pt-4 text-xs">
-              {/* Fila 1: FO, MAC, FUR */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {/* Fila 1: FO, FUR */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="rounded-lg border border-border bg-muted/30 p-3">
                   <span className="block text-[10px] font-semibold text-muted-foreground uppercase">
                     Fórmula Obstétrica
@@ -777,18 +777,6 @@ export function PatientDetailView({
                       {background.obstetricFormulaDetails}
                     </p>
                   ) : null}
-                </div>
-
-                <div className="rounded-lg border border-border bg-muted/30 p-3">
-                  <span className="block text-[10px] font-semibold text-muted-foreground uppercase">
-                    MAC Actual
-                  </span>
-                  <p className="mt-1 text-sm font-semibold text-foreground">
-                    {background?.contraceptiveMethod || "Ninguno"}
-                  </p>
-                  <span className="text-[10px] text-muted-foreground">
-                    Método anticonceptivo
-                  </span>
                 </div>
 
                 <div className="rounded-lg border border-warning/30 bg-warning/10 p-3">
@@ -847,8 +835,16 @@ export function PatientDetailView({
                 </div>
               </div>
 
-              {/* Fila 3: ITS, PAP, VPH */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {/* Fila 3: MAC, ITS, PAP, VPH */}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-lg border border-border bg-muted/20 p-2.5">
+                  <span className="block text-[10px] font-semibold text-muted-foreground uppercase">
+                    MAC Actual
+                  </span>
+                  <p className="mt-0.5 font-medium text-foreground">
+                    {background?.contraceptiveMethod || "Ninguno"}
+                  </p>
+                </div>
                 <div className="rounded-lg border border-border bg-muted/20 p-2.5">
                   <span className="block text-[10px] font-semibold text-muted-foreground uppercase">
                     Antecedentes ITS
